@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { checkUsage } from "../check-usage";
 
 function createMockSupabase(profileData: unknown, usageData: unknown) {
@@ -30,6 +30,10 @@ function createMockSupabase(profileData: unknown, usageData: unknown) {
 }
 
 describe("checkUsage", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("returns defaults when no usage row exists", async () => {
     const supabase = createMockSupabase(
       { subscription_tier: "free" },
@@ -40,8 +44,8 @@ describe("checkUsage", () => {
 
     expect(result.allowed).toBe(true);
     expect(result.used).toBe(0);
-    expect(result.limit).toBe(3);
-    expect(result.remaining).toBe(3);
+    expect(result.limit).toBe(1);
+    expect(result.remaining).toBe(1);
     expect(result.bonus).toBe(0);
   });
 
@@ -91,11 +95,11 @@ describe("checkUsage", () => {
 
     const result = await checkUsage(supabase, "user-1");
 
-    expect(result.limit).toBe(50);
-    expect(result.remaining).toBe(50);
+    expect(result.limit).toBe(10);
+    expect(result.remaining).toBe(10);
   });
 
-  it("returns period in YYYY-MM format", async () => {
+  it("returns period in YYYY-MM format for free user", async () => {
     const supabase = createMockSupabase(
       { subscription_tier: "free" },
       null
@@ -104,6 +108,22 @@ describe("checkUsage", () => {
     const result = await checkUsage(supabase, "user-1");
 
     expect(result.period).toMatch(/^\d{4}-\d{2}$/);
+    expect(result.resetDate).toBeInstanceOf(Date);
+  });
+
+  it("returns billing period key for pro user with current_period_end", async () => {
+    vi.useFakeTimers({ now: new Date("2026-02-20T12:00:00Z") });
+
+    const supabase = createMockSupabase(
+      { subscription_tier: "pro", current_period_end: "2026-03-15T00:00:00Z" },
+      null
+    );
+
+    const result = await checkUsage(supabase, "user-1");
+
+    expect(result.period).toBe("2026-02-15");
+    expect(result.resetDate).toEqual(new Date("2026-03-15T00:00:00Z"));
+    expect(result.limit).toBe(10);
   });
 
   it("defaults to free tier when profile is null", async () => {
@@ -111,8 +131,8 @@ describe("checkUsage", () => {
 
     const result = await checkUsage(supabase, "user-1");
 
-    expect(result.limit).toBe(3);
-    expect(result.remaining).toBe(3);
+    expect(result.limit).toBe(1);
+    expect(result.remaining).toBe(1);
     expect(result.allowed).toBe(true);
   });
 

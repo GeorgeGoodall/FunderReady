@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { SubmitReviewRequestSchema } from "@/lib/schemas/criteria";
 import { inngest } from "@/lib/inngest/client";
+import { getUsagePeriod } from "@/lib/usage/period";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -30,18 +31,18 @@ export async function POST(request: Request) {
 
   const { bidFileName, bidFilePath, criteriaJson } = parsed.data;
   const serviceClient = createServiceClient();
-  const period = new Date().toISOString().slice(0, 7);
 
-  // Get profile for model tier
+  // Get profile for model tier and billing period
   const { data: profile } = await serviceClient
     .from("profiles")
-    .select("subscription_tier")
+    .select("subscription_tier, current_period_end")
     .eq("id", user.id)
     .single();
 
   const tier = profile?.subscription_tier ?? "free";
   const modelTier = tier === "pro" ? "sonnet" : "haiku";
-  const defaultLimit = tier === "pro" ? 50 : 3;
+  const defaultLimit = tier === "pro" ? 10 : 1;
+  const { periodKey: period } = getUsagePeriod(tier, profile?.current_period_end);
 
   // Upsert usage row (atomic — won't fail if it already exists)
   await serviceClient.from("usage").upsert(

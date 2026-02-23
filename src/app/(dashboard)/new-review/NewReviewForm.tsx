@@ -38,7 +38,7 @@ export function NewReviewForm({ userId, usage }: NewReviewFormProps) {
   const [submitting, setSubmitting] = useState(false);
 
   if (!usage.allowed) {
-    return <UpsellPrompt used={usage.used} limit={usage.limit + usage.bonus} period={usage.period} />;
+    return <UpsellPrompt used={usage.used} limit={usage.limit + usage.bonus} resetDate={usage.resetDate.toISOString()} />;
   }
 
   const handleUploadComplete = (name: string, path: string) => {

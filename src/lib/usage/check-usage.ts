@@ -1,8 +1,9 @@
 import { SupabaseClient } from "@supabase/supabase-js";
+import { getUsagePeriod } from "./period";
 
 const TIER_LIMITS: Record<string, number> = {
-  free: 3,
-  pro: 50,
+  free: 1,
+  pro: 10,
 };
 
 export interface UsageResult {
@@ -12,23 +13,23 @@ export interface UsageResult {
   bonus: number;
   remaining: number;
   period: string;
+  resetDate: Date;
 }
 
 export async function checkUsage(
   supabase: SupabaseClient,
   userId: string
 ): Promise<UsageResult> {
-  const period = new Date().toISOString().slice(0, 7); // "YYYY-MM"
-
   // Get user's subscription tier
   const { data: profile } = await supabase
     .from("profiles")
-    .select("subscription_tier")
+    .select("subscription_tier, current_period_end")
     .eq("id", userId)
     .single();
 
   const tier = profile?.subscription_tier ?? "free";
   const limit = TIER_LIMITS[tier] ?? TIER_LIMITS.free;
+  const { periodKey: period, resetDate } = getUsagePeriod(tier, profile?.current_period_end);
 
   // Get current period usage
   const { data: usage } = await supabase
@@ -46,6 +47,7 @@ export async function checkUsage(
       bonus: 0,
       remaining: limit,
       period,
+      resetDate,
     };
   }
 
@@ -59,5 +61,6 @@ export async function checkUsage(
     bonus: usage.bonus_reviews ?? 0,
     remaining,
     period,
+    resetDate,
   };
 }

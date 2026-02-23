@@ -3,14 +3,11 @@
 interface UpsellPromptProps {
   used: number;
   limit: number;
-  period: string;
+  resetDate: string;
 }
 
-export function UpsellPrompt({ used, limit, period }: UpsellPromptProps) {
-  // Calculate reset date (1st of next month)
-  const [year, month] = period.split("-").map(Number);
-  const resetDate = new Date(year, month, 1); // month is 0-indexed, so this gives 1st of next month
-  const resetStr = resetDate.toLocaleDateString("en-GB", {
+export function UpsellPrompt({ used, limit, resetDate }: UpsellPromptProps) {
+  const resetStr = new Date(resetDate).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -26,21 +23,13 @@ export function UpsellPrompt({ used, limit, period }: UpsellPromptProps) {
         Your allowance resets on {resetStr}.
       </p>
 
-      <div className="mt-4 flex gap-3">
-        <button
-          type="button"
-          disabled
-          className="rounded-lg bg-zinc-300 px-4 py-2 text-sm font-medium text-zinc-500 cursor-not-allowed"
+      <div className="mt-4">
+        <a
+          href="/billing"
+          className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
         >
-          Buy additional review (coming soon)
-        </button>
-        <button
-          type="button"
-          disabled
-          className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-500 cursor-not-allowed dark:border-zinc-700 dark:bg-zinc-800"
-        >
-          Upgrade to Pro (coming soon)
-        </button>
+          Upgrade to Pro
+        </a>
       </div>
     </div>
   );

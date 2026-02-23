@@ -231,7 +231,7 @@ describe("POST /api/submit-review", () => {
     authenticatedUser();
 
     // Profile query
-    const profileChain = chainMock({ data: { subscription_tier: "free" } });
+    const profileChain = chainMock({ data: { subscription_tier: "free", current_period_end: null } });
     mockServiceFrom.mockImplementation((table: string) => {
       if (table === "profiles") return profileChain;
       if (table === "usage") {
@@ -261,7 +261,7 @@ describe("POST /api/submit-review", () => {
   it("returns 201 and fires Inngest event on success", async () => {
     authenticatedUser();
 
-    const profileChain = chainMock({ data: { subscription_tier: "free" } });
+    const profileChain = chainMock({ data: { subscription_tier: "free", current_period_end: null } });
     const usageChain = chainMock({
       data: { reviews_used: 0, reviews_limit: 3, bonus_reviews: 0 },
     });
@@ -298,9 +298,9 @@ describe("POST /api/submit-review", () => {
   it("selects sonnet model for pro tier", async () => {
     authenticatedUser();
 
-    const profileChain = chainMock({ data: { subscription_tier: "pro" } });
+    const profileChain = chainMock({ data: { subscription_tier: "pro", current_period_end: "2026-03-15T00:00:00Z" } });
     const usageChain = chainMock({
-      data: { reviews_used: 0, reviews_limit: 50, bonus_reviews: 0 },
+      data: { reviews_used: 0, reviews_limit: 10, bonus_reviews: 0 },
     });
     mockServiceFrom.mockImplementation((table: string) => {
       if (table === "profiles") return profileChain;
@@ -333,7 +333,7 @@ describe("POST /api/submit-review", () => {
   it("accounts for bonus_reviews in limit calculation", async () => {
     authenticatedUser();
 
-    const profileChain = chainMock({ data: { subscription_tier: "free" } });
+    const profileChain = chainMock({ data: { subscription_tier: "free", current_period_end: null } });
     // Used 3 of 3 base limit, but has 2 bonus
     const usageChain = chainMock({
       data: { reviews_used: 3, reviews_limit: 3, bonus_reviews: 2 },
