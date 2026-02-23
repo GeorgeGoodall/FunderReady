@@ -1,0 +1,125 @@
+import { NextResponse } from "next/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { SubmitReviewRequestSchema } from "@/lib/schemas/criteria";
+import { inngest } from "@/lib/inngest/client";
+
+export async function POST(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = SubmitReviewRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.errors[0]?.message ?? "Invalid request" },
+      { status: 400 }
+    );
+  }
+
+  const { bidFileName, bidFilePath, criteriaJson } = parsed.data;
+  const serviceClient = createServiceClient();
+  const period = new Date().toISOString().slice(0, 7);
+
+  // Get profile for model tier
+  const { data: profile } = await serviceClient
+    .from("profiles")
+    .select("subscription_tier")
+    .eq("id", user.id)
+    .single();
+
+  const tier = profile?.subscription_tier ?? "free";
+  const modelTier = tier === "pro" ? "sonnet" : "haiku";
+  const defaultLimit = tier === "pro" ? 50 : 3;
+
+  // Upsert usage row (atomic — won't fail if it already exists)
+  await serviceClient.from("usage").upsert(
+    {
+      user_id: user.id,
+      period,
+      reviews_used: 0,
+      reviews_limit: defaultLimit,
+      bonus_reviews: 0,
+    },
+    { onConflict: "user_id,period", ignoreDuplicates: true }
+  );
+
+  // Check remaining reviews
+  const { data: usage } = await serviceClient
+    .from("usage")
+    .select("reviews_used, reviews_limit, bonus_reviews")
+    .eq("user_id", user.id)
+    .eq("period", period)
+    .single();
+
+  if (!usage) {
+    return NextResponse.json({ error: "Usage check failed" }, { status: 500 });
+  }
+
+  const effectiveLimit = usage.reviews_limit + (usage.bonus_reviews ?? 0);
+  if (usage.reviews_used >= effectiveLimit) {
+    return NextResponse.json(
+      { error: "Monthly review limit reached" },
+      { status: 403 }
+    );
+  }
+
+  // Create review row (RLS enforced via user's client)
+  const { data: review, error: reviewError } = await supabase
+    .from("reviews")
+    .insert({
+      user_id: user.id,
+      status: "pending",
+      bid_file_name: bidFileName,
+      bid_file_path: bidFilePath,
+      criteria_json: criteriaJson,
+      model_tier: modelTier,
+    })
+    .select("id")
+    .single();
+
+  if (reviewError || !review) {
+    console.error("review insert error:", reviewError);
+    return NextResponse.json({ error: "Failed to create review" }, { status: 500 });
+  }
+
+  // Create review_results row + increment usage (service client for cross-table ops)
+  const [resultsRes, usageRes] = await Promise.all([
+    serviceClient.from("review_results").insert({
+      review_id: review.id,
+      progress: {},
+      results: {},
+    }),
+    serviceClient
+      .from("usage")
+      .update({ reviews_used: usage.reviews_used + 1 })
+      .eq("user_id", user.id)
+      .eq("period", period),
+  ]);
+
+  if (resultsRes.error) {
+    console.error("review_results insert error:", resultsRes.error);
+  }
+  if (usageRes.error) {
+    console.error("usage update error:", usageRes.error);
+  }
+
+  // Fire Inngest event
+  await inngest.send({
+    name: "review/submitted",
+    data: { reviewId: review.id, userId: user.id },
+  });
+
+  return NextResponse.json({ reviewId: review.id }, { status: 201 });
+}
