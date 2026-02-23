@@ -26,9 +26,12 @@ export function DashboardNav({
           FunderReady
         </Link>
         <div className="flex items-center gap-4">
-          <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium capitalize dark:bg-zinc-800">
+          <Link
+            href="/billing"
+            className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium capitalize transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+          >
             {tier}
-          </span>
+          </Link>
           <span className="text-sm text-zinc-600 dark:text-zinc-400">
             {displayName}
           </span>
