@@ -71,7 +71,7 @@ export function NewReviewForm({ userId, usage }: NewReviewFormProps) {
         return;
       }
 
-      router.push("/dashboard");
+      router.push(`/reviews/${data.reviewId}`);
     } catch {
       setError("Network error. Please try again.");
     } finally {
