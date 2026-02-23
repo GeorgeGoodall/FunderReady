@@ -20,6 +20,7 @@ import {
   CommentRangeEnd,
   CommentReference,
 } from "docx";
+import AdmZip from "adm-zip";
 import type { ParsedBid } from "./parse-bid";
 import type { SectionAnalysis, Scoring, ImprovementAppendixItem } from "./schemas";
 
@@ -531,5 +532,63 @@ export async function generateReviewDoc(
   });
 
   const buffer = await Packer.toBuffer(doc);
+
+  // Post-process to fix Word Online compatibility issues with comments.
+  // docx.js generates XML that desktop Word tolerates but Word Online rejects:
+  //   1. <w:commentReference> must be wrapped in <w:r> (run) elements
+  //   2. Comment dates must not contain milliseconds
+  //   3. Comments need w:initials attribute
+  if (commentOptions.length > 0) {
+    return fixCommentXml(Buffer.from(buffer));
+  }
+
   return Buffer.from(buffer);
+}
+
+// ---------------------------------------------------------------------------
+// Word Online compatibility fix for comments
+// ---------------------------------------------------------------------------
+
+function fixCommentXml(buffer: Buffer): Buffer {
+  const zip = new AdmZip(buffer);
+
+  // Fix 1: Wrap bare <w:commentReference> in <w:r> in document.xml
+  const docEntry = zip.getEntry("word/document.xml");
+  if (docEntry) {
+    let docXml = docEntry.getData().toString("utf8");
+    docXml = docXml.replace(
+      /<w:commentReference\s+w:id="(\d+)"\/>/g,
+      '<w:r><w:commentReference w:id="$1"/></w:r>'
+    );
+    zip.updateFile("word/document.xml", Buffer.from(docXml, "utf8"));
+  }
+
+  // Fix 2 & 3: Strip milliseconds from dates, add initials in comments.xml
+  const commentsEntry = zip.getEntry("word/comments.xml");
+  if (commentsEntry) {
+    let commentsXml = commentsEntry.getData().toString("utf8");
+
+    // 2026-02-23T18:15:54.559Z → 2026-02-23T18:15:54Z
+    commentsXml = commentsXml.replace(
+      /w:date="(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d+Z"/g,
+      'w:date="$1Z"'
+    );
+
+    // Add w:initials if missing
+    commentsXml = commentsXml.replace(
+      /w:author="([^"]+)"(?!\s+w:initials)/g,
+      (_match: string, author: string) => {
+        const initials = author
+          .split(/\s+/)
+          .map((w: string) => w[0])
+          .join("")
+          .toUpperCase();
+        return `w:author="${author}" w:initials="${initials}"`;
+      }
+    );
+
+    zip.updateFile("word/comments.xml", Buffer.from(commentsXml, "utf8"));
+  }
+
+  return zip.toBuffer();
 }
