@@ -40,8 +40,17 @@ export async function POST(request: Request) {
     .single();
 
   const tier = profile?.subscription_tier ?? "free";
-  const modelTier = tier === "pro" ? "sonnet" : "haiku";
-  const defaultLimit = tier === "pro" ? 10 : 1;
+
+  // Free tier users cannot submit reviews — must subscribe to Pro
+  if (tier !== "pro") {
+    return NextResponse.json(
+      { error: "Active subscription required" },
+      { status: 403 }
+    );
+  }
+
+  const modelTier = "sonnet";
+  const defaultLimit = 10;
   const { periodKey: period } = getUsagePeriod(tier, profile?.current_period_end);
 
   // Upsert usage row (atomic — won't fail if it already exists)

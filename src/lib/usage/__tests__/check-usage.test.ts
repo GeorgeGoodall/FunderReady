@@ -34,7 +34,7 @@ describe("checkUsage", () => {
     vi.useRealTimers();
   });
 
-  it("returns defaults when no usage row exists", async () => {
+  it("returns defaults when no usage row exists (free tier blocked)", async () => {
     const supabase = createMockSupabase(
       { subscription_tier: "free" },
       null
@@ -42,10 +42,10 @@ describe("checkUsage", () => {
 
     const result = await checkUsage(supabase, "user-1");
 
-    expect(result.allowed).toBe(true);
+    expect(result.allowed).toBe(false);
     expect(result.used).toBe(0);
-    expect(result.limit).toBe(1);
-    expect(result.remaining).toBe(1);
+    expect(result.limit).toBe(0);
+    expect(result.remaining).toBe(0);
     expect(result.bonus).toBe(0);
   });
 
@@ -126,14 +126,14 @@ describe("checkUsage", () => {
     expect(result.limit).toBe(10);
   });
 
-  it("defaults to free tier when profile is null", async () => {
+  it("defaults to free tier when profile is null (blocked)", async () => {
     const supabase = createMockSupabase(null, null);
 
     const result = await checkUsage(supabase, "user-1");
 
-    expect(result.limit).toBe(1);
-    expect(result.remaining).toBe(1);
-    expect(result.allowed).toBe(true);
+    expect(result.limit).toBe(0);
+    expect(result.remaining).toBe(0);
+    expect(result.allowed).toBe(false);
   });
 
   it("returns allowed=false when over limit (used > limit)", async () => {

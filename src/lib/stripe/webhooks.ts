@@ -40,7 +40,7 @@ async function syncUsageOnDowngrade(
   const period = new Date().toISOString().slice(0, 7);
   await supabase
     .from("usage")
-    .update({ reviews_limit: PLANS.free.reviewsPerMonth })
+    .update({ reviews_limit: 0 })
     .eq("user_id", userId)
     .eq("period", period);
 }

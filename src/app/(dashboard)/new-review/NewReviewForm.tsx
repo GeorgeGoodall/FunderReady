@@ -11,6 +11,7 @@ import type { UsageResult } from "@/lib/usage/check-usage";
 
 interface NewReviewFormProps {
   userId: string;
+  tier: "free" | "pro";
   usage: UsageResult;
 }
 
@@ -22,7 +23,7 @@ const STEPS: { key: Step; label: string }[] = [
   { key: "confirm", label: "Confirm" },
 ];
 
-export function NewReviewForm({ userId, usage }: NewReviewFormProps) {
+export function NewReviewForm({ userId, tier, usage }: NewReviewFormProps) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("upload");
   const [error, setError] = useState("");
@@ -38,7 +39,7 @@ export function NewReviewForm({ userId, usage }: NewReviewFormProps) {
   const [submitting, setSubmitting] = useState(false);
 
   if (!usage.allowed) {
-    return <UpsellPrompt used={usage.used} limit={usage.limit + usage.bonus} resetDate={usage.resetDate.toISOString()} />;
+    return <UpsellPrompt tier={tier} used={usage.used} limit={usage.limit + usage.bonus} resetDate={usage.resetDate.toISOString()} />;
   }
 
   const handleUploadComplete = (name: string, path: string) => {

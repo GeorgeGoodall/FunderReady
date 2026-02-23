@@ -227,24 +227,40 @@ describe("POST /api/submit-review", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 403 when usage limit reached", async () => {
+  it("returns 403 when free tier user tries to submit", async () => {
     authenticatedUser();
 
-    // Profile query
     const profileChain = chainMock({ data: { subscription_tier: "free", current_period_end: null } });
     mockServiceFrom.mockImplementation((table: string) => {
       if (table === "profiles") return profileChain;
+      return chainMock({ data: null });
+    });
+
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/submit-review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(validBody),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toContain("subscription required");
+  });
+
+  it("returns 403 when pro user hits usage limit", async () => {
+    authenticatedUser();
+
+    const profileChain = chainMock({ data: { subscription_tier: "pro", current_period_end: "2026-03-15T00:00:00Z" } });
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === "profiles") return profileChain;
       if (table === "usage") {
-        // First call = upsert, second = select for limit check
-        const usageChain = chainMock({
-          data: { reviews_used: 3, reviews_limit: 3, bonus_reviews: 0 },
+        return chainMock({
+          data: { reviews_used: 10, reviews_limit: 10, bonus_reviews: 0 },
         });
-        return usageChain;
       }
       return chainMock({ data: null });
     });
 
-    // Review insert via user client (won't be reached)
     mockFrom.mockReturnValue(chainMock({ data: null }));
 
     const POST = await importRoute();
@@ -261,9 +277,9 @@ describe("POST /api/submit-review", () => {
   it("returns 201 and fires Inngest event on success", async () => {
     authenticatedUser();
 
-    const profileChain = chainMock({ data: { subscription_tier: "free", current_period_end: null } });
+    const profileChain = chainMock({ data: { subscription_tier: "pro", current_period_end: "2026-03-15T00:00:00Z" } });
     const usageChain = chainMock({
-      data: { reviews_used: 0, reviews_limit: 3, bonus_reviews: 0 },
+      data: { reviews_used: 0, reviews_limit: 10, bonus_reviews: 0 },
     });
     mockServiceFrom.mockImplementation((table: string) => {
       if (table === "profiles") return profileChain;
@@ -333,10 +349,10 @@ describe("POST /api/submit-review", () => {
   it("accounts for bonus_reviews in limit calculation", async () => {
     authenticatedUser();
 
-    const profileChain = chainMock({ data: { subscription_tier: "free", current_period_end: null } });
-    // Used 3 of 3 base limit, but has 2 bonus
+    const profileChain = chainMock({ data: { subscription_tier: "pro", current_period_end: "2026-03-15T00:00:00Z" } });
+    // Used 10 of 10 base limit, but has 2 bonus
     const usageChain = chainMock({
-      data: { reviews_used: 3, reviews_limit: 3, bonus_reviews: 2 },
+      data: { reviews_used: 10, reviews_limit: 10, bonus_reviews: 2 },
     });
     mockServiceFrom.mockImplementation((table: string) => {
       if (table === "profiles") return profileChain;

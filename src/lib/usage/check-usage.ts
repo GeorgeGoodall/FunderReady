@@ -2,7 +2,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { getUsagePeriod } from "./period";
 
 const TIER_LIMITS: Record<string, number> = {
-  free: 1,
+  free: 0,
   pro: 10,
 };
 
@@ -41,7 +41,7 @@ export async function checkUsage(
 
   if (!usage) {
     return {
-      allowed: true,
+      allowed: limit > 0,
       used: 0,
       limit,
       bonus: 0,

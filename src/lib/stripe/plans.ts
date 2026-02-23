@@ -2,9 +2,8 @@ export const PLANS = {
   free: {
     name: "Free",
     price: 0,
-    reviewsPerMonth: 1,
-    model: "haiku" as const,
-    features: ["Scorecard only"],
+    reviewsPerMonth: 0,
+    features: ["No active plan"],
   },
   pro: {
     name: "Pro",

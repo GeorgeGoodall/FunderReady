@@ -30,7 +30,7 @@ export function DashboardNav({
             href="/billing"
             className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium capitalize transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
           >
-            {tier}
+            {tier === "free" ? "Subscribe" : tier}
           </Link>
           <span className="text-sm text-zinc-600 dark:text-zinc-400">
             {displayName}

@@ -71,7 +71,7 @@ export default async function BillingPage({
               )}
             </div>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              {tier === "pro" ? "£49/month" : "£0/month"}
+              {tier === "pro" ? "£49/month" : "No active plan"}
             </p>
           </div>
         </div>
@@ -86,9 +86,11 @@ export default async function BillingPage({
               ✓ {feature}
             </li>
           ))}
-          <li className="text-sm text-zinc-600 dark:text-zinc-400">
-            ✓ {plan.reviewsPerMonth} review{plan.reviewsPerMonth !== 1 ? "s" : ""}/month
-          </li>
+          {plan.reviewsPerMonth > 0 && (
+            <li className="text-sm text-zinc-600 dark:text-zinc-400">
+              ✓ {plan.reviewsPerMonth} reviews/month
+            </li>
+          )}
         </ul>
       </div>
 
@@ -108,7 +110,7 @@ export default async function BillingPage({
             <div
               className="h-full rounded-full bg-blue-600 transition-all"
               style={{
-                width: `${Math.min(100, (usage.used / usage.limit) * 100)}%`,
+                width: `${usage.limit > 0 ? Math.min(100, (usage.used / usage.limit) * 100) : 0}%`,
               }}
             />
           </div>

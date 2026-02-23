@@ -95,7 +95,7 @@ export const reviewSubmitted = inngest.createFunction(
       return data;
     });
 
-    const model = MODEL_MAP[reviewData.model_tier] ?? MODEL_MAP.haiku;
+    const model = MODEL_MAP[reviewData.model_tier] ?? MODEL_MAP.sonnet;
     const criteria = (reviewData.criteria_json as { criteria: Criterion[] })?.criteria ?? [];
 
     // -----------------------------------------------------------------------
@@ -202,27 +202,23 @@ export const reviewSubmitted = inngest.createFunction(
     }
 
     // -----------------------------------------------------------------------
-    // Step 4: Cross-reference (skip for free tier)
+    // Step 4: Cross-reference
     // -----------------------------------------------------------------------
-    let crossReference: CrossReference | null = null;
+    const crossReference: CrossReference = await step.run("cross-reference", async () => {
+      await updateProgress(reviewId, "analysing", { crossref_started: Date.now() });
 
-    if (reviewData.model_tier !== "haiku") {
-      crossReference = await step.run("cross-reference", async () => {
-        await updateProgress(reviewId, "analysing", { crossref_started: Date.now() });
-
-        const prompt = buildCrossReferencePrompt(parsedBid, sectionAnalyses, criteria);
-        const result = await callClaude({
-          prompt,
-          schema: CrossReferenceSchema,
-          model,
-          maxTokens: 4096,
-        });
-
-        await updateProgress(reviewId, "analysing", { crossref_completed: Date.now() });
-
-        return result;
+      const prompt = buildCrossReferencePrompt(parsedBid, sectionAnalyses, criteria);
+      const result = await callClaude({
+        prompt,
+        schema: CrossReferenceSchema,
+        model,
+        maxTokens: 4096,
       });
-    }
+
+      await updateProgress(reviewId, "analysing", { crossref_completed: Date.now() });
+
+      return result;
+    });
 
     // -----------------------------------------------------------------------
     // Step 5: Scoring
@@ -231,14 +227,7 @@ export const reviewSubmitted = inngest.createFunction(
     const scoring: Scoring = await step.run("scoring", async () => {
       await updateProgress(reviewId, "scoring", { scoring_started: Date.now() });
 
-      // If no cross-reference, provide a minimal placeholder
-      const crossRefData = crossReference ?? {
-        findings: [],
-        overall_coherence: "adequate" as const,
-        summary: "Cross-reference analysis was not performed for this tier.",
-      };
-
-      const prompt = buildScoringPrompt(parsedBid, sectionAnalyses, crossRefData, criteria);
+      const prompt = buildScoringPrompt(parsedBid, sectionAnalyses, crossReference, criteria);
       const result = await callClaude({
         prompt,
         systemPrompt: scoringSystemPrompt,

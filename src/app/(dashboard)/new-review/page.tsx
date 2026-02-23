@@ -11,6 +11,13 @@ export default async function NewReviewPage() {
 
   if (!user) redirect("/login");
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("subscription_tier")
+    .eq("id", user.id)
+    .single();
+
+  const tier = (profile?.subscription_tier ?? "free") as "free" | "pro";
   const usage = await checkUsage(supabase, user.id);
 
   return (
@@ -20,7 +27,7 @@ export default async function NewReviewPage() {
         Upload your bid document and paste the funder&apos;s evaluation criteria.
       </p>
       <div className="mt-6">
-        <NewReviewForm userId={user.id} usage={usage} />
+        <NewReviewForm userId={user.id} tier={tier} usage={usage} />
       </div>
     </div>
   );

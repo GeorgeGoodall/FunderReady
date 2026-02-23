@@ -54,18 +54,18 @@ export function BillingClient({ tier }: { tier: "free" | "pro" }) {
   return (
     <div className="rounded-lg border border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-900/20">
       <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200">
-        Upgrade to Pro
+        Subscribe to FunderReady Pro
       </h3>
       <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
-        Get 10 full reviews per month with Sonnet, inline comments, and
-        improvement appendix — £49/month.
+        Subscribe to FunderReady Pro to review your bids. Get 10 full reviews
+        per month with inline comments and improvement appendix — £49/month.
       </p>
       <button
         onClick={handleUpgrade}
         disabled={loading}
         className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
       >
-        {loading ? "Redirecting…" : "Upgrade to Pro — £49/month"}
+        {loading ? "Redirecting…" : "Subscribe to Pro — £49/month"}
       </button>
     </div>
   );
