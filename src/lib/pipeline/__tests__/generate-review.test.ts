@@ -64,7 +64,7 @@ function mockScoring(): Scoring {
       {
         criterion_id: "c1",
         criterion: "Clear Need",
-        score: "Adequate",
+        score: "Fair",
         bid_evidence: ["Section 1 describes target group"],
         gaps: ["No statistics on need"],
         summary: "Need is described but lacks data",

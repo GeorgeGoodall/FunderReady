@@ -62,7 +62,7 @@ const scoringResults = {
       {
         criterion_id: "c2",
         criterion: "Impact",
-        score: "Weak" as const,
+        score: "Needs Improvement" as const,
         bid_evidence: [],
         gaps: ["No metrics"],
         summary: "Lacks measurable outcomes",
@@ -302,7 +302,7 @@ describe("ReviewDetail — completed state", () => {
     expect(screen.getByText("Value for Money")).toBeInTheDocument();
     expect(screen.getByText("Strong")).toBeInTheDocument();
     expect(screen.getByText("Impact")).toBeInTheDocument();
-    expect(screen.getByText("Weak")).toBeInTheDocument();
+    expect(screen.getByText("Needs Improvement")).toBeInTheDocument();
   });
 
   it("shows criteria summaries", () => {

@@ -10,7 +10,7 @@ FunderReady runs a multi-stage AI review pipeline:
 2. **Preflight** — Validate the document is a reviewable bid
 3. **Section Analysis** — Evaluate each section against scoring criteria
 4. **Cross-Reference** — Check for consistency across sections
-5. **Scoring** — Generate traffic-light scores (Strong / Adequate / Weak / Missing)
+5. **Scoring** — Generate traffic-light scores (Strong / Fair / Needs Improvement / Missing)
 6. **Document Generation** — Produce a Word document with inline comments and scorecard
 
 ## Tech Stack

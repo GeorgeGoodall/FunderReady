@@ -18,8 +18,8 @@ export const SCORING_RUBRIC = `
 | Rating | Definition |
 |--------|-----------|
 | **Strong** | Fully addresses the criterion with specific evidence, clear logic, and appropriate detail. A panel member would be satisfied with no follow-up questions. |
-| **Adequate** | Addresses the criterion but with gaps — missing specifics, vague language, or incomplete reasoning. Would likely prompt follow-up questions from a reviewer. |
-| **Weak** | Mentions the topic but fails to make a convincing case. Major gaps in evidence or logic. A panel member would score this poorly. |
+| **Fair** | Addresses the criterion but with gaps — missing specifics, vague language, or incomplete reasoning. Would likely prompt follow-up questions from a reviewer. |
+| **Needs Improvement** | Mentions the topic but fails to make a convincing case. Major gaps in evidence or logic. A panel member would score this poorly. |
 | **Missing** | The criterion is not addressed in the bid at all. |`;
 
 export const FEW_SHOT_COMMENTS = `
@@ -401,7 +401,7 @@ Return a JSON object:
     {
       "criterion_id": "c1",
       "criterion": "Name of the criterion",
-      "score": "Strong|Adequate|Weak|Missing",
+      "score": "Strong|Fair|Needs Improvement|Missing",
       "bid_evidence": ["Section X, para Y: specific evidence cited"],
       "gaps": ["What's missing or weak"],
       "summary": "1-2 sentence summary of how the bid addresses this criterion"

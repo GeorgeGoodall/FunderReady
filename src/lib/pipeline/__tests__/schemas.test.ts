@@ -141,7 +141,7 @@ describe("ScoringSchema", () => {
         {
           criterion_id: "c2",
           criterion: "Measurable outcomes",
-          score: "Weak" as const,
+          score: "Needs Improvement" as const,
           bid_evidence: [],
           gaps: ["No specific metrics provided"],
           summary: "Outcomes are vaguely described",

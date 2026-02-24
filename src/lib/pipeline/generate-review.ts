@@ -30,8 +30,8 @@ import type { SectionAnalysis, Scoring, ImprovementAppendixItem } from "./schema
 
 const COLOURS: Record<string, { fill: string; text: string }> = {
   Strong: { fill: "00B050", text: "FFFFFF" },
-  Adequate: { fill: "FFC000", text: "000000" },
-  Weak: { fill: "FF0000", text: "FFFFFF" },
+  Fair: { fill: "FFC000", text: "000000" },
+  "Needs Improvement": { fill: "FF0000", text: "FFFFFF" },
   Missing: { fill: "808080", text: "FFFFFF" },
 };
 

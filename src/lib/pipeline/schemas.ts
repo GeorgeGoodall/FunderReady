@@ -27,7 +27,7 @@ export const CommentCategory = z.enum(COMMENT_CATEGORIES);
 // Score ratings
 // ---------------------------------------------------------------------------
 
-export const ScoreRating = z.enum(["Strong", "Adequate", "Weak", "Missing"]);
+export const ScoreRating = z.enum(["Strong", "Fair", "Needs Improvement", "Missing"]);
 
 // ---------------------------------------------------------------------------
 // Pre-flight check response (Prompt A)
