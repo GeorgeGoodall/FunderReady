@@ -30,7 +30,7 @@ export type CriteriaSet = z.infer<typeof CriteriaSetSchema>;
 // ---------------------------------------------------------------------------
 
 export const ParseCriteriaRequestSchema = z.object({
-  rawText: z.string().min(10, "Criteria text must be at least 10 characters").max(10000, "Criteria text must be under 10,000 characters"),
+  rawText: z.string().min(10, "Criteria text must be at least 10 characters"),
 });
 
 export type ParseCriteriaRequest = z.infer<typeof ParseCriteriaRequestSchema>;
@@ -39,6 +39,7 @@ export const SubmitReviewRequestSchema = z.object({
   bidFileName: z.string().min(1),
   bidFilePath: z.string().min(1),
   criteriaJson: CriteriaSetSchema,
+  completeDraft: z.boolean().optional().default(true),
 });
 
 export type SubmitReviewRequest = z.infer<typeof SubmitReviewRequestSchema>;

@@ -122,11 +122,11 @@ describe("ParseCriteriaRequestSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects text longer than 10000 characters", () => {
+  it("accepts long text without upper limit", () => {
     const result = ParseCriteriaRequestSchema.safeParse({
-      rawText: "a".repeat(10001),
+      rawText: "a".repeat(50000),
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 });
 

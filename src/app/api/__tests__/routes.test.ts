@@ -307,7 +307,7 @@ describe("POST /api/submit-review", () => {
 
     expect(mockInngestSend).toHaveBeenCalledWith({
       name: "review/submitted",
-      data: { reviewId: "rev-1", userId: "user-123" },
+      data: { reviewId: "rev-1", userId: "user-123", completeDraft: true },
     });
   });
 

@@ -30,7 +30,7 @@ import { generateReviewDoc } from "@/lib/pipeline/generate-review";
 
 const MODEL_MAP: Record<string, string> = {
   haiku: "claude-haiku-4-5-20251001",
-  sonnet: "claude-sonnet-4-5-20250929",
+  sonnet: "claude-sonnet-4-6",
 };
 
 // ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ export const reviewSubmitted = inngest.createFunction(
   },
   { event: "review/submitted" },
   async ({ event, step }) => {
-    const { reviewId, userId } = event.data;
+    const { reviewId, userId, completeDraft = true } = event.data;
 
     // -----------------------------------------------------------------------
     // Load review metadata
@@ -150,7 +150,8 @@ export const reviewSubmitted = inngest.createFunction(
     });
 
     // Check preflight result — reject if not a bid
-    if (!preflight.is_bid || !preflight.substantive) {
+    // If completeDraft is false (user marked as WIP), skip the substantive check
+    if (!preflight.is_bid || (completeDraft && !preflight.substantive)) {
       await step.run("reject-non-bid", async () => {
         const reason =
           preflight.rejection_reason || "Document does not appear to be a substantive funding bid.";
@@ -185,7 +186,7 @@ export const reviewSubmitted = inngest.createFunction(
             systemPrompt: sectionSystemPrompt,
             schema: SectionAnalysisSchema,
             model,
-            maxTokens: 4096,
+            maxTokens: 16384,
           });
 
           await updateProgress(reviewId, "analysing", {
@@ -212,7 +213,7 @@ export const reviewSubmitted = inngest.createFunction(
         prompt,
         schema: CrossReferenceSchema,
         model,
-        maxTokens: 4096,
+        maxTokens: 16384,
       });
 
       await updateProgress(reviewId, "analysing", { crossref_completed: Date.now() });
@@ -233,7 +234,7 @@ export const reviewSubmitted = inngest.createFunction(
         systemPrompt: scoringSystemPrompt,
         schema: ScoringSchema,
         model,
-        maxTokens: 8192,
+        maxTokens: 16384,
       });
 
       await updateProgress(reviewId, "scoring", { scoring_completed: Date.now() });

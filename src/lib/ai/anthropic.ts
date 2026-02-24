@@ -148,6 +148,13 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T> {
     tool_choice: { type: "tool", name: TOOL_NAME },
   });
 
+  // Check for truncated response
+  if (message.stop_reason === "max_tokens") {
+    throw new Error(
+      `Claude response truncated (hit max_tokens=${maxTokens}). Increase maxTokens for this call.`
+    );
+  }
+
   // Extract tool use result
   const toolBlock = message.content.find((block) => block.type === "tool_use");
   if (toolBlock && toolBlock.type === "tool_use") {
@@ -170,7 +177,14 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T> {
         { role: "assistant", content: message.content },
         {
           role: "user",
-          content: `Your tool call had validation errors:\n${errors}\n\nPlease call the tool again with corrected data.`,
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: toolBlock.id,
+              is_error: true,
+              content: `Validation errors:\n${errors}\n\nPlease call the tool again with corrected data.`,
+            },
+          ],
         },
       ],
       tools: [tool],
@@ -179,8 +193,17 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T> {
 
     const retryToolBlock = retryMessage.content.find((block) => block.type === "tool_use");
     if (retryToolBlock && retryToolBlock.type === "tool_use") {
-      return schema.parse(retryToolBlock.input);
+      const retryResult = schema.safeParse(retryToolBlock.input);
+      if (retryResult.success) {
+        return retryResult.data;
+      }
+      throw new Error(
+        `Claude tool use failed validation after retry. ` +
+        `Original errors: ${errors}. ` +
+        `Retry errors: ${retryResult.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(", ")}`
+      );
     }
+    throw new Error(`Claude retry did not return a tool use block`);
   }
 
   // Fallback: try parsing text response (shouldn't happen with tool_choice forced)

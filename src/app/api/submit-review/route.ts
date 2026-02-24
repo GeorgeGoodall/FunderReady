@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { bidFileName, bidFilePath, criteriaJson } = parsed.data;
+  const { bidFileName, bidFilePath, criteriaJson, completeDraft } = parsed.data;
   const serviceClient = createServiceClient();
 
   // Get profile for model tier and billing period
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
   // Fire Inngest event
   await inngest.send({
     name: "review/submitted",
-    data: { reviewId: review.id, userId: user.id },
+    data: { reviewId: review.id, userId: user.id, completeDraft },
   });
 
   return NextResponse.json({ reviewId: review.id }, { status: 201 });
