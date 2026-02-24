@@ -21,6 +21,7 @@ const PIPELINE_STEPS = [
   { key: "pending", label: "Queued" },
   { key: "parsing", label: "Parsing document" },
   { key: "analysing", label: "Analysing sections" },
+  { key: "cross_referencing", label: "Cross-referencing" },
   { key: "scoring", label: "Scoring" },
   { key: "generating", label: "Generating report" },
 ];

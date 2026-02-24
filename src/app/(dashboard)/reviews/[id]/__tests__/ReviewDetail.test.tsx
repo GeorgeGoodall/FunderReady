@@ -166,6 +166,7 @@ describe("ReviewDetail — in-progress state", () => {
     expect(screen.getByText("Queued")).toBeInTheDocument();
     expect(screen.getByText("Parsing document")).toBeInTheDocument();
     expect(screen.getByText("Analysing sections")).toBeInTheDocument();
+    expect(screen.getByText("Cross-referencing")).toBeInTheDocument();
     expect(screen.getByText("Scoring")).toBeInTheDocument();
     expect(screen.getByText("Generating report")).toBeInTheDocument();
   });
@@ -179,6 +180,32 @@ describe("ReviewDetail — in-progress state", () => {
       />
     );
     expect(screen.getByText(/3\/8 sections/)).toBeInTheDocument();
+  });
+
+  it("highlights cross-referencing step when status is cross_referencing", () => {
+    render(
+      <ReviewDetail
+        review={{ ...baseReview, status: "cross_referencing" }}
+        progress={{ crossref_started: Date.now() }}
+        results={null}
+      />
+    );
+    const label = screen.getByText("Cross-referencing");
+    expect(label).toHaveClass("font-medium", "text-blue-600");
+  });
+
+  it("shows analysing as completed when cross-referencing is active", () => {
+    render(
+      <ReviewDetail
+        review={{ ...baseReview, status: "cross_referencing" }}
+        progress={{ crossref_started: Date.now() }}
+        results={null}
+      />
+    );
+    // "Analysing sections" should be styled as done (not current)
+    const label = screen.getByText("Analysing sections");
+    expect(label).toHaveClass("text-zinc-500");
+    expect(label).not.toHaveClass("font-medium");
   });
 
   it("does not show section count for non-analysing steps", () => {

@@ -206,7 +206,7 @@ export const reviewSubmitted = inngest.createFunction(
     // Step 4: Cross-reference
     // -----------------------------------------------------------------------
     const crossReference: CrossReference = await step.run("cross-reference", async () => {
-      await updateProgress(reviewId, "analysing", { crossref_started: Date.now() });
+      await updateProgress(reviewId, "cross_referencing", { crossref_started: Date.now() });
 
       const prompt = buildCrossReferencePrompt(parsedBid, sectionAnalyses, criteria);
       const result = await callClaude({
@@ -216,7 +216,7 @@ export const reviewSubmitted = inngest.createFunction(
         maxTokens: 16384,
       });
 
-      await updateProgress(reviewId, "analysing", { crossref_completed: Date.now() });
+      await updateProgress(reviewId, "cross_referencing", { crossref_completed: Date.now() });
 
       return result;
     });
