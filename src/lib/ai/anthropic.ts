@@ -115,6 +115,8 @@ interface CallClaudeOptions<T> {
   schema: ZodSchema<T>;
   model: string;
   maxTokens: number;
+  /** When true, return null on max_tokens truncation instead of throwing */
+  allowPartial?: boolean;
 }
 
 const TOOL_NAME = "structured_output";
@@ -154,8 +156,10 @@ function isTransientError(error: unknown): boolean {
   return false;
 }
 
-export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T> {
-  const { prompt, systemPrompt, schema, model, maxTokens } = options;
+export async function callClaude<T>(options: CallClaudeOptions<T> & { allowPartial: true }): Promise<T | null>;
+export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T>;
+export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | null> {
+  const { prompt, systemPrompt, schema, model, maxTokens, allowPartial } = options;
 
   const client = getClient();
   const tool = buildTool(schema);
@@ -182,6 +186,9 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T> {
 
   // Check for truncated response — permanent, won't fix itself on retry
   if (message.stop_reason === "max_tokens") {
+    if (allowPartial) {
+      return null;
+    }
     throw new NonRetriableError(
       `Claude response truncated (hit max_tokens=${maxTokens}). Increase maxTokens for this call.`
     );

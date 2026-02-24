@@ -14,12 +14,17 @@ import {
   buildSectionAnalysisPrompt,
   buildCrossReferencePrompt,
   buildScoringPrompt,
+  splitLargeSection,
+  mergeSectionAnalyses,
   SYSTEM_PERSONA,
   SCORING_RUBRIC,
   FEW_SHOT_COMMENTS,
   COMMENT_CATEGORIES_DESC,
   ANTI_HALLUCINATION,
   MIN_SECTION_WORDS,
+  MAX_BID_WORDS,
+  MAX_SECTION_WORDS,
+  TARGET_CHUNK_WORDS,
   type Criterion,
 } from "../prompt-templates";
 
@@ -439,9 +444,9 @@ describe("buildScoringPrompt", () => {
     expect(prompt).toContain("## s1");
   });
 
-  it("includes cross-reference as JSON", () => {
+  it("includes cross-reference as compact JSON", () => {
     const prompt = buildScoringPrompt(parsedBid, sectionAnalyses, crossRef, criteria);
-    expect(prompt).toContain('"overall_coherence": "adequate"');
+    expect(prompt).toContain('"overall_coherence":"adequate"');
     expect(prompt).toContain("Coherent bid.");
   });
 
@@ -451,5 +456,200 @@ describe("buildScoringPrompt", () => {
     expect(prompt).toContain('"overall_score"');
     expect(prompt).toContain('"submission_readiness"');
     expect(prompt).toContain('"improvement_appendix"');
+  });
+
+  it("limits cross-reference findings to 20", () => {
+    const manyFindings = Array.from({ length: 25 }, (_, i) => ({
+      type: "gap",
+      description: `Finding ${i}`,
+      sections_involved: ["s1"],
+      severity: "low",
+    }));
+    const bigCrossRef = { findings: manyFindings, overall_coherence: "weak", summary: "Many issues." };
+    const prompt = buildScoringPrompt(parsedBid, sectionAnalyses, bigCrossRef, criteria);
+    // Should contain Finding 19 (0-indexed, last of 20) but not Finding 20
+    expect(prompt).toContain("Finding 19");
+    expect(prompt).not.toContain("Finding 20");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+describe("token limit constants", () => {
+  it("MAX_BID_WORDS is 50000", () => {
+    expect(MAX_BID_WORDS).toBe(50_000);
+  });
+
+  it("MAX_SECTION_WORDS is 8000", () => {
+    expect(MAX_SECTION_WORDS).toBe(8_000);
+  });
+
+  it("TARGET_CHUNK_WORDS is 4000", () => {
+    expect(TARGET_CHUNK_WORDS).toBe(4_000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// splitLargeSection
+// ---------------------------------------------------------------------------
+
+describe("splitLargeSection", () => {
+  // Build a large section with many paragraphs
+  const largeParagraphs: ParsedBid["paragraphs"] = {};
+  const largeParagraphIds: string[] = [];
+  for (let i = 0; i < 20; i++) {
+    const pid = `lp${i}`;
+    largeParagraphIds.push(pid);
+    largeParagraphs[pid] = {
+      id: pid,
+      section_id: "s_large",
+      text: "word ".repeat(500).trim(), // 500 words each
+      word_count: 500,
+    };
+  }
+  // Total: 20 * 500 = 10,000 words
+
+  const largeSection: Section = {
+    id: "s_large",
+    title: "Large Section",
+    level: 1,
+    word_count: 10000,
+    paragraph_ids: largeParagraphIds,
+  };
+
+  it("splits section into multiple chunks", () => {
+    const chunks = splitLargeSection(largeSection, largeParagraphs);
+    expect(chunks.length).toBeGreaterThan(1);
+  });
+
+  it("never splits mid-paragraph", () => {
+    const chunks = splitLargeSection(largeSection, largeParagraphs);
+    // All paragraph IDs across chunks should equal original
+    const allIds = chunks.flatMap((c) => c.paragraphIds);
+    expect(allIds).toEqual(largeParagraphIds);
+  });
+
+  it("sets correct partIndex and partTotal", () => {
+    const chunks = splitLargeSection(largeSection, largeParagraphs);
+    for (let i = 0; i < chunks.length; i++) {
+      expect(chunks[i].partIndex).toBe(i);
+      expect(chunks[i].partTotal).toBe(chunks.length);
+    }
+  });
+
+  it("each chunk has sectionId matching the original", () => {
+    const chunks = splitLargeSection(largeSection, largeParagraphs);
+    for (const chunk of chunks) {
+      expect(chunk.sectionId).toBe("s_large");
+    }
+  });
+
+  it("targets approximately TARGET_CHUNK_WORDS per chunk", () => {
+    const chunks = splitLargeSection(largeSection, largeParagraphs);
+    // Each chunk should be roughly 4000 words (8 paragraphs * 500 words)
+    for (const chunk of chunks.slice(0, -1)) {
+      // All but last chunk should be at or above TARGET_CHUNK_WORDS
+      expect(chunk.wordCount).toBeGreaterThanOrEqual(TARGET_CHUNK_WORDS);
+    }
+  });
+
+  it("handles section with single paragraph", () => {
+    const singleSection: Section = {
+      id: "s_single",
+      title: "Single Para",
+      level: 1,
+      word_count: 9000,
+      paragraph_ids: ["sp1"],
+    };
+    const singleParas: ParsedBid["paragraphs"] = {
+      sp1: { id: "sp1", section_id: "s_single", text: "word ".repeat(9000), word_count: 9000 },
+    };
+    const chunks = splitLargeSection(singleSection, singleParas);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].paragraphIds).toEqual(["sp1"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mergeSectionAnalyses
+// ---------------------------------------------------------------------------
+
+describe("mergeSectionAnalyses", () => {
+  const analysis1: SectionAnalysis = {
+    section_id: "s1",
+    inline_comments: [
+      {
+        paragraph_id: "p1",
+        target_text: "some text",
+        category: "EVIDENCE",
+        issue: "Missing evidence for claim about impact.",
+        suggestion: "Add specific metrics to support this claim.",
+      },
+    ],
+    criteria_relevance: [
+      { criterion_id: "c1", relevance: "partially_addresses", notes: "Partial" },
+      { criterion_id: "c2", relevance: "not_relevant" },
+    ],
+    strengths: ["Good opening"],
+    weaknesses: ["Lacks data"],
+    questions_for_later_sections: ["Budget details?"],
+  };
+
+  const analysis2: SectionAnalysis = {
+    section_id: "s1",
+    inline_comments: [
+      {
+        paragraph_id: "p2",
+        target_text: "other text",
+        category: "CLARITY",
+        issue: "Unclear sentence about deliverables.",
+        suggestion: "Rewrite to specify exact deliverables.",
+      },
+    ],
+    criteria_relevance: [
+      { criterion_id: "c1", relevance: "directly_addresses", notes: "Full" },
+      { criterion_id: "c3", relevance: "partially_addresses", notes: "Somewhat" },
+    ],
+    strengths: ["Strong evidence"],
+    weaknesses: ["Repetitive"],
+    questions_for_later_sections: ["Timeline?"],
+  };
+
+  it("concatenates inline_comments from all parts", () => {
+    const merged = mergeSectionAnalyses("s1", [analysis1, analysis2]);
+    expect(merged.inline_comments).toHaveLength(2);
+    expect(merged.inline_comments[0].paragraph_id).toBe("p1");
+    expect(merged.inline_comments[1].paragraph_id).toBe("p2");
+  });
+
+  it("concatenates strengths and weaknesses", () => {
+    const merged = mergeSectionAnalyses("s1", [analysis1, analysis2]);
+    expect(merged.strengths).toEqual(["Good opening", "Strong evidence"]);
+    expect(merged.weaknesses).toEqual(["Lacks data", "Repetitive"]);
+  });
+
+  it("keeps highest relevance per criterion", () => {
+    const merged = mergeSectionAnalyses("s1", [analysis1, analysis2]);
+    const c1 = merged.criteria_relevance.find((cr) => cr.criterion_id === "c1");
+    expect(c1?.relevance).toBe("directly_addresses"); // Higher than partially_addresses
+    expect(c1?.notes).toBe("Full");
+  });
+
+  it("includes criteria from all parts", () => {
+    const merged = mergeSectionAnalyses("s1", [analysis1, analysis2]);
+    const ids = merged.criteria_relevance.map((cr) => cr.criterion_id).sort();
+    expect(ids).toEqual(["c1", "c2", "c3"]);
+  });
+
+  it("concatenates questions_for_later_sections", () => {
+    const merged = mergeSectionAnalyses("s1", [analysis1, analysis2]);
+    expect(merged.questions_for_later_sections).toEqual(["Budget details?", "Timeline?"]);
+  });
+
+  it("preserves given section_id", () => {
+    const merged = mergeSectionAnalyses("s_custom", [analysis1, analysis2]);
+    expect(merged.section_id).toBe("s_custom");
   });
 });

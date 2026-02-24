@@ -20,7 +20,11 @@ import {
   buildScoringPrompt,
   buildScoringSystemPrompt,
   createSkippedSectionAnalysis,
+  splitLargeSection,
+  mergeSectionAnalyses,
   MIN_SECTION_WORDS,
+  MAX_BID_WORDS,
+  MAX_SECTION_WORDS,
   type Criterion,
 } from "@/lib/pipeline/prompt-templates";
 import { generateReviewDoc } from "@/lib/pipeline/generate-review";
@@ -129,6 +133,19 @@ export const reviewSubmitted = inngest.createFunction(
     });
 
     // -----------------------------------------------------------------------
+    // Word count gate — reject bids exceeding the limit
+    // -----------------------------------------------------------------------
+    if (parsedBid.metadata.total_words > MAX_BID_WORDS) {
+      await step.run("reject-too-large", async () => {
+        await markFailed(
+          reviewId,
+          `This bid is approximately ${parsedBid.metadata.total_words.toLocaleString()} words, which exceeds our ${MAX_BID_WORDS.toLocaleString()} word limit. Please submit a shorter document or split it into parts.`
+        );
+      });
+      return { reviewId, status: "failed", reason: "Bid too large" };
+    }
+
+    // -----------------------------------------------------------------------
     // Step 2: Pre-flight check
     // -----------------------------------------------------------------------
     const preflight = await step.run("preflight-check", async () => {
@@ -174,33 +191,116 @@ export const reviewSubmitted = inngest.createFunction(
         continue;
       }
 
-      const analysis = await step.run(
-        `section-analysis-${section.id}`,
-        async () => {
-          await updateProgress(reviewId, "analysing", {
-            analysis_started: Date.now(),
-          });
+      // Dynamic max_tokens based on section size
+      const sectionMaxTokens = section.word_count > 5000 ? 32768
+        : section.word_count > 2000 ? 16384
+        : 8192;
 
-          const prompt = buildSectionAnalysisPrompt(parsedBid, section, completeDraft);
-          const result = await callClaude({
-            prompt,
-            systemPrompt: sectionSystemPrompt,
-            schema: SectionAnalysisSchema,
-            model,
-            maxTokens: 16384,
-          });
+      // Large sections get split into chunks
+      if (section.word_count > MAX_SECTION_WORDS) {
+        const subSections = splitLargeSection(section, parsedBid.paragraphs);
+        const partAnalyses: SectionAnalysis[] = [];
 
+        for (const sub of subSections) {
+          const subSection: typeof section = {
+            ...section,
+            paragraph_ids: sub.paragraphIds,
+            word_count: sub.wordCount,
+          };
+          const chunkMaxTokens = sub.wordCount > 5000 ? 32768
+            : sub.wordCount > 2000 ? 16384
+            : 8192;
+
+          const partResult = await step.run(
+            `section-analysis-${section.id}-part-${sub.partIndex}`,
+            async () => {
+              await updateProgress(reviewId, "analysing", {
+                analysis_started: Date.now(),
+              });
+
+              const prompt = buildSectionAnalysisPrompt(parsedBid, subSection, completeDraft);
+              const result = await callClaude({
+                prompt,
+                systemPrompt: sectionSystemPrompt,
+                schema: SectionAnalysisSchema,
+                model,
+                maxTokens: chunkMaxTokens,
+                allowPartial: true,
+              });
+
+              return result;
+            }
+          );
+
+          if (partResult) {
+            partAnalyses.push(partResult);
+          } else {
+            // Truncated — add placeholder
+            partAnalyses.push({
+              section_id: section.id,
+              inline_comments: [],
+              criteria_relevance: [],
+              strengths: ["[Analysis truncated — section chunk too large for full review]"],
+              weaknesses: [],
+              questions_for_later_sections: [],
+            });
+          }
+        }
+
+        const merged = mergeSectionAnalyses(section.id, partAnalyses);
+
+        await step.run(`section-analysis-${section.id}-progress`, async () => {
           await updateProgress(reviewId, "analysing", {
             [`section_${section.id}_completed`]: Date.now(),
             sections_completed: sectionAnalyses.length + 1,
             sections_total: parsedBid.sections.length,
           });
+        });
 
-          return result;
+        sectionAnalyses.push(merged);
+      } else {
+        // Normal-sized section — single call
+        const analysis = await step.run(
+          `section-analysis-${section.id}`,
+          async () => {
+            await updateProgress(reviewId, "analysing", {
+              analysis_started: Date.now(),
+            });
+
+            const prompt = buildSectionAnalysisPrompt(parsedBid, section, completeDraft);
+            const result = await callClaude({
+              prompt,
+              systemPrompt: sectionSystemPrompt,
+              schema: SectionAnalysisSchema,
+              model,
+              maxTokens: sectionMaxTokens,
+              allowPartial: true,
+            });
+
+            await updateProgress(reviewId, "analysing", {
+              [`section_${section.id}_completed`]: Date.now(),
+              sections_completed: sectionAnalyses.length + 1,
+              sections_total: parsedBid.sections.length,
+            });
+
+            return result;
+          }
+        );
+
+        if (analysis) {
+          sectionAnalyses.push(analysis);
+        } else {
+          // Truncated — add placeholder
+          sectionAnalyses.push({
+            section_id: section.id,
+            inline_comments: [],
+            criteria_relevance: [],
+            strengths: ["[Analysis truncated — section too large for full review]"],
+            weaknesses: [],
+            questions_for_later_sections: [],
+          });
         }
-      );
-
-      sectionAnalyses.push(analysis);
+      }
     }
 
     // -----------------------------------------------------------------------

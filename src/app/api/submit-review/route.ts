@@ -125,11 +125,27 @@ export async function POST(request: Request) {
     console.error("usage update error:", usageRes.error);
   }
 
+  // Estimate document size for advisory warning (~200 words per KB for .docx)
+  let warning: string | undefined;
+  const folderPath = bidFilePath.substring(0, bidFilePath.lastIndexOf("/"));
+  const fileName = bidFilePath.substring(bidFilePath.lastIndexOf("/") + 1);
+  const { data: fileList } = await serviceClient.storage
+    .from("bid-uploads")
+    .list(folderPath, { search: fileName, limit: 1 });
+  const fileSizeBytes = fileList?.[0]?.metadata?.size;
+  if (typeof fileSizeBytes === "number") {
+    const estimatedWords = Math.round((fileSizeBytes / 1024) * 200);
+    if (estimatedWords > 30_000) warning = "large_document";
+  }
+
   // Fire Inngest event
   await inngest.send({
     name: "review/submitted",
     data: { reviewId: review.id, userId: user.id, completeDraft },
   });
 
-  return NextResponse.json({ reviewId: review.id }, { status: 201 });
+  return NextResponse.json(
+    { reviewId: review.id, ...(warning && { warning }) },
+    { status: 201 }
+  );
 }

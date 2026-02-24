@@ -182,6 +182,9 @@ export function buildScoringSystemPrompt(): CacheBlock[] {
 // ---------------------------------------------------------------------------
 
 export const MIN_SECTION_WORDS = 50;
+export const MAX_BID_WORDS = 50_000;
+export const MAX_SECTION_WORDS = 8_000;
+export const TARGET_CHUNK_WORDS = 4_000;
 
 export function createSkippedSectionAnalysis(section: Section): SectionAnalysis {
   return {
@@ -192,6 +195,112 @@ export function createSkippedSectionAnalysis(section: Section): SectionAnalysis 
     weaknesses: [],
     questions_for_later_sections: [],
   };
+}
+
+// ---------------------------------------------------------------------------
+// Section splitting for large sections
+// ---------------------------------------------------------------------------
+
+export interface SubSection {
+  sectionId: string;
+  partIndex: number;
+  partTotal: number;
+  paragraphIds: string[];
+  wordCount: number;
+}
+
+export function splitLargeSection(
+  section: Section,
+  paragraphs: ParsedBid["paragraphs"]
+): SubSection[] {
+  const chunks: SubSection[] = [];
+  let currentIds: string[] = [];
+  let currentWords = 0;
+
+  for (const pid of section.paragraph_ids) {
+    const para = paragraphs[pid];
+    const paraWords = para?.word_count ?? 0;
+
+    // If adding this paragraph would exceed target and we already have content, start a new chunk
+    if (currentIds.length > 0 && currentWords + paraWords > TARGET_CHUNK_WORDS) {
+      chunks.push({
+        sectionId: section.id,
+        partIndex: chunks.length,
+        partTotal: 0, // Will be set after
+        paragraphIds: currentIds,
+        wordCount: currentWords,
+      });
+      currentIds = [];
+      currentWords = 0;
+    }
+
+    currentIds.push(pid);
+    currentWords += paraWords;
+  }
+
+  // Push remaining
+  if (currentIds.length > 0) {
+    chunks.push({
+      sectionId: section.id,
+      partIndex: chunks.length,
+      partTotal: 0,
+      paragraphIds: currentIds,
+      wordCount: currentWords,
+    });
+  }
+
+  // Set partTotal on all chunks
+  for (const chunk of chunks) {
+    chunk.partTotal = chunks.length;
+  }
+
+  return chunks;
+}
+
+// ---------------------------------------------------------------------------
+// Merge split section analyses back together
+// ---------------------------------------------------------------------------
+
+export function mergeSectionAnalyses(
+  sectionId: string,
+  analyses: SectionAnalysis[]
+): SectionAnalysis {
+  const merged: SectionAnalysis = {
+    section_id: sectionId,
+    inline_comments: [],
+    criteria_relevance: [],
+    strengths: [],
+    weaknesses: [],
+    questions_for_later_sections: [],
+  };
+
+  // Track highest relevance per criterion
+  const relevanceMap = new Map<string, SectionAnalysis["criteria_relevance"][0]>();
+  const relevanceRank: Record<string, number> = {
+    directly_addresses: 3,
+    partially_addresses: 2,
+    not_relevant: 1,
+  };
+
+  for (const analysis of analyses) {
+    merged.inline_comments.push(...analysis.inline_comments);
+    merged.strengths.push(...analysis.strengths);
+    merged.weaknesses.push(...analysis.weaknesses);
+    if (analysis.questions_for_later_sections) {
+      merged.questions_for_later_sections!.push(...analysis.questions_for_later_sections);
+    }
+
+    for (const cr of analysis.criteria_relevance) {
+      const existing = relevanceMap.get(cr.criterion_id);
+      if (!existing || relevanceRank[cr.relevance] > relevanceRank[existing.relevance]) {
+        relevanceMap.set(cr.criterion_id, cr);
+      }
+    }
+  }
+
+  merged.criteria_relevance = Array.from(relevanceMap.values());
+
+  return merged;
 }
 
 // ---------------------------------------------------------------------------
@@ -380,7 +489,12 @@ export function buildScoringPrompt(
   const docMap = formatDocumentMapLite(parsedBid);
   const criteriaText = formatCriteria(criteria);
   const analysesText = formatAnalysesSummary(sectionAnalyses);
-  const crossRefText = JSON.stringify(crossReference, null, 2);
+  // Compact JSON to save tokens; limit findings to top 20 if there are more
+  const crossRefObj = crossReference as { findings?: unknown[] };
+  const trimmedCrossRef = crossRefObj.findings && crossRefObj.findings.length > 20
+    ? { ...crossRefObj, findings: crossRefObj.findings.slice(0, 20) }
+    : crossReference;
+  const crossRefText = JSON.stringify(trimmedCrossRef);
 
   return `## Task: Final Scoring & Synthesis
 

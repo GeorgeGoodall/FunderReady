@@ -287,6 +287,9 @@ describe("POST /api/submit-review", () => {
       if (table === "review_results") return chainMock({ error: null });
       return chainMock({ data: null });
     });
+    mockServiceStorageFrom.mockReturnValue({
+      list: vi.fn().mockResolvedValue({ data: [{ metadata: { size: 50000 } }] }),
+    });
 
     // Review insert
     const reviewChain = chainMock({ data: { id: "rev-1" }, error: null });
@@ -304,6 +307,7 @@ describe("POST /api/submit-review", () => {
     expect(res.status).toBe(201);
     const data = await res.json();
     expect(data.reviewId).toBe("rev-1");
+    expect(data.warning).toBeUndefined(); // 50KB ≈ 10K words — no warning
 
     expect(mockInngestSend).toHaveBeenCalledWith({
       name: "review/submitted",
@@ -323,6 +327,9 @@ describe("POST /api/submit-review", () => {
       if (table === "usage") return usageChain;
       if (table === "review_results") return chainMock({ error: null });
       return chainMock({ data: null });
+    });
+    mockServiceStorageFrom.mockReturnValue({
+      list: vi.fn().mockResolvedValue({ data: [] }),
     });
 
     const insertArgs: Record<string, unknown>[] = [];
@@ -360,6 +367,9 @@ describe("POST /api/submit-review", () => {
       if (table === "review_results") return chainMock({ error: null });
       return chainMock({ data: null });
     });
+    mockServiceStorageFrom.mockReturnValue({
+      list: vi.fn().mockResolvedValue({ data: [] }),
+    });
 
     const reviewChain = chainMock({ data: { id: "rev-3" }, error: null });
     mockFrom.mockReturnValue(reviewChain);
@@ -374,6 +384,40 @@ describe("POST /api/submit-review", () => {
     const res = await POST(req);
     // Should succeed because 3 < 3 + 2 = 5
     expect(res.status).toBe(201);
+  });
+
+  it("includes warning for large documents", async () => {
+    authenticatedUser();
+
+    const profileChain = chainMock({ data: { subscription_tier: "pro", current_period_end: "2026-03-15T00:00:00Z" } });
+    const usageChain = chainMock({
+      data: { reviews_used: 0, reviews_limit: 10, bonus_reviews: 0 },
+    });
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === "profiles") return profileChain;
+      if (table === "usage") return usageChain;
+      if (table === "review_results") return chainMock({ error: null });
+      return chainMock({ data: null });
+    });
+    // 200KB ≈ 40K words — above 30K threshold
+    mockServiceStorageFrom.mockReturnValue({
+      list: vi.fn().mockResolvedValue({ data: [{ metadata: { size: 200_000 } }] }),
+    });
+
+    const reviewChain = chainMock({ data: { id: "rev-large" }, error: null });
+    mockFrom.mockReturnValue(reviewChain);
+    mockInngestSend.mockResolvedValue(undefined);
+
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/submit-review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(validBody),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.warning).toBe("large_document");
   });
 });
 

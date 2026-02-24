@@ -154,6 +154,39 @@ describe("callClaude", () => {
     expect(call.tools[0].name).toBe("structured_output");
   });
 
+  it("throws NonRetriableError on max_tokens by default", async () => {
+    mockCreate.mockResolvedValue({
+      stop_reason: "max_tokens",
+      content: [],
+    });
+
+    await expect(
+      callClaude({
+        prompt: "test",
+        schema: TestSchema,
+        model: "claude-haiku-4-5-20251001",
+        maxTokens: 512,
+      })
+    ).rejects.toThrow(NonRetriableError);
+  });
+
+  it("returns null on max_tokens when allowPartial is true", async () => {
+    mockCreate.mockResolvedValue({
+      stop_reason: "max_tokens",
+      content: [],
+    });
+
+    const result = await callClaude({
+      prompt: "test",
+      schema: TestSchema,
+      model: "claude-haiku-4-5-20251001",
+      maxTokens: 512,
+      allowPartial: true,
+    });
+
+    expect(result).toBeNull();
+  });
+
   it("passes structured system blocks with cache_control unchanged", async () => {
     mockCreate.mockResolvedValue({
       content: [
