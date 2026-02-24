@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NonRetriableError } from "inngest";
 import { z } from "zod";
 
 const { mockCreate } = vi.hoisted(() => {
@@ -77,10 +78,13 @@ describe("callClaude", () => {
     // Verify retry includes error feedback in messages
     const retryCall = mockCreate.mock.calls[1];
     const lastMessage = retryCall[0].messages[retryCall[0].messages.length - 1];
-    expect(lastMessage.content).toContain("validation errors");
+    const contentText = Array.isArray(lastMessage.content)
+      ? lastMessage.content.map((c: { content?: string }) => c.content ?? "").join(" ")
+      : String(lastMessage.content);
+    expect(contentText.toLowerCase()).toContain("validation errors");
   });
 
-  it("throws on second failure after retry", async () => {
+  it("throws NonRetriableError on second failure after retry", async () => {
     mockCreate.mockResolvedValue({
       content: [
         { type: "tool_use", id: "t1", name: "structured_output", input: { name: "test" } }, // always missing value
@@ -94,7 +98,7 @@ describe("callClaude", () => {
         model: "claude-haiku-4-5-20251001",
         maxTokens: 512,
       })
-    ).rejects.toThrow();
+    ).rejects.toThrow(NonRetriableError);
 
     expect(mockCreate).toHaveBeenCalledTimes(2);
   });
@@ -114,7 +118,7 @@ describe("callClaude", () => {
     expect(result).toEqual({ name: "fallback", value: 7 });
   });
 
-  it("throws when response has neither tool use nor text", async () => {
+  it("throws NonRetriableError when response has neither tool use nor text", async () => {
     mockCreate.mockResolvedValue({
       content: [],
     });
@@ -126,7 +130,7 @@ describe("callClaude", () => {
         model: "claude-haiku-4-5-20251001",
         maxTokens: 512,
       })
-    ).rejects.toThrow("No tool use or text response from Claude");
+    ).rejects.toThrow(NonRetriableError);
   });
 
   it("passes system prompt and tools config", async () => {

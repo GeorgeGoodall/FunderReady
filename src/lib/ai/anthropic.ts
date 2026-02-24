@@ -4,6 +4,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { NonRetriableError } from "inngest";
 import type { ZodSchema } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
@@ -133,24 +134,55 @@ function buildTool<T>(schema: ZodSchema<T>): Anthropic.Tool {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Error classification — transient errors should retry, permanent should not
+// ---------------------------------------------------------------------------
+
+function isTransientError(error: unknown): boolean {
+  if (error instanceof Anthropic.APIError) {
+    // 429 = rate limited, 529 = overloaded, 5xx = server errors
+    return error.status === 429 || error.status === 529 || error.status >= 500;
+  }
+  // Network/connection errors are transient
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    return msg.includes("econnreset") ||
+      msg.includes("etimedout") ||
+      msg.includes("fetch failed") ||
+      msg.includes("socket hang up");
+  }
+  return false;
+}
+
 export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T> {
   const { prompt, systemPrompt, schema, model, maxTokens } = options;
 
   const client = getClient();
   const tool = buildTool(schema);
 
-  const message = await client.messages.create({
-    model,
-    max_tokens: maxTokens,
-    system: systemPrompt || undefined,
-    messages: [{ role: "user", content: prompt }],
-    tools: [tool],
-    tool_choice: { type: "tool", name: TOOL_NAME },
-  });
+  let message: Anthropic.Message;
+  try {
+    message = await client.messages.create({
+      model,
+      max_tokens: maxTokens,
+      system: systemPrompt || undefined,
+      messages: [{ role: "user", content: prompt }],
+      tools: [tool],
+      tool_choice: { type: "tool", name: TOOL_NAME },
+    });
+  } catch (error) {
+    if (isTransientError(error)) {
+      throw error; // Let Inngest retry
+    }
+    throw new NonRetriableError(
+      `Claude API error (permanent): ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error instanceof Error ? error : undefined }
+    );
+  }
 
-  // Check for truncated response
+  // Check for truncated response — permanent, won't fix itself on retry
   if (message.stop_reason === "max_tokens") {
-    throw new Error(
+    throw new NonRetriableError(
       `Claude response truncated (hit max_tokens=${maxTokens}). Increase maxTokens for this call.`
     );
   }
@@ -168,28 +200,39 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T> {
       .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
       .join("\n");
 
-    const retryMessage = await client.messages.create({
-      model,
-      max_tokens: maxTokens,
-      system: systemPrompt || undefined,
-      messages: [
-        { role: "user", content: prompt },
-        { role: "assistant", content: message.content },
-        {
-          role: "user",
-          content: [
-            {
-              type: "tool_result",
-              tool_use_id: toolBlock.id,
-              is_error: true,
-              content: `Validation errors:\n${errors}\n\nPlease call the tool again with corrected data.`,
-            },
-          ],
-        },
-      ],
-      tools: [tool],
-      tool_choice: { type: "tool", name: TOOL_NAME },
-    });
+    let retryMessage: Anthropic.Message;
+    try {
+      retryMessage = await client.messages.create({
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt || undefined,
+        messages: [
+          { role: "user", content: prompt },
+          { role: "assistant", content: message.content },
+          {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: toolBlock.id,
+                is_error: true,
+                content: `Validation errors:\n${errors}\n\nPlease call the tool again with corrected data.`,
+              },
+            ],
+          },
+        ],
+        tools: [tool],
+        tool_choice: { type: "tool", name: TOOL_NAME },
+      });
+    } catch (error) {
+      if (isTransientError(error)) {
+        throw error;
+      }
+      throw new NonRetriableError(
+        `Claude API error on validation retry (permanent): ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error instanceof Error ? error : undefined }
+      );
+    }
 
     const retryToolBlock = retryMessage.content.find((block) => block.type === "tool_use");
     if (retryToolBlock && retryToolBlock.type === "tool_use") {
@@ -197,21 +240,28 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T> {
       if (retryResult.success) {
         return retryResult.data;
       }
-      throw new Error(
+      // Failed validation twice — this is deterministic, don't retry
+      throw new NonRetriableError(
         `Claude tool use failed validation after retry. ` +
         `Original errors: ${errors}. ` +
         `Retry errors: ${retryResult.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(", ")}`
       );
     }
-    throw new Error(`Claude retry did not return a tool use block`);
+    throw new NonRetriableError(`Claude retry did not return a tool use block`);
   }
 
   // Fallback: try parsing text response (shouldn't happen with tool_choice forced)
   const textBlock = message.content.find((block) => block.type === "text");
   if (textBlock && textBlock.type === "text") {
-    const parsed = parseJsonPermissive(textBlock.text);
-    return schema.parse(parsed);
+    try {
+      const parsed = parseJsonPermissive(textBlock.text);
+      return schema.parse(parsed);
+    } catch (error) {
+      throw new NonRetriableError(
+        `Claude returned text instead of tool use and parsing failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
-  throw new Error("No tool use or text response from Claude");
+  throw new NonRetriableError("No tool use or text response from Claude");
 }

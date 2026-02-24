@@ -1,3 +1,4 @@
+import { NonRetriableError } from "inngest";
 import { inngest } from "./client";
 import { createServiceClient } from "@/lib/supabase/server";
 import { parseBid } from "@/lib/pipeline/parse-bid";
@@ -91,7 +92,7 @@ export const reviewSubmitted = inngest.createFunction(
         .eq("id", reviewId)
         .single();
 
-      if (error || !data) throw new Error(`Review not found: ${reviewId}`);
+      if (error || !data) throw new NonRetriableError(`Review not found: ${reviewId}`);
       return data;
     });
 
@@ -110,7 +111,7 @@ export const reviewSubmitted = inngest.createFunction(
         .download(reviewData.bid_file_path);
 
       if (downloadError || !fileData) {
-        throw new Error(`Failed to download bid: ${downloadError?.message}`);
+        throw new NonRetriableError(`Failed to download bid: ${downloadError?.message}`);
       }
 
       const arrayBuffer = await fileData.arrayBuffer();
