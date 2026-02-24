@@ -85,6 +85,7 @@ const sectionAnalyses: SectionAnalysis[] = [
     ],
     strengths: ["Clear opening", "Good structure"],
     weaknesses: ["Lacks evidence"],
+    questions_for_later_sections: ["Does the budget section include costs for the outreach worker?"],
   },
   {
     section_id: "s2",
@@ -204,9 +205,9 @@ describe("formatAnalysesSummary", () => {
     expect(result).toContain("## s2");
   });
 
-  it("includes relevant criteria (filters out not_relevant)", () => {
+  it("includes relevant criteria with notes (filters out not_relevant)", () => {
     const result = formatAnalysesSummary(sectionAnalyses);
-    expect(result).toContain("c1 (directly_addresses)");
+    expect(result).toContain("c1 (directly_addresses — Covers VFM)");
     expect(result).not.toContain("c2");
   });
 
@@ -220,20 +221,27 @@ describe("formatAnalysesSummary", () => {
     expect(result).toContain("Weaknesses: Lacks evidence");
   });
 
-  it("includes comment count", () => {
+  it("includes inline comment issues with category", () => {
     const result = formatAnalysesSummary(sectionAnalyses);
-    expect(result).toContain("Comments: 1");
-    expect(result).toContain("Comments: 0");
+    expect(result).toContain("Issues flagged:");
+    expect(result).toContain("- [CLARITY] This introduction lacks specificity about the project.");
   });
 
-  it("omits criteria/strengths/weaknesses lines when empty", () => {
+  it("includes questions for later sections", () => {
+    const result = formatAnalysesSummary(sectionAnalyses);
+    expect(result).toContain("Open questions: Does the budget section include costs for the outreach worker?");
+  });
+
+  it("omits all optional lines when empty", () => {
     const s2Block = formatAnalysesSummary(sectionAnalyses)
       .split("\n\n")
       .find((b) => b.includes("## s2"))!;
     expect(s2Block).not.toContain("Criteria:");
     expect(s2Block).not.toContain("Strengths:");
     expect(s2Block).not.toContain("Weaknesses:");
-    expect(s2Block).toContain("Comments: 0");
+    expect(s2Block).not.toContain("Issues flagged:");
+    expect(s2Block).not.toContain("Open questions:");
+    expect(s2Block).toBe("## s2");
   });
 });
 

@@ -127,13 +127,24 @@ export function formatAnalysesSummary(analyses: SectionAnalysis[]): string {
     .map((a) => {
       const relevance = a.criteria_relevance
         .filter((r) => r.relevance !== "not_relevant")
-        .map((r) => `${r.criterion_id} (${r.relevance})`)
+        .map((r) => {
+          const note = r.notes ? ` — ${r.notes}` : "";
+          return `${r.criterion_id} (${r.relevance}${note})`;
+        })
         .join(", ");
       const lines = [`## ${a.section_id}`];
       if (relevance) lines.push(`Criteria: ${relevance}`);
       if (a.strengths.length) lines.push(`Strengths: ${a.strengths.join("; ")}`);
       if (a.weaknesses.length) lines.push(`Weaknesses: ${a.weaknesses.join("; ")}`);
-      lines.push(`Comments: ${a.inline_comments.length}`);
+      if (a.inline_comments.length) {
+        const commentSummaries = a.inline_comments
+          .map((c) => `- [${c.category}] ${c.issue}`)
+          .join("\n");
+        lines.push(`Issues flagged:\n${commentSummaries}`);
+      }
+      if (a.questions_for_later_sections?.length) {
+        lines.push(`Open questions: ${a.questions_for_later_sections.join("; ")}`);
+      }
       return lines.join("\n");
     })
     .join("\n\n");
