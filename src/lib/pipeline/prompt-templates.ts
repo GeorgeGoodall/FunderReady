@@ -403,7 +403,11 @@ Guidelines:
 - Cover all relevant criteria in criteria_relevance
 - Be specific — avoid generic feedback
 ${!completeDraft ? `
-**IMPORTANT — Draft Bid Context:** The applicant has indicated this bid is a work in progress. Avoid using the MISSING comment category for content the applicant likely hasn't written yet. Instead, focus your inline comments on improving the quality of what IS written — clarity, evidence, alignment, structure, and specificity. If a section is thin or clearly incomplete, note it briefly in weaknesses but don't generate multiple MISSING comments for content that isn't there yet.` : ""}
+**IMPORTANT — Draft Bid Context:** The applicant has indicated this bid is a work in progress.
+- **Placeholders:** The bid may contain placeholder text in various formats — [square brackets], *asterisks*, (parentheses), or written-out notes like "will fill this in later", "TBC", "waiting on response from X", etc. These are normal in a draft. Do NOT flag placeholders with MISSING or SPECIFICITY comments. Instead, if a placeholder is in an important location, note briefly what kind of content should replace it (e.g., "When you fill this in, include specific metrics and a named partner").
+- **MISSING comments:** Avoid using the MISSING category for content the applicant likely hasn't written yet. If a section is thin or clearly incomplete, note it briefly in weaknesses but don't generate multiple MISSING comments.
+- **SPECIFICITY comments:** Be lenient with SPECIFICITY comments near or around placeholder text. The applicant already knows these areas need detail. Only use SPECIFICITY for text that appears to be "finished" prose but is still vague.
+- Focus your inline comments on improving the quality of what IS written — clarity, evidence, alignment, and structure.` : ""}
 
 Return ONLY the JSON object, no other text.`;
 }
@@ -449,7 +453,10 @@ ${analysesText}
 5. **Inconsistencies** — Terminology, tone, or naming that shifts between sections
 6. **Repetition without new evidence** — Restating the same point without strengthening it
 ${!completeDraft ? `
-**IMPORTANT — Draft Bid Context:** The applicant has indicated this bid is a work in progress and not all sections are complete. When identifying missing criteria, note them for the applicant's awareness but treat them as "not yet written" rather than omissions. Focus your analysis on the content that IS present — contradictions, gaps, and inconsistencies in existing text are more valuable feedback than listing sections the applicant already knows they haven't written yet. Mark missing_criterion findings as **low severity** unless the document structure suggests the criterion was meant to be addressed in an existing section.` : ""}
+**IMPORTANT — Draft Bid Context:** The applicant has indicated this bid is a work in progress and not all sections are complete.
+- **Placeholders:** The bid may contain placeholder text — [square brackets], *asterisks*, (parentheses), or written-out notes like "TBC", "will fill this in later", etc. Do not treat placeholders as contradictions or inconsistencies. If a placeholder conflicts with concrete text elsewhere, note it gently as something to align when the placeholder is filled in.
+- When identifying missing criteria, note them for the applicant's awareness but treat them as "not yet written" rather than omissions. Mark missing_criterion findings as **low severity** unless the document structure suggests the criterion was meant to be addressed in an existing section.
+- Focus your analysis on the content that IS present — contradictions, gaps, and inconsistencies in existing text are more valuable feedback than listing sections the applicant already knows they haven't written yet.` : ""}
 
 ## Required Output
 
@@ -558,6 +565,7 @@ Guidelines:
 - Be specific with example language — give the applicant something they can use
 ${!completeDraft ? `
 **IMPORTANT — Draft Bid Context:** The applicant has indicated this bid is a work in progress. Not all sections may be complete. When scoring:
+- **Placeholders:** The bid may contain placeholder text — [square brackets], *asterisks*, (parentheses), or written-out notes like "TBC", "will fill this in later", etc. Do not penalise placeholder text in scoring. If a section contains a mix of real content and placeholders, score based on the quality of the real content and note the placeholders as areas to complete.
 - If a criterion is not addressed because the relevant section appears unwritten or incomplete, still score it as "Missing" but frame the summary as guidance (e.g., "This section hasn't been written yet. When you write it, make sure to include…") rather than a criticism.
 - Focus improvement_appendix entries for missing criteria on what TO INCLUDE when the applicant writes that section, with practical example language they can build on.
 - Weight overall_score, submission_readiness, and top_improvements toward the content that IS present. The applicant knows unwritten sections need writing — help them improve what they've already drafted.
