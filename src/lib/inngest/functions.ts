@@ -306,8 +306,11 @@ export const reviewSubmitted = inngest.createFunction(
     // -----------------------------------------------------------------------
     // Step 4: Cross-reference
     // -----------------------------------------------------------------------
-    const crossReference: CrossReference = await step.run("cross-reference", async () => {
+    await step.run("cross-reference-progress", async () => {
       await updateProgress(reviewId, "cross_referencing", { crossref_started: Date.now() });
+    });
+
+    const crossReference: CrossReference = await step.run("cross-reference", async () => {
 
       const prompt = buildCrossReferencePrompt(parsedBid, sectionAnalyses, criteria, completeDraft);
       const result = await callClaude({
@@ -326,8 +329,11 @@ export const reviewSubmitted = inngest.createFunction(
     // Step 5: Scoring
     // -----------------------------------------------------------------------
     const scoringSystemPrompt = buildScoringSystemPrompt();
-    const scoring: Scoring = await step.run("scoring", async () => {
+    await step.run("scoring-progress", async () => {
       await updateProgress(reviewId, "scoring", { scoring_started: Date.now() });
+    });
+
+    const scoring: Scoring = await step.run("scoring", async () => {
 
       const prompt = buildScoringPrompt(parsedBid, sectionAnalyses, crossReference, criteria, completeDraft);
       const result = await callClaude({
@@ -346,8 +352,11 @@ export const reviewSubmitted = inngest.createFunction(
     // -----------------------------------------------------------------------
     // Step 6: Generate review document
     // -----------------------------------------------------------------------
-    const outputPath = await step.run("generate-doc", async () => {
+    await step.run("generate-doc-progress", async () => {
       await updateProgress(reviewId, "generating", { generation_started: Date.now() });
+    });
+
+    const outputPath = await step.run("generate-doc", async () => {
 
       const bidName = reviewData.bid_file_name.replace(/\.docx$/i, "");
       const docBuffer = await generateReviewDoc(parsedBid, sectionAnalyses, scoring, bidName);
