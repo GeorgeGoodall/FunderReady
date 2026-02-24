@@ -229,7 +229,8 @@ Return ONLY the JSON object, no other text.`;
 
 export function buildSectionAnalysisPrompt(
   parsedBid: ParsedBid,
-  section: Section
+  section: Section,
+  completeDraft = true
 ): string {
   const sectionText = formatSectionText(section, parsedBid.paragraphs);
   const docMapLite = formatDocumentMapLite(parsedBid);
@@ -281,6 +282,8 @@ Guidelines:
 - paragraph_id must match one of the IDs shown in the section text above
 - Cover all relevant criteria in criteria_relevance
 - Be specific — avoid generic feedback
+${!completeDraft ? `
+**IMPORTANT — Draft Bid Context:** The applicant has indicated this bid is a work in progress. Avoid using the MISSING comment category for content the applicant likely hasn't written yet. Instead, focus your inline comments on improving the quality of what IS written — clarity, evidence, alignment, structure, and specificity. If a section is thin or clearly incomplete, note it briefly in weaknesses but don't generate multiple MISSING comments for content that isn't there yet.` : ""}
 
 Return ONLY the JSON object, no other text.`;
 }
@@ -292,7 +295,8 @@ Return ONLY the JSON object, no other text.`;
 export function buildCrossReferencePrompt(
   parsedBid: ParsedBid,
   sectionAnalyses: SectionAnalysis[],
-  criteria: Criterion[]
+  criteria: Criterion[],
+  completeDraft = true
 ): string {
   const docMap = formatDocumentMapLite(parsedBid);
   const criteriaText = formatCriteria(criteria);
@@ -324,6 +328,8 @@ ${analysesText}
 4. **Unresolved references** — "See Section X" but Section X doesn't deliver
 5. **Inconsistencies** — Terminology, tone, or naming that shifts between sections
 6. **Repetition without new evidence** — Restating the same point without strengthening it
+${!completeDraft ? `
+**IMPORTANT — Draft Bid Context:** The applicant has indicated this bid is a work in progress and not all sections are complete. When identifying missing criteria, note them for the applicant's awareness but treat them as "not yet written" rather than omissions. Focus your analysis on the content that IS present — contradictions, gaps, and inconsistencies in existing text are more valuable feedback than listing sections the applicant already knows they haven't written yet. Mark missing_criterion findings as **low severity** unless the document structure suggests the criterion was meant to be addressed in an existing section.` : ""}
 
 ## Required Output
 
@@ -357,7 +363,8 @@ export function buildScoringPrompt(
   parsedBid: ParsedBid,
   sectionAnalyses: SectionAnalysis[],
   crossReference: unknown,
-  criteria: Criterion[]
+  criteria: Criterion[],
+  completeDraft = true
 ): string {
   const docMap = formatDocumentMapLite(parsedBid);
   const criteriaText = formatCriteria(criteria);
@@ -424,6 +431,12 @@ Guidelines:
 - top_strengths and top_improvements should be the 3 highest-impact items
 - improvement_appendix should cover every criterion, even those scored Strong (note what makes them strong)
 - Be specific with example language — give the applicant something they can use
+${!completeDraft ? `
+**IMPORTANT — Draft Bid Context:** The applicant has indicated this bid is a work in progress. Not all sections may be complete. When scoring:
+- If a criterion is not addressed because the relevant section appears unwritten or incomplete, still score it as "Missing" but frame the summary as guidance (e.g., "This section hasn't been written yet. When you write it, make sure to include…") rather than a criticism.
+- Focus improvement_appendix entries for missing criteria on what TO INCLUDE when the applicant writes that section, with practical example language they can build on.
+- Weight overall_score, submission_readiness, and top_improvements toward the content that IS present. The applicant knows unwritten sections need writing — help them improve what they've already drafted.
+- Use submission_readiness of "Needs revisions" or "Major rework needed" based on the QUALITY of existing content, not the quantity of missing sections.` : ""}
 
 Return ONLY the JSON object, no other text.`;
 }

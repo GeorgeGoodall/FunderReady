@@ -180,7 +180,7 @@ export const reviewSubmitted = inngest.createFunction(
             analysis_started: Date.now(),
           });
 
-          const prompt = buildSectionAnalysisPrompt(parsedBid, section);
+          const prompt = buildSectionAnalysisPrompt(parsedBid, section, completeDraft);
           const result = await callClaude({
             prompt,
             systemPrompt: sectionSystemPrompt,
@@ -208,7 +208,7 @@ export const reviewSubmitted = inngest.createFunction(
     const crossReference: CrossReference = await step.run("cross-reference", async () => {
       await updateProgress(reviewId, "cross_referencing", { crossref_started: Date.now() });
 
-      const prompt = buildCrossReferencePrompt(parsedBid, sectionAnalyses, criteria);
+      const prompt = buildCrossReferencePrompt(parsedBid, sectionAnalyses, criteria, completeDraft);
       const result = await callClaude({
         prompt,
         schema: CrossReferenceSchema,
@@ -228,7 +228,7 @@ export const reviewSubmitted = inngest.createFunction(
     const scoring: Scoring = await step.run("scoring", async () => {
       await updateProgress(reviewId, "scoring", { scoring_started: Date.now() });
 
-      const prompt = buildScoringPrompt(parsedBid, sectionAnalyses, crossReference, criteria);
+      const prompt = buildScoringPrompt(parsedBid, sectionAnalyses, crossReference, criteria, completeDraft);
       const result = await callClaude({
         prompt,
         systemPrompt: scoringSystemPrompt,
