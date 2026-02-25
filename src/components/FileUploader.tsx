@@ -1,3 +1,7 @@
+/**
+ * @deprecated Used by legacy document-upload review flow.
+ * New form-based applications don't need file uploads.
+ */
 "use client";
 
 import { useState, useCallback, useRef } from "react";

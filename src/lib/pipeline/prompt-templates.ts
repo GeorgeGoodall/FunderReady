@@ -36,7 +36,9 @@ Here are examples of GOOD and POOR inline comments. Match the quality of the GOO
 - "[EVIDENCE] You claim 'significant impact' but provide no figures. Add a specific metric, e.g., 'Our 2023 pilot reached 340 young people, with 78% reporting improved confidence (independent evaluation, Smith & Assoc, 2024).'"
 - "[ALIGNMENT] The funder asks specifically about sustainability beyond the funding period. You describe project activities but don't explain how they'll continue after funding ends. Add a paragraph covering: ongoing funding sources, embedded partnerships, or how the model becomes self-sustaining."
 - "[SPECIFICITY] 'Various community partners' is vague. Name 2-3 key partners and describe each partnership briefly, e.g., 'We partner with Southwark Council's Adult Social Care team, Pecan food bank, and the Maudsley NHS Foundation Trust.'"
-- "[STRUCTURE] This paragraph covers three distinct service gaps but presents them as a single block of text. Break into a numbered or bulleted list — funders often skim-read, and clear structure helps your points land."`;
+- "[STRUCTURE] This paragraph covers three distinct service gaps but presents them as a single block of text. Break into a numbered or bulleted list — funders often skim-read, and clear structure helps your points land."
+- "[CONCISENESS] 'It is important to note that our organisation has a long and established history of working collaboratively with partners across the region...' — 17 words of preamble with no new information. Cut to: 'Our 15-year track record with regional partners...' to free word count for evidence."
+- "[CONCISENESS] This paragraph restates the need described in the previous section without adding new evidence. Remove or replace with a forward reference ('As outlined in Section 1...') to recover ~80 words for your delivery methodology."`;
 
 export const ANTI_HALLUCINATION = `
 ## Critical Rules
@@ -59,7 +61,8 @@ Use exactly one of these category tags for each comment:
 - **BUDGET** — Budget concerns, value for money issues
 - **MISSING** — Important content that should be here but isn't
 - **CONSISTENCY** — Contradictions or inconsistencies within the bid
-- **SPECIFICITY** — Vague claims that need specific details`;
+- **SPECIFICITY** — Vague claims that need specific details
+- **CONCISENESS** — Filler, padding, or unnecessarily verbose content consuming word count`;
 
 // ---------------------------------------------------------------------------
 // Criteria type (from criteria schema)
@@ -148,6 +151,147 @@ export function formatAnalysesSummary(analyses: SectionAnalysis[]): string {
       return lines.join("\n");
     })
     .join("\n\n");
+}
+
+// ---------------------------------------------------------------------------
+// Word count context (for question-based sectioning)
+// ---------------------------------------------------------------------------
+
+export interface WordCountContext {
+  overall_word_limit?: number;
+  overall_word_count: number;
+  sections: Array<{
+    section_id: string;
+    question_id?: string;
+    question_text?: string;
+    word_count: number;
+    word_count_min?: number;
+    word_count_max?: number;
+    utilization: number; // 0-1, word_count / word_count_max
+  }>;
+  /** Questions with word limits that weren't matched to any bid section */
+  unmatched_questions_with_limits?: Array<{
+    question_id: string;
+    question_text: string;
+    word_count_min?: number;
+    word_count_max?: number;
+  }>;
+}
+
+export function formatWordCountGuidance(
+  sectionId: string,
+  wordCountContext?: WordCountContext
+): string {
+  if (!wordCountContext) return "";
+
+  const sectionCtx = wordCountContext.sections.find((s) => s.section_id === sectionId);
+  if (!sectionCtx) return "";
+
+  const lines: string[] = [];
+
+  // Per-section guidance
+  if (sectionCtx.word_count_max) {
+    const pct = sectionCtx.utilization;
+    lines.push(
+      `\n## Word Count Awareness\n\nThis section is ${sectionCtx.word_count} words out of a ${sectionCtx.word_count_max}-word limit (${Math.round(pct * 100)}% utilised).`
+    );
+
+    if (sectionCtx.word_count_min && sectionCtx.word_count < sectionCtx.word_count_min) {
+      lines.push(
+        `This section is BELOW the minimum word count of ${sectionCtx.word_count_min}. The applicant needs to add more content.`
+      );
+    }
+
+    if (pct > 0.85) {
+      lines.push(
+        "Prioritise CONCISENESS comments. Do NOT suggest adding content unless replacing something of equal or greater length. Every word must earn its place."
+      );
+    } else if (pct >= 0.7) {
+      lines.push(
+        "Balance suggestions for additions with trimming filler. Flag any padding or verbose phrasing that consumes word count without adding value."
+      );
+    }
+    // <60% or no limit: don't mention conciseness
+  }
+
+  // Overall utilisation
+  if (wordCountContext.overall_word_limit) {
+    const overallPct = wordCountContext.overall_word_count / wordCountContext.overall_word_limit;
+    lines.push(
+      `Overall application: ${wordCountContext.overall_word_count} of ${wordCountContext.overall_word_limit} words (${Math.round(overallPct * 100)}% utilised).`
+    );
+  }
+
+  return lines.join("\n");
+}
+
+export function formatWordCountSummaryForScoring(wordCountContext?: WordCountContext): string {
+  if (!wordCountContext) return "";
+  const hasLimits = wordCountContext.sections.some((s) => s.word_count_max);
+  if (!hasLimits && !wordCountContext.overall_word_limit) return "";
+
+  const lines: string[] = ["\n## Word Count Summary\n"];
+  lines.push("| Section | Words | Limit | Usage |");
+  lines.push("|---------|-------|-------|-------|");
+
+  for (const s of wordCountContext.sections) {
+    const limit = s.word_count_max ? `${s.word_count_max}` : "—";
+    const usage = s.word_count_max ? `${Math.round(s.utilization * 100)}%` : "—";
+    const label = s.question_text ? `${s.section_id} (${s.question_text.substring(0, 40)})` : s.section_id;
+    lines.push(`| ${label} | ${s.word_count} | ${limit} | ${usage} |`);
+  }
+
+  if (wordCountContext.overall_word_limit) {
+    const pct = Math.round((wordCountContext.overall_word_count / wordCountContext.overall_word_limit) * 100);
+    lines.push(`| **TOTAL** | **${wordCountContext.overall_word_count}** | **${wordCountContext.overall_word_limit}** | **${pct}%** |`);
+  }
+
+  lines.push("\nConsider word budget usage when assessing submission readiness. Sections near or over their limits with filler content should be flagged.");
+
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Question mapping prompt (AI fallback for low-confidence matching)
+// ---------------------------------------------------------------------------
+
+export function buildQuestionMappingPrompt(
+  sectionHeadings: Array<{ id: string; title: string }>,
+  questions: Array<{ id: string; question: string }>
+): string {
+  const sectionsText = sectionHeadings
+    .map((s) => `${s.id}: "${s.title}"`)
+    .join("\n");
+
+  const questionsText = questions
+    .map((q) => `${q.id}: "${q.question}"`)
+    .join("\n");
+
+  return `You are mapping bid document sections to funder application questions.
+
+## Document Sections
+
+${sectionsText}
+
+## Funder Questions
+
+${questionsText}
+
+## Task
+
+Match each section to the most appropriate question. A section should only be mapped to a question if its content is clearly intended to answer that question. Not every section needs a mapping (e.g., preamble, cover pages).
+
+Return a JSON object:
+
+\`\`\`json
+{
+  "mappings": [
+    { "section_id": "s1", "question_id": "q1" }
+  ]
+}
+\`\`\`
+
+Only include mappings where you are confident the section addresses that question. Return ONLY the JSON object.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -350,10 +494,12 @@ Return ONLY the JSON object, no other text.`;
 export function buildSectionAnalysisPrompt(
   parsedBid: ParsedBid,
   section: Section,
-  completeDraft = true
+  completeDraft = true,
+  wordCountContext?: WordCountContext
 ): string {
   const sectionText = formatSectionText(section, parsedBid.paragraphs);
   const docMapLite = formatDocumentMapLite(parsedBid);
+  const wordCountGuidance = formatWordCountGuidance(section.id, wordCountContext);
 
   return `## Task: Analyse Section "${section.title}"
 
@@ -366,7 +512,7 @@ ${docMapLite}
 ## Section to Analyse: ${section.id} — "${section.title}" (${section.word_count} words, paragraphs: ${section.paragraph_ids.join(", ")})
 
 ${sectionText}
-
+${wordCountGuidance}
 ## Required Output
 
 Return a JSON object matching this exact structure:
@@ -491,11 +637,13 @@ export function buildScoringPrompt(
   sectionAnalyses: SectionAnalysis[],
   crossReference: unknown,
   criteria: Criterion[],
-  completeDraft = true
+  completeDraft = true,
+  wordCountContext?: WordCountContext
 ): string {
   const docMap = formatDocumentMapLite(parsedBid);
   const criteriaText = formatCriteria(criteria);
   const analysesText = formatAnalysesSummary(sectionAnalyses);
+  const wordCountSummary = formatWordCountSummaryForScoring(wordCountContext);
   // Compact JSON to save tokens; limit findings to top 20 if there are more
   const crossRefObj = crossReference as { findings?: unknown[] };
   const trimmedCrossRef = crossRefObj.findings && crossRefObj.findings.length > 20
@@ -522,7 +670,7 @@ ${analysesText}
 ## Cross-Reference Findings
 
 ${crossRefText}
-
+${wordCountSummary}
 ## Required Output
 
 Return a JSON object:

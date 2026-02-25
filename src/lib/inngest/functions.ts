@@ -8,10 +8,13 @@ import {
   SectionAnalysisSchema,
   CrossReferenceSchema,
   ScoringSchema,
+  QuestionMappingSchema,
   type SectionAnalysis,
   type CrossReference,
   type Scoring,
 } from "@/lib/pipeline/schemas";
+import type { QuestionsSet } from "@/lib/schemas/criteria";
+import { matchQuestionsToSections } from "@/lib/pipeline/question-matcher";
 import {
   buildPreFlightPrompt,
   buildSectionAnalysisPrompt,
@@ -19,6 +22,7 @@ import {
   buildCrossReferencePrompt,
   buildScoringPrompt,
   buildScoringSystemPrompt,
+  buildQuestionMappingPrompt,
   createSkippedSectionAnalysis,
   splitLargeSection,
   mergeSectionAnalyses,
@@ -26,6 +30,7 @@ import {
   MAX_BID_WORDS,
   MAX_SECTION_WORDS,
   type Criterion,
+  type WordCountContext,
 } from "@/lib/pipeline/prompt-templates";
 import { generateReviewDoc } from "@/lib/pipeline/generate-review";
 
@@ -80,28 +85,78 @@ export const reviewSubmitted = inngest.createFunction(
     id: "review-submitted",
     concurrency: { key: "event.data.userId", limit: 1 },
     retries: 3,
+    onFailure: async ({ event }) => {
+      const { reviewId } = event.data.event.data;
+      if (reviewId) {
+        await markFailed(
+          reviewId,
+          "The review pipeline encountered an unexpected error. Please try again."
+        );
+      }
+    },
   },
   { event: "review/submitted" },
   async ({ event, step }) => {
     const { reviewId, userId, completeDraft = true } = event.data;
 
     // -----------------------------------------------------------------------
-    // Load review metadata
+    // Load review metadata (join through criteria_sets / questions_sets)
     // -----------------------------------------------------------------------
     const reviewData = await step.run("load-review", async () => {
       const supabase = createServiceClient();
       const { data, error } = await supabase
         .from("reviews")
-        .select("bid_file_name, bid_file_path, criteria_json, model_tier")
+        .select(
+          "bid_file_name, bid_file_path, model_tier, criteria_set_id, questions_set_id, criteria_json, questions_json"
+        )
         .eq("id", reviewId)
         .single();
 
       if (error || !data) throw new NonRetriableError(`Review not found: ${reviewId}`);
-      return data;
+
+      // Load criteria from set table (new path) or fall back to inline JSONB (legacy)
+      let criteriaFromSet: Criterion[] | null = null;
+      if (data.criteria_set_id) {
+        const { data: cs } = await supabase
+          .from("criteria_sets")
+          .select("criteria_json")
+          .eq("id", data.criteria_set_id)
+          .single();
+        if (cs?.criteria_json) {
+          criteriaFromSet = cs.criteria_json as unknown as Criterion[];
+        }
+      }
+
+      // Load questions from set table (new path) or fall back to inline JSONB (legacy)
+      let questionsFromSet: QuestionsSet | null = null;
+      if (data.questions_set_id) {
+        const { data: qs } = await supabase
+          .from("questions_sets")
+          .select("questions_json, overall_word_limit")
+          .eq("id", data.questions_set_id)
+          .single();
+        if (qs?.questions_json) {
+          questionsFromSet = {
+            questions: qs.questions_json as unknown as QuestionsSet["questions"],
+            overall_word_limit: qs.overall_word_limit ?? undefined,
+          };
+        }
+      }
+
+      return {
+        bid_file_name: data.bid_file_name,
+        bid_file_path: data.bid_file_path,
+        model_tier: data.model_tier,
+        // New path: criteria from set; legacy fallback: inline JSONB
+        criteria: criteriaFromSet ?? (data.criteria_json as { criteria: Criterion[] })?.criteria ?? [],
+        // New path: questions from set; legacy fallback: inline JSONB
+        questionsSet: questionsFromSet ?? (data.questions_json as QuestionsSet | null),
+      };
     });
 
     const model = MODEL_MAP[reviewData.model_tier] ?? MODEL_MAP.sonnet;
-    const criteria = (reviewData.criteria_json as { criteria: Criterion[] })?.criteria ?? [];
+    const criteria = reviewData.criteria;
+    const questionsSet = reviewData.questionsSet;
 
     // -----------------------------------------------------------------------
     // Step 1: Parse bid
@@ -179,6 +234,90 @@ export const reviewSubmitted = inngest.createFunction(
     }
 
     // -----------------------------------------------------------------------
+    // Step 2.5: Question matching (when questions provided)
+    // -----------------------------------------------------------------------
+    let wordCountContext: WordCountContext | undefined;
+
+    if (questionsSet?.questions?.length) {
+      const matchResult = await step.run("question-matching", async () => {
+        const result = matchQuestionsToSections(parsedBid, questionsSet.questions);
+
+        // AI fallback for low-confidence matching
+        if (result.match_confidence === "low") {
+          const mappingPrompt = buildQuestionMappingPrompt(
+            parsedBid.sections.map((s) => ({ id: s.id, title: s.title })),
+            questionsSet.questions.map((q) => ({ id: q.id, question: q.question }))
+          );
+          const mapping = await callClaude({
+            prompt: mappingPrompt,
+            schema: QuestionMappingSchema,
+            model: MODEL_MAP.haiku,
+            maxTokens: 1024,
+          });
+
+          // Clear sequential fallback assignments so AI can fully replace them
+          for (const section of result.sections) {
+            section.question_id = undefined;
+            section.word_count_min = undefined;
+            section.word_count_max = undefined;
+          }
+
+          // Apply AI mappings to sections
+          for (const m of mapping.mappings) {
+            const section = result.sections.find((s) => s.id === m.section_id);
+            const question = questionsSet.questions.find((q) => q.id === m.question_id);
+            if (section && question) {
+              section.question_id = question.id;
+              section.word_count_min = question.word_count_min;
+              section.word_count_max = question.word_count_max;
+            }
+          }
+        }
+
+        await updateProgress(reviewId, "parsing", {
+          question_matching_completed: Date.now(),
+          match_confidence: result.match_confidence,
+        });
+
+        return result;
+      });
+
+      // Replace sections with question-matched versions
+      parsedBid.sections = matchResult.sections;
+
+      // Compute word count context
+      const matchedQuestionIds = new Set(
+        parsedBid.sections.map((s) => s.question_id).filter(Boolean)
+      );
+      const unmatchedWithLimits = questionsSet.questions
+        .filter((q) => !matchedQuestionIds.has(q.id) && (q.word_count_max || q.word_count_min))
+        .map((q) => ({
+          question_id: q.id,
+          question_text: q.question,
+          word_count_min: q.word_count_min,
+          word_count_max: q.word_count_max,
+        }));
+
+      wordCountContext = {
+        overall_word_limit: questionsSet.overall_word_limit,
+        overall_word_count: parsedBid.metadata.total_words,
+        sections: parsedBid.sections.map((s) => {
+          const question = questionsSet.questions.find((q) => q.id === s.question_id);
+          return {
+            section_id: s.id,
+            question_id: s.question_id,
+            question_text: question?.question,
+            word_count: s.word_count,
+            word_count_min: s.word_count_min,
+            word_count_max: s.word_count_max,
+            utilization: s.word_count_max ? s.word_count / s.word_count_max : 0,
+          };
+        }),
+        unmatched_questions_with_limits: unmatchedWithLimits.length > 0 ? unmatchedWithLimits : undefined,
+      };
+    }
+
+    // -----------------------------------------------------------------------
     // Step 3: Section analysis (sequential — one per section)
     // -----------------------------------------------------------------------
     const sectionAnalyses: SectionAnalysis[] = [];
@@ -218,7 +357,7 @@ export const reviewSubmitted = inngest.createFunction(
                 analysis_started: Date.now(),
               });
 
-              const prompt = buildSectionAnalysisPrompt(parsedBid, subSection, completeDraft);
+              const prompt = buildSectionAnalysisPrompt(parsedBid, subSection, completeDraft, wordCountContext);
               const result = await callClaude({
                 prompt,
                 systemPrompt: sectionSystemPrompt,
@@ -267,7 +406,7 @@ export const reviewSubmitted = inngest.createFunction(
               analysis_started: Date.now(),
             });
 
-            const prompt = buildSectionAnalysisPrompt(parsedBid, section, completeDraft);
+            const prompt = buildSectionAnalysisPrompt(parsedBid, section, completeDraft, wordCountContext);
             const result = await callClaude({
               prompt,
               systemPrompt: sectionSystemPrompt,
@@ -335,7 +474,7 @@ export const reviewSubmitted = inngest.createFunction(
 
     const scoring: Scoring = await step.run("scoring", async () => {
 
-      const prompt = buildScoringPrompt(parsedBid, sectionAnalyses, crossReference, criteria, completeDraft);
+      const prompt = buildScoringPrompt(parsedBid, sectionAnalyses, crossReference, criteria, completeDraft, wordCountContext);
       const result = await callClaude({
         prompt,
         systemPrompt: scoringSystemPrompt,
@@ -359,7 +498,7 @@ export const reviewSubmitted = inngest.createFunction(
     const outputPath = await step.run("generate-doc", async () => {
 
       const bidName = reviewData.bid_file_name.replace(/\.docx$/i, "");
-      const docBuffer = await generateReviewDoc(parsedBid, sectionAnalyses, scoring, bidName);
+      const docBuffer = await generateReviewDoc(parsedBid, sectionAnalyses, scoring, bidName, wordCountContext);
 
       // Upload to Supabase Storage
       const supabase = createServiceClient();
@@ -377,8 +516,8 @@ export const reviewSubmitted = inngest.createFunction(
         throw new Error(`Failed to upload review: ${uploadError.message}`);
       }
 
-      // Save results + mark completed
-      await supabase
+      // Save results
+      const { error: resultsError } = await supabase
         .from("review_results")
         .update({
           results: {
@@ -389,14 +528,27 @@ export const reviewSubmitted = inngest.createFunction(
         })
         .eq("review_id", reviewId);
 
-      await supabase
-        .from("reviews")
-        .update({ status: "completed", output_file_path: filePath })
-        .eq("id", reviewId);
-
-      await updateProgress(reviewId, "completed", { generation_completed: Date.now() });
+      if (resultsError) {
+        console.error("Failed to save review results:", resultsError);
+      }
 
       return filePath;
+    });
+
+    // Mark completed in a separate step so it always runs even if generate-doc
+    // retried after a partial failure (upload succeeded but DB update didn't)
+    await step.run("mark-completed", async () => {
+      const supabase = createServiceClient();
+      const { error: statusError } = await supabase
+        .from("reviews")
+        .update({ status: "completed", output_file_path: outputPath })
+        .eq("id", reviewId);
+
+      if (statusError) {
+        throw new Error(`Failed to mark review as completed: ${statusError.message}`);
+      }
+
+      await updateProgress(reviewId, "completed", { generation_completed: Date.now() });
     });
 
     return { reviewId, status: "completed", outputPath };

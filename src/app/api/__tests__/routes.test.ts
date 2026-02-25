@@ -187,10 +187,8 @@ describe("POST /api/submit-review", () => {
   const validBody = {
     bidFileName: "test.docx",
     bidFilePath: "user-123/abc/test.docx",
-    criteriaJson: {
-      name: "Test criteria",
-      criteria: [{ id: "c1", criterion: "Quality", sub_questions: [] }],
-    },
+    fundId: "550e8400-e29b-41d4-a716-446655440000",
+    criteriaSetId: "660e8400-e29b-41d4-a716-446655440000",
   };
 
   it("returns 401 when not authenticated", async () => {
@@ -281,10 +279,12 @@ describe("POST /api/submit-review", () => {
     const usageChain = chainMock({
       data: { reviews_used: 0, reviews_limit: 10, bonus_reviews: 0 },
     });
+    const criteriaSetChain = chainMock({ data: { id: validBody.criteriaSetId, fund_id: validBody.fundId } });
     mockServiceFrom.mockImplementation((table: string) => {
       if (table === "profiles") return profileChain;
       if (table === "usage") return usageChain;
       if (table === "review_results") return chainMock({ error: null });
+      if (table === "criteria_sets") return criteriaSetChain;
       return chainMock({ data: null });
     });
     mockServiceStorageFrom.mockReturnValue({
@@ -311,7 +311,7 @@ describe("POST /api/submit-review", () => {
 
     expect(mockInngestSend).toHaveBeenCalledWith({
       name: "review/submitted",
-      data: { reviewId: "rev-1", userId: "user-123", completeDraft: true },
+      data: { reviewId: "rev-1", userId: "user-123", completeDraft: true, hasQuestions: false },
     });
   });
 
@@ -322,10 +322,12 @@ describe("POST /api/submit-review", () => {
     const usageChain = chainMock({
       data: { reviews_used: 0, reviews_limit: 10, bonus_reviews: 0 },
     });
+    const criteriaSetChain = chainMock({ data: { id: validBody.criteriaSetId, fund_id: validBody.fundId } });
     mockServiceFrom.mockImplementation((table: string) => {
       if (table === "profiles") return profileChain;
       if (table === "usage") return usageChain;
       if (table === "review_results") return chainMock({ error: null });
+      if (table === "criteria_sets") return criteriaSetChain;
       return chainMock({ data: null });
     });
     mockServiceStorageFrom.mockReturnValue({
@@ -361,10 +363,12 @@ describe("POST /api/submit-review", () => {
     const usageChain = chainMock({
       data: { reviews_used: 10, reviews_limit: 10, bonus_reviews: 2 },
     });
+    const criteriaSetChain = chainMock({ data: { id: validBody.criteriaSetId, fund_id: validBody.fundId } });
     mockServiceFrom.mockImplementation((table: string) => {
       if (table === "profiles") return profileChain;
       if (table === "usage") return usageChain;
       if (table === "review_results") return chainMock({ error: null });
+      if (table === "criteria_sets") return criteriaSetChain;
       return chainMock({ data: null });
     });
     mockServiceStorageFrom.mockReturnValue({
@@ -393,10 +397,12 @@ describe("POST /api/submit-review", () => {
     const usageChain = chainMock({
       data: { reviews_used: 0, reviews_limit: 10, bonus_reviews: 0 },
     });
+    const criteriaSetChain = chainMock({ data: { id: validBody.criteriaSetId, fund_id: validBody.fundId } });
     mockServiceFrom.mockImplementation((table: string) => {
       if (table === "profiles") return profileChain;
       if (table === "usage") return usageChain;
       if (table === "review_results") return chainMock({ error: null });
+      if (table === "criteria_sets") return criteriaSetChain;
       return chainMock({ data: null });
     });
     // 200KB ≈ 40K words — above 30K threshold

@@ -27,6 +27,12 @@ export function DashboardNav({
         </Link>
         <div className="flex items-center gap-4">
           <Link
+            href="/applications/new"
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            New Application
+          </Link>
+          <Link
             href="/billing"
             className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium capitalize transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
           >

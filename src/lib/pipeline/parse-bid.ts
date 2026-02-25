@@ -1,4 +1,7 @@
 /**
+ * @deprecated Used by legacy document-upload review pipeline.
+ * New form-based applications don't need document parsing.
+ *
  * Bid parser — converts .docx buffer into structured document map.
  * Ported from prototypes/end-to-end/parse-bid.js
  */
@@ -22,6 +25,9 @@ export interface Section {
   level: number;
   word_count: number;
   paragraph_ids: string[];
+  question_id?: string;
+  word_count_min?: number;
+  word_count_max?: number;
 }
 
 export interface ParsedBid {
@@ -205,10 +211,14 @@ function extractParagraphs(html: string): string[] {
     }
   }
 
-  // Table cells
+  // Table cells — only extract from <td> elements that do NOT contain <p>/<li>
+  // tags, since those inner elements are already captured by the regex above.
+  // This avoids double-counting words when tables wrap content in paragraphs.
   const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
   while ((pMatch = cellRegex.exec(html)) !== null) {
-    const text = stripHtml(pMatch[1]);
+    const cellHtml = pMatch[1];
+    if (/<(?:p|li)[^>]*>/i.test(cellHtml)) continue; // already captured above
+    const text = stripHtml(cellHtml);
     if (text.length > 10) {
       paragraphs.push(text);
     }

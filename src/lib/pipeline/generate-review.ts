@@ -1,4 +1,7 @@
 /**
+ * @deprecated Used by legacy document-upload review pipeline.
+ * New form-based applications display feedback in-browser.
+ *
  * Review document generator — produces .docx with scorecard, comments, appendix.
  * Ported from prototypes/end-to-end/generate-review.js
  */
@@ -23,6 +26,7 @@ import {
 import AdmZip from "adm-zip";
 import type { ParsedBid } from "./parse-bid";
 import type { SectionAnalysis, Scoring, ImprovementAppendixItem } from "./schemas";
+import type { WordCountContext } from "./prompt-templates";
 
 // ---------------------------------------------------------------------------
 // Colour definitions
@@ -500,6 +504,182 @@ function buildAppendix(appendixItems: ImprovementAppendixItem[] | undefined): Pa
 }
 
 // ---------------------------------------------------------------------------
+// Section 4: Word count summary (optional — only when questions have limits)
+// ---------------------------------------------------------------------------
+
+const WC_STATUS_COLOURS: Record<string, { fill: string; text: string }> = {
+  green: { fill: "00B050", text: "FFFFFF" },
+  amber: { fill: "FFC000", text: "000000" },
+  red: { fill: "FF0000", text: "FFFFFF" },
+  gray: { fill: "E0E0E0", text: "666666" },
+};
+
+function getWordCountStatus(utilization: number, hasLimit: boolean): { label: string; colour: string } {
+  if (!hasLimit) return { label: "—", colour: "gray" };
+  if (utilization > 0.9) return { label: "Over budget", colour: "red" };
+  if (utilization >= 0.7) return { label: "Near limit", colour: "amber" };
+  return { label: "Within limit", colour: "green" };
+}
+
+function buildWordCountSummary(wordCountContext?: WordCountContext): Paragraph[] {
+  if (!wordCountContext) return [];
+
+  const hasLimits = wordCountContext.sections.some((s) => s.word_count_max);
+  const hasUnmatchedLimits = (wordCountContext.unmatched_questions_with_limits?.length ?? 0) > 0;
+  if (!hasLimits && !hasUnmatchedLimits && !wordCountContext.overall_word_limit) return [];
+
+  const children: Paragraph[] = [];
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+
+  children.push(
+    new Paragraph({
+      children: [
+        new TextRun({ text: "Word Count Summary", bold: true, size: 32, color: "1F3864" }),
+      ],
+      heading: HeadingLevel.HEADING_1,
+      spacing: { after: 200 },
+    })
+  );
+
+  children.push(
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: "Word count utilisation per section against funder limits.",
+          size: 20,
+          color: "666666",
+          italics: true,
+        }),
+      ],
+      spacing: { after: 300 },
+    })
+  );
+
+  // Header row
+  const headerRow = new TableRow({
+    children: [
+      createCell("Section", {
+        bold: true,
+        shading: "1F3864",
+        fontColor: "FFFFFF",
+        width: { size: 40, type: WidthType.PERCENTAGE },
+      }),
+      createCell("Words", {
+        bold: true,
+        shading: "1F3864",
+        fontColor: "FFFFFF",
+        alignment: AlignmentType.CENTER,
+        width: { size: 15, type: WidthType.PERCENTAGE },
+      }),
+      createCell("Limit", {
+        bold: true,
+        shading: "1F3864",
+        fontColor: "FFFFFF",
+        alignment: AlignmentType.CENTER,
+        width: { size: 15, type: WidthType.PERCENTAGE },
+      }),
+      createCell("Status", {
+        bold: true,
+        shading: "1F3864",
+        fontColor: "FFFFFF",
+        alignment: AlignmentType.CENTER,
+        width: { size: 30, type: WidthType.PERCENTAGE },
+      }),
+    ],
+  });
+
+  const dataRows = wordCountContext.sections.map((s) => {
+    const label = s.question_text
+      ? `${s.section_id}: ${s.question_text.substring(0, 50)}${s.question_text.length > 50 ? "..." : ""}`
+      : s.section_id;
+    const limitStr = s.word_count_max ? `${s.word_count_max}` : "—";
+    const status = getWordCountStatus(s.utilization, !!s.word_count_max);
+    const statusColour = WC_STATUS_COLOURS[status.colour] ?? WC_STATUS_COLOURS.gray;
+
+    return new TableRow({
+      children: [
+        createCell(label, { fontSize: 18 }),
+        createCell(`${s.word_count}`, { alignment: AlignmentType.CENTER, fontSize: 18 }),
+        createCell(limitStr, { alignment: AlignmentType.CENTER, fontSize: 18 }),
+        createCell(status.label, {
+          bold: true,
+          shading: statusColour.fill,
+          fontColor: statusColour.text,
+          alignment: AlignmentType.CENTER,
+          fontSize: 18,
+        }),
+      ],
+    });
+  });
+
+  // Unmatched questions with limits (not found in bid)
+  if (wordCountContext.unmatched_questions_with_limits?.length) {
+    for (const uq of wordCountContext.unmatched_questions_with_limits) {
+      const label = `${uq.question_id}: ${uq.question_text.substring(0, 50)}${uq.question_text.length > 50 ? "..." : ""}`;
+      const limitStr = uq.word_count_max ? `${uq.word_count_max}` : "—";
+      dataRows.push(
+        new TableRow({
+          children: [
+            createCell(label, { fontSize: 18 }),
+            createCell("—", { alignment: AlignmentType.CENTER, fontSize: 18 }),
+            createCell(limitStr, { alignment: AlignmentType.CENTER, fontSize: 18 }),
+            createCell("Not matched", {
+              bold: true,
+              shading: WC_STATUS_COLOURS.gray.fill,
+              fontColor: WC_STATUS_COLOURS.gray.text,
+              alignment: AlignmentType.CENTER,
+              fontSize: 18,
+            }),
+          ],
+        })
+      );
+    }
+  }
+
+  // Overall total row
+  if (wordCountContext.overall_word_limit) {
+    const overallUtil = wordCountContext.overall_word_count / wordCountContext.overall_word_limit;
+    const overallStatus = getWordCountStatus(overallUtil, true);
+    const overallColour = WC_STATUS_COLOURS[overallStatus.colour] ?? WC_STATUS_COLOURS.gray;
+
+    dataRows.push(
+      new TableRow({
+        children: [
+          createCell("TOTAL", { bold: true, fontSize: 18 }),
+          createCell(`${wordCountContext.overall_word_count}`, {
+            bold: true,
+            alignment: AlignmentType.CENTER,
+            fontSize: 18,
+          }),
+          createCell(`${wordCountContext.overall_word_limit}`, {
+            bold: true,
+            alignment: AlignmentType.CENTER,
+            fontSize: 18,
+          }),
+          createCell(overallStatus.label, {
+            bold: true,
+            shading: overallColour.fill,
+            fontColor: overallColour.text,
+            alignment: AlignmentType.CENTER,
+            fontSize: 18,
+          }),
+        ],
+      })
+    );
+  }
+
+  children.push(
+    new Table({
+      rows: [headerRow, ...dataRows],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+    }) as unknown as Paragraph
+  );
+
+  return children;
+}
+
+// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 
@@ -507,9 +687,11 @@ export async function generateReviewDoc(
   parsedBid: ParsedBid,
   sectionAnalyses: SectionAnalysis[],
   scoring: Scoring,
-  bidName: string
+  bidName: string,
+  wordCountContext?: WordCountContext
 ): Promise<Buffer> {
   const scorecardChildren = buildScorecardPage(scoring, bidName);
+  const wordCountChildren = buildWordCountSummary(wordCountContext);
   const { children: annotatedChildren, commentOptions } = buildAnnotatedBid(
     parsedBid,
     sectionAnalyses
@@ -524,6 +706,7 @@ export async function generateReviewDoc(
       {
         children: [
           ...scorecardChildren,
+          ...wordCountChildren,
           ...(annotatedChildren as Paragraph[]),
           ...appendixChildren,
         ],

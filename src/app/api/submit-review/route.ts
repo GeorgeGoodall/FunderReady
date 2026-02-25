@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { SubmitReviewRequestSchema } from "@/lib/schemas/criteria";
+import { SubmitReviewRequestV2Schema } from "@/lib/schemas/criteria";
 import { inngest } from "@/lib/inngest/client";
 import { getUsagePeriod } from "@/lib/usage/period";
 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const parsed = SubmitReviewRequestSchema.safeParse(body);
+  const parsed = SubmitReviewRequestV2Schema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.errors[0]?.message ?? "Invalid request" },
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { bidFileName, bidFilePath, criteriaJson, completeDraft } = parsed.data;
+  const { bidFileName, bidFilePath, fundId, criteriaSetId, questionsSetId, completeDraft } = parsed.data;
   const serviceClient = createServiceClient();
 
   // Get profile for model tier and billing period
@@ -85,6 +85,36 @@ export async function POST(request: Request) {
     );
   }
 
+  // Validate that criteria set exists and belongs to the fund
+  const { data: criteriaSet } = await serviceClient
+    .from("criteria_sets")
+    .select("id, fund_id")
+    .eq("id", criteriaSetId)
+    .single();
+
+  if (!criteriaSet || criteriaSet.fund_id !== fundId) {
+    return NextResponse.json(
+      { error: "Invalid criteria set for this fund" },
+      { status: 400 }
+    );
+  }
+
+  // Validate questions set if provided
+  if (questionsSetId) {
+    const { data: questionsSet } = await serviceClient
+      .from("questions_sets")
+      .select("id, fund_id")
+      .eq("id", questionsSetId)
+      .single();
+
+    if (!questionsSet || questionsSet.fund_id !== fundId) {
+      return NextResponse.json(
+        { error: "Invalid questions set for this fund" },
+        { status: 400 }
+      );
+    }
+  }
+
   // Create review row (RLS enforced via user's client)
   const { data: review, error: reviewError } = await supabase
     .from("reviews")
@@ -93,7 +123,9 @@ export async function POST(request: Request) {
       status: "pending",
       bid_file_name: bidFileName,
       bid_file_path: bidFilePath,
-      criteria_json: criteriaJson,
+      fund_id: fundId,
+      criteria_set_id: criteriaSetId,
+      questions_set_id: questionsSetId ?? null,
       model_tier: modelTier,
     })
     .select("id")
@@ -141,7 +173,12 @@ export async function POST(request: Request) {
   // Fire Inngest event
   await inngest.send({
     name: "review/submitted",
-    data: { reviewId: review.id, userId: user.id, completeDraft },
+    data: {
+      reviewId: review.id,
+      userId: user.id,
+      completeDraft,
+      hasQuestions: !!questionsSetId,
+    },
   });
 
   return NextResponse.json(

@@ -19,7 +19,7 @@ export default async function ReviewPage({
 
   const { data: review } = await supabase
     .from("reviews")
-    .select("id, status, bid_file_name, created_at, output_file_path, error_message")
+    .select("id, status, bid_file_name, created_at, output_file_path, error_message, fund_id, funds(name)")
     .eq("id", id)
     .single();
 
@@ -31,9 +31,16 @@ export default async function ReviewPage({
     .eq("review_id", id)
     .single();
 
+  const fundName = (review as unknown as { funds: { name: string }[] | null }).funds?.[0]?.name;
+
   return (
     <div>
       <h1 className="text-2xl font-bold">{review.bid_file_name}</h1>
+      {fundName && (
+        <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
+          Fund: {fundName}
+        </p>
+      )}
       <p className="mt-1 text-xs text-zinc-500">
         Submitted{" "}
         {new Date(review.created_at).toLocaleDateString("en-GB", {

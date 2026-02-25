@@ -1,0 +1,197 @@
+"use client";
+
+import { CopyButton } from "./CopyButton";
+
+interface Question {
+  id: string;
+  question: string;
+  word_count_min?: number;
+  word_count_max?: number;
+  guidance?: string;
+  field_type?: string;
+  options?: string[];
+  char_limit?: number;
+  required?: boolean;
+  section?: string;
+}
+
+interface FormFieldProps {
+  question: Question;
+  value: string;
+  selectedOptions?: string[];
+  lastReviewedText?: string | null;
+  onChange: (value: string) => void;
+  onOptionsChange?: (options: string[]) => void;
+  onBlur: () => void;
+}
+
+function wordCount(text: string): number {
+  return text.trim() ? text.trim().split(/\s+/).length : 0;
+}
+
+function WordCounter({ text, min, max }: { text: string; min?: number; max?: number }) {
+  const count = wordCount(text);
+  if (!min && !max) return null;
+
+  const limit = max ?? 0;
+  const ratio = limit > 0 ? count / limit : 0;
+  const colour =
+    limit > 0 && ratio > 0.95
+      ? "text-red-600 dark:text-red-400"
+      : limit > 0 && ratio > 0.8
+        ? "text-amber-600 dark:text-amber-400"
+        : "text-zinc-500";
+
+  return (
+    <span className={`text-xs ${colour}`}>
+      {count} words
+      {max ? ` / ${max}` : ""}
+      {min && count < min ? ` (min ${min})` : ""}
+    </span>
+  );
+}
+
+export function FormField({
+  question,
+  value,
+  selectedOptions,
+  lastReviewedText,
+  onChange,
+  onOptionsChange,
+  onBlur,
+}: FormFieldProps) {
+  const fieldType = question.field_type ?? "text_long";
+  const isOutdated =
+    lastReviewedText !== null &&
+    lastReviewedText !== undefined &&
+    value !== lastReviewedText;
+
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            {question.question}
+            {question.required !== false && (
+              <span className="ml-1 text-red-500">*</span>
+            )}
+          </label>
+          {question.guidance && (
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              {question.guidance}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {isOutdated && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              Changed since review
+            </span>
+          )}
+          {value.trim() && <CopyButton text={value} />}
+        </div>
+      </div>
+
+      <div className="mt-3">
+        {fieldType === "text_short" && (
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={onBlur}
+            maxLength={question.char_limit}
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+          />
+        )}
+
+        {fieldType === "text_long" && (
+          <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={onBlur}
+            rows={Math.max(4, Math.min(12, Math.ceil(value.length / 80)))}
+            maxLength={question.char_limit}
+            className="w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+          />
+        )}
+
+        {fieldType === "dropdown" && question.options && (
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={onBlur}
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+          >
+            <option value="">Select an option...</option>
+            {question.options.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {fieldType === "radio" && question.options && (
+          <div className="space-y-2">
+            {question.options.map((opt) => (
+              <label key={opt} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name={`q-${question.id}`}
+                  value={opt}
+                  checked={value === opt}
+                  onChange={(e) => onChange(e.target.value)}
+                  onBlur={onBlur}
+                  className="text-blue-600 focus:ring-blue-500"
+                />
+                {opt}
+              </label>
+            ))}
+          </div>
+        )}
+
+        {fieldType === "checkbox" && question.options && (
+          <div className="space-y-2">
+            {question.options.map((opt) => {
+              const checked = (selectedOptions ?? []).includes(opt);
+              return (
+                <label key={opt} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      const current = selectedOptions ?? [];
+                      const updated = checked
+                        ? current.filter((o) => o !== opt)
+                        : [...current, opt];
+                      onOptionsChange?.(updated);
+                    }}
+                    onBlur={onBlur}
+                    className="rounded text-blue-600 focus:ring-blue-500"
+                  />
+                  {opt}
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Word counter for text fields */}
+      {(fieldType === "text_long" || fieldType === "text_short") && (
+        <div className="mt-1.5 flex items-center justify-between">
+          <WordCounter
+            text={value}
+            min={question.word_count_min}
+            max={question.word_count_max}
+          />
+          {question.char_limit && (
+            <span className="text-xs text-zinc-400">
+              {value.length} / {question.char_limit} chars
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
