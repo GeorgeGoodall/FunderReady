@@ -195,6 +195,11 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
         setSelectedFund(fundData.fund);
       }
 
+      if (!fund) {
+        setError("Fund data unavailable");
+        return;
+      }
+
       const savedCriteriaSetId = await saveCriteriaSetsIfNeeded(fund.id);
       const savedQuestionsSetId = await saveQuestionsSetsIfNeeded(fund.id);
 
