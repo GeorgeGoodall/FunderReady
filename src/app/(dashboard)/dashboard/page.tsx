@@ -21,15 +21,7 @@ export default async function DashboardPage() {
     <div className="space-y-10">
       {/* Applications section */}
       <div>
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Your Applications</h1>
-          <Link
-            href="/applications/new"
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            New Application
-          </Link>
-        </div>
+        <h1 className="text-2xl font-bold">Your Applications</h1>
 
         {!hasApplications && (
           <div className="mt-16 text-center">
