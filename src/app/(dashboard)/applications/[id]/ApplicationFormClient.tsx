@@ -69,6 +69,42 @@ export function ApplicationFormClient({
   const [error, setError] = useState("");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
+  // Title editing
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState(application.title ?? "");
+  const [savingTitle, setSavingTitle] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTitleEdit = () => {
+    setEditingTitle(true);
+    setTimeout(() => titleInputRef.current?.select(), 0);
+  };
+
+  const handleTitleSave = async () => {
+    setEditingTitle(false);
+    const trimmed = titleValue.trim();
+    // No change
+    if (trimmed === (application.title ?? "")) return;
+    setSavingTitle(true);
+    try {
+      await fetch(`/api/applications/${application.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: trimmed }),
+      });
+    } finally {
+      setSavingTitle(false);
+    }
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") handleTitleSave();
+    if (e.key === "Escape") {
+      setTitleValue(application.title ?? "");
+      setEditingTitle(false);
+    }
+  };
+
   // Parse questions from the questions set
   const questions: Question[] = Array.isArray(questionsSet?.questions_json)
     ? (questionsSet.questions_json as unknown as Question[])
@@ -238,9 +274,39 @@ export function ApplicationFormClient({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">
-            {application.title ?? fund?.name ?? "Application"}
-          </h1>
+          {editingTitle ? (
+            <input
+              ref={titleInputRef}
+              value={titleValue}
+              onChange={(e) => setTitleValue(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={handleTitleKeyDown}
+              placeholder={fund?.name ?? "Application name"}
+              className="w-full rounded-md border border-blue-400 bg-transparent px-2 py-0.5 text-2xl font-bold outline-none ring-2 ring-blue-200 dark:border-blue-500 dark:ring-blue-900/50"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={handleTitleEdit}
+              className="group flex items-center gap-2 text-left"
+            >
+              <h1 className="text-2xl font-bold">
+                {titleValue || fund?.name || "Application"}
+                {savingTitle && (
+                  <span className="ml-2 text-sm font-normal text-zinc-400">Saving...</span>
+                )}
+              </h1>
+              <svg
+                className="h-4 w-4 shrink-0 text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.75}
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+              </svg>
+            </button>
+          )}
           <p className="mt-1 text-sm text-zinc-500">
             {fund?.name}
             {fund?.funder_organisation ? ` — ${fund.funder_organisation}` : ""}
