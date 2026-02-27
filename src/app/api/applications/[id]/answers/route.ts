@@ -27,7 +27,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Application not found" }, { status: 404 });
   }
 
-  if (application.status !== "draft") {
+  if (application.status === "submitted_for_review") {
     return NextResponse.json(
       { error: "Cannot edit answers while review is in progress" },
       { status: 409 }
