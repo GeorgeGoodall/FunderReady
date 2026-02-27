@@ -1,6 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { QuestionsSet, Question } from "@/lib/schemas/criteria";
 
 interface QuestionsPreviewProps {
@@ -19,6 +34,8 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
 const FIELD_TYPES = ["text_long", "text_short", "dropdown", "radio", "checkbox"] as const;
 
 export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewProps) {
+  const sensors = useSensors(useSensor(PointerSensor));
+
   const updateQuestion = (index: number, updates: Partial<Question>) => {
     const questions = [...questionsSet.questions];
     questions[index] = { ...questions[index], ...updates };
@@ -40,6 +57,14 @@ export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewPro
         { id: newId, question: "" },
       ],
     });
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = questionsSet.questions.findIndex((q) => q.id === active.id);
+    const newIndex = questionsSet.questions.findIndex((q) => q.id === over.id);
+    onChange({ ...questionsSet, questions: arrayMove(questionsSet.questions, oldIndex, newIndex) });
   };
 
   return (
@@ -79,23 +104,30 @@ export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewPro
         )}
       </div>
 
-      <div className="space-y-3">
-        {questionsSet.questions.map((question, qi) => (
-          <QuestionCard
-            key={question.id}
-            question={question}
-            index={qi}
-            canRemove={questionsSet.questions.length > 1}
-            onUpdate={(updates) => updateQuestion(qi, updates)}
-            onRemove={() => removeQuestion(qi)}
-          />
-        ))}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext
+          items={questionsSet.questions.map((q) => q.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-3">
+            {questionsSet.questions.map((question, qi) => (
+              <SortableQuestionCard
+                key={question.id}
+                question={question}
+                index={qi}
+                canRemove={questionsSet.questions.length > 1}
+                onUpdate={(updates) => updateQuestion(qi, updates)}
+                onRemove={() => removeQuestion(qi)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }
 
-function QuestionCard({
+function SortableQuestionCard({
   question,
   index,
   canRemove,
@@ -108,17 +140,25 @@ function QuestionCard({
   onUpdate: (updates: Partial<Question>) => void;
   onRemove: () => void;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: question.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   const fieldType = question.field_type ?? "text_long";
   const hasOptions = fieldType === "dropdown" || fieldType === "radio" || fieldType === "checkbox";
   const [newOption, setNewOption] = useState("");
 
   const handleFieldTypeChange = (newType: string) => {
     const updates: Partial<Question> = { field_type: newType as Question["field_type"] };
-    // Clear options when switching away from option-based types
     if (newType !== "dropdown" && newType !== "radio" && newType !== "checkbox") {
       updates.options = undefined;
     }
-    // Initialize options array when switching to option-based types
     if ((newType === "dropdown" || newType === "radio" || newType === "checkbox") && !question.options?.length) {
       updates.options = [];
     }
@@ -136,8 +176,23 @@ function QuestionCard({
   };
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+    >
       <div className="flex items-start gap-3">
+        {/* Drag handle */}
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="mt-1.5 cursor-grab touch-none text-zinc-300 hover:text-zinc-500 active:cursor-grabbing dark:text-zinc-600 dark:hover:text-zinc-400"
+          aria-label="Drag to reorder"
+        >
+          <GripIcon />
+        </button>
+
         <span className="mt-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
           {index + 1}
         </span>
@@ -301,5 +356,24 @@ function QuestionCard({
         )}
       </div>
     </div>
+  );
+}
+
+function GripIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle cx="4" cy="2.5" r="1.2" />
+      <circle cx="10" cy="2.5" r="1.2" />
+      <circle cx="4" cy="7" r="1.2" />
+      <circle cx="10" cy="7" r="1.2" />
+      <circle cx="4" cy="11.5" r="1.2" />
+      <circle cx="10" cy="11.5" r="1.2" />
+    </svg>
   );
 }
