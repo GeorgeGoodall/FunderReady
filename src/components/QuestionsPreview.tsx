@@ -66,7 +66,7 @@ export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewPro
 
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          {questionsSet.questions.length} question{questionsSet.questions.length !== 1 ? "s" : ""} extracted
+          {questionsSet.questions.length} question{questionsSet.questions.length !== 1 ? "s" : ""}
         </h3>
         {questionsSet.questions.length < 30 && (
           <button

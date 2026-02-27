@@ -60,14 +60,23 @@ export function CriteriaInput({ onParsed }: CriteriaInputProps) {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={handleParse}
-        disabled={loading || rawText.trim().length < 10}
-        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {loading ? "Parsing..." : "Parse with AI"}
-      </button>
+      <div className="flex items-center gap-4">
+        <button
+          type="button"
+          onClick={handleParse}
+          disabled={loading || rawText.trim().length < 10}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? "Parsing..." : "Parse with AI"}
+        </button>
+        <button
+          type="button"
+          onClick={() => onParsed({ name: "Criteria", criteria: [{ id: "c1", criterion: "", sub_questions: [] }] })}
+          className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+        >
+          Enter manually instead
+        </button>
+      </div>
     </div>
   );
 }
