@@ -14,6 +14,12 @@ interface Application {
   funds: { name: string } | null;
 }
 
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function formatDateUTC(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
 export function ApplicationsList({ applications }: { applications: Application[] }) {
   const router = useRouter();
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -74,11 +80,7 @@ export function ApplicationsList({ applications }: { applications: Application[]
                     <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
                       <span>
                         Updated{" "}
-                        {new Date(app.updated_at).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {formatDateUTC(app.updated_at)}
                       </span>
                       {app.review_count > 0 && (
                         <span>

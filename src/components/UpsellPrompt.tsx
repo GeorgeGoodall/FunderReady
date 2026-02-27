@@ -33,11 +33,9 @@ export function UpsellPrompt({ tier, used, limit, resetDate }: UpsellPromptProps
   }
 
   // Pro user who hit their monthly limit
-  const resetStr = new Date(resetDate).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const d = new Date(resetDate);
+  const resetStr = `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 
   return (
     <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-900/20">

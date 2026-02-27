@@ -75,6 +75,11 @@ export function AdminDashboard({
     return 0;
   };
 
+  const formatDate = (iso: string): string => {
+    const d = new Date(iso);
+    return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+  };
+
   return (
     <div className="space-y-8">
       {/* Pending Criteria Sets */}
@@ -94,7 +99,7 @@ export function AdminDashboard({
                   <p className="text-sm text-zinc-500">
                     Fund: {cs.funds?.[0]?.name ?? "Unknown"} &middot;{" "}
                     {getCriteriaCount(cs.criteria_json)} criteria &middot;{" "}
-                    {new Date(cs.created_at).toLocaleDateString("en-GB")}
+                    {formatDate(cs.created_at)}
                   </p>
                 </div>
                 <button
@@ -129,7 +134,7 @@ export function AdminDashboard({
                   <p className="text-sm text-zinc-500">
                     {getQuestionsCount(qs.questions_json)} questions
                     {qs.overall_word_limit ? ` (${qs.overall_word_limit} word limit)` : ""} &middot;{" "}
-                    {new Date(qs.created_at).toLocaleDateString("en-GB")}
+                    {formatDate(qs.created_at)}
                   </p>
                 </div>
                 <button

@@ -117,12 +117,14 @@ function ScoreChart({ reviews }: { reviews: ReviewSummary[] }) {
 // Review row
 // ---------------------------------------------------------------------------
 
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function formatDateUTC(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
 function ReviewRow({ review, applicationId }: { review: ReviewSummary; applicationId: string }) {
-  const date = new Date(review.created_at).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const date = formatDateUTC(review.created_at);
 
   return (
     <div className="flex items-center gap-4 px-5 py-3">
