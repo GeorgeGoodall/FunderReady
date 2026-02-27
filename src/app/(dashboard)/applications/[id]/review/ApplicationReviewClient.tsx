@@ -555,6 +555,19 @@ function HighlightedText({
   text: string;
   comments: AnswerInlineComment[];
 }) {
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const containerRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpenIdx(null);
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, []);
+
   if (!text.trim()) {
     return <p className="text-sm italic text-zinc-400">No answer provided</p>;
   }
@@ -598,7 +611,13 @@ function HighlightedText({
       );
     }
     segments.push(
-      <CommentHighlight key={`h-${i}`} text={text.slice(m.start, m.end)} comment={m.comment} />
+      <CommentHighlight
+        key={`h-${i}`}
+        text={text.slice(m.start, m.end)}
+        comment={m.comment}
+        isOpen={openIdx === i}
+        onToggle={() => setOpenIdx(openIdx === i ? null : i)}
+      />
     );
     pos = m.end;
   }
@@ -607,7 +626,7 @@ function HighlightedText({
   }
 
   return (
-    <p className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">{segments}</p>
+    <p ref={containerRef} className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">{segments}</p>
   );
 }
 
@@ -618,12 +637,14 @@ function HighlightedText({
 function CommentHighlight({
   text,
   comment,
+  isOpen,
+  onToggle,
 }: {
   text: string;
   comment: AnswerInlineComment;
+  isOpen: boolean;
+  onToggle: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-
   const categoryColours: Record<string, string> = {
     ALIGNMENT: "bg-blue-100 dark:bg-blue-900/30",
     EVIDENCE: "bg-purple-100 dark:bg-purple-900/30",
@@ -641,12 +662,12 @@ function CommentHighlight({
     <span className="relative inline">
       <mark
         className={`cursor-pointer rounded-sm px-0.5 ${categoryColours[comment.category] ?? "bg-yellow-100 dark:bg-yellow-900/30"}`}
-        onClick={() => setOpen(!open)}
+        onClick={onToggle}
         title={`[${comment.category}] ${comment.issue}`}
       >
         {text}
       </mark>
-      {open && (
+      {isOpen && (
         <span className="absolute left-0 top-full z-20 mt-1 w-80 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
           <span className="mb-1 flex items-center justify-between">
             <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
@@ -654,7 +675,7 @@ function CommentHighlight({
             </span>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+              onClick={(e) => { e.stopPropagation(); onToggle(); }}
               className="text-xs text-zinc-400 hover:text-zinc-600"
             >
               &times;
