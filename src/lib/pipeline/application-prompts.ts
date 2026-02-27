@@ -84,7 +84,7 @@ export function buildAnswerAnalysisPrompt(
 
   let guidanceSection = "";
   if (answer.guidance) {
-    guidanceSection = `\n## Funder Guidance for This Question\n\n${answer.guidance}`;
+    guidanceSection = `\n## Funder Guidance for This Question\n\n${answer.guidance}\n\nIMPORTANT: Treat the funder guidance above as mandatory requirements for this question. The answer MUST address every point raised in the guidance. Score down for any guidance points not addressed, and flag missing guidance points as weaknesses.`;
   }
 
   let prioritySection = "";

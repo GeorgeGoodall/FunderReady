@@ -46,7 +46,7 @@ export async function parseQuestionsWithAI(rawText: string): Promise<QuestionsSe
 
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 2048,
+    max_tokens: 8192,
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -55,6 +55,12 @@ export async function parseQuestionsWithAI(rawText: string): Promise<QuestionsSe
       },
     ],
   });
+
+  console.log(`[parse-questions] stop_reason=${message.stop_reason}, usage: input=${message.usage.input_tokens} output=${message.usage.output_tokens}`);
+
+  if (message.stop_reason === "max_tokens") {
+    console.warn("[parse-questions] Response truncated — output hit max_tokens limit");
+  }
 
   const textBlock = message.content.find((block) => block.type === "text");
   if (!textBlock || textBlock.type !== "text") {
