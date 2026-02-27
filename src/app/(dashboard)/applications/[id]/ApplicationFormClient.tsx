@@ -64,6 +64,8 @@ export function ApplicationFormClient({
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState("");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
@@ -188,6 +190,28 @@ export function ApplicationFormClient({
       setError("Network error. Please try again.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/applications/${application.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to delete application");
+        setShowDeleteConfirm(false);
+        return;
+      }
+      router.push("/dashboard");
+    } catch {
+      setError("Network error. Please try again.");
+      setShowDeleteConfirm(false);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -336,21 +360,64 @@ export function ApplicationFormClient({
             Review History
           </Link>
         )}
-        {(isDraft || isReviewed) && (
+        <div className="ml-auto flex items-center gap-3">
           <button
             type="button"
-            onClick={handleSubmitForReview}
-            disabled={submitting}
-            className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
           >
-            {submitting
-              ? "Submitting..."
-              : isReviewed
-                ? "Request New Review"
-                : "Submit for Review"}
+            Delete Application
           </button>
-        )}
+          {(isDraft || isReviewed) && (
+            <button
+              type="button"
+              onClick={handleSubmitForReview}
+              disabled={submitting}
+              className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting
+                ? "Submitting..."
+                : isReviewed
+                  ? "Request New Review"
+                  : "Submit for Review"}
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+            <h2 className="text-lg font-semibold">Delete application?</h2>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              This will permanently delete{" "}
+              <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                {application.title ?? fund?.name ?? "Untitled application"}
+              </span>{" "}
+              and all its answers and reviews. This cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

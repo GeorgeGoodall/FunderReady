@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { ApplicationsList } from "./ApplicationsList";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -61,69 +62,11 @@ export default async function DashboardPage() {
         )}
 
         {hasApplications && (
-          <div className="mt-6 space-y-3">
-            {applications.map((app) => {
-              const fundName = (app as unknown as { funds: { name: string }[] | null }).funds?.[0]?.name;
-              return (
-                <Link
-                  key={app.id}
-                  href={`/applications/${app.id}`}
-                  className="block rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">
-                      {app.title ?? fundName ?? "Untitled application"}
-                    </span>
-                    <ApplicationStatusBadge status={app.status} />
-                  </div>
-                  <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
-                    {fundName && <span>{fundName}</span>}
-                    <span>
-                      Updated{" "}
-                      {new Date(app.updated_at).toLocaleDateString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </span>
-                    {app.review_count > 0 && (
-                      <span>
-                        {app.review_count} review{app.review_count !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          <ApplicationsList applications={applications as unknown as Parameters<typeof ApplicationsList>[0]["applications"]} />
         )}
       </div>
 
     </div>
-  );
-}
-
-function ApplicationStatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    draft: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-    submitted_for_review: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-    reviewing: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-    reviewed: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  };
-
-  const labels: Record<string, string> = {
-    draft: "Draft",
-    submitted_for_review: "Submitted",
-    reviewing: "Reviewing",
-    reviewed: "Reviewed",
-  };
-
-  return (
-    <span
-      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status] ?? styles.draft}`}
-    >
-      {labels[status] ?? status}
-    </span>
   );
 }
 
