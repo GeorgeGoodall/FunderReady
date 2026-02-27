@@ -14,16 +14,7 @@ export default async function DashboardPage() {
     .eq("user_id", user!.id)
     .order("updated_at", { ascending: false });
 
-  // Fetch legacy reviews
-  const { data: reviews } = await supabase
-    .from("reviews")
-    .select("id, status, bid_file_name, created_at")
-    .eq("user_id", user!.id)
-    .order("created_at", { ascending: false });
-
   const hasApplications = applications && applications.length > 0;
-  const hasReviews = reviews && reviews.length > 0;
-  const hasNothing = !hasApplications && !hasReviews;
 
   return (
     <div className="space-y-10">
@@ -39,7 +30,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {hasNothing && (
+        {!hasApplications && (
           <div className="mt-16 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
               <svg
@@ -108,44 +99,6 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* Legacy reviews section */}
-      {hasReviews && (
-        <div>
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-zinc-700 dark:text-zinc-300">
-              Document Reviews
-            </h2>
-            <Link
-              href="/new-review"
-              className="text-sm text-zinc-500 transition-colors hover:text-zinc-700 dark:hover:text-zinc-300"
-            >
-              New Document Review
-            </Link>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {reviews.map((review) => (
-              <Link
-                key={review.id}
-                href={`/reviews/${review.id}`}
-                className="block rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{review.bid_file_name}</span>
-                  <ReviewStatusBadge status={review.status} />
-                </div>
-                <p className="mt-1 text-xs text-zinc-500">
-                  {new Date(review.created_at).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -174,22 +127,3 @@ function ApplicationStatusBadge({ status }: { status: string }) {
   );
 }
 
-function ReviewStatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    pending: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-    parsing: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-    analysing: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-    scoring: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-    generating: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-    completed: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-    failed: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  };
-
-  return (
-    <span
-      className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${styles[status] ?? styles.pending}`}
-    >
-      {status}
-    </span>
-  );
-}

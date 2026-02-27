@@ -1,6 +1,5 @@
 /**
  * Pipeline Zod schemas for all AI response types.
- * Ported from prototypes/end-to-end/schemas.js
  */
 
 import { z } from "zod";
@@ -31,51 +30,7 @@ export const CommentCategory = z.enum(COMMENT_CATEGORIES);
 export const ScoreRating = z.enum(["Strong", "Fair", "Needs Improvement", "Missing"]);
 
 // ---------------------------------------------------------------------------
-// Pre-flight check response (Prompt A)
-// ---------------------------------------------------------------------------
-
-export const PreFlightSchema = z.object({
-  is_bid: z.boolean(),
-  language: z.string(),
-  substantive: z.boolean(),
-  title: z.string().optional().nullable(),
-  word_count_estimate: z.number().optional().nullable(),
-  rejection_reason: z.string().optional().nullable(),
-});
-
-// ---------------------------------------------------------------------------
-// Inline comment (used within section analysis)
-// ---------------------------------------------------------------------------
-
-export const InlineCommentSchema = z.object({
-  paragraph_id: z.string(),
-  target_text: z.string().min(1),
-  category: CommentCategory,
-  issue: z.string().min(10),
-  suggestion: z.string().min(10),
-});
-
-// ---------------------------------------------------------------------------
-// Section analysis response (Prompt B)
-// ---------------------------------------------------------------------------
-
-export const SectionAnalysisSchema = z.object({
-  section_id: z.string(),
-  inline_comments: z.array(InlineCommentSchema),
-  criteria_relevance: z.array(
-    z.object({
-      criterion_id: z.string(),
-      relevance: z.enum(["directly_addresses", "partially_addresses", "not_relevant"]),
-      notes: z.string().optional(),
-    })
-  ),
-  strengths: z.array(z.string()),
-  weaknesses: z.array(z.string()),
-  questions_for_later_sections: z.array(z.string()).optional(),
-});
-
-// ---------------------------------------------------------------------------
-// Cross-reference finding (Prompt C)
+// Cross-reference finding
 // ---------------------------------------------------------------------------
 
 export const CrossReferenceFindingSchema = z.object({
@@ -122,48 +77,14 @@ export const ImprovementAppendixItemSchema = z.object({
   example_language: z.string().optional(),
 });
 
-export const ScoringSchema = z.object({
-  criteria_scores: z.array(CriterionScoreSchema),
-  overall_score: z.number().min(0).max(100),
-  overall_descriptor: z.string(),
-  submission_readiness: z.enum([
-    "Ready to submit",
-    "Nearly ready",
-    "Needs revisions",
-    "Major rework needed",
-  ]),
-  top_strengths: z.array(z.string()).min(1).max(5),
-  top_improvements: z.array(z.string()).min(1).max(5),
-  improvement_appendix: z.array(ImprovementAppendixItemSchema).optional(),
-});
-
-// ---------------------------------------------------------------------------
-// Question mapping (AI fallback for low-confidence matching)
-// ---------------------------------------------------------------------------
-
-export const QuestionMappingSchema = z.object({
-  mappings: z.array(
-    z.object({
-      section_id: z.string(),
-      question_id: z.string(),
-    })
-  ),
-});
-
-export type QuestionMapping = z.infer<typeof QuestionMappingSchema>;
-
 // ---------------------------------------------------------------------------
 // Inferred types
 // ---------------------------------------------------------------------------
 
-export type PreFlight = z.infer<typeof PreFlightSchema>;
-export type InlineComment = z.infer<typeof InlineCommentSchema>;
-export type SectionAnalysis = z.infer<typeof SectionAnalysisSchema>;
 export type CrossReferenceFinding = z.infer<typeof CrossReferenceFindingSchema>;
 export type CrossReference = z.infer<typeof CrossReferenceSchema>;
 export type CriterionScore = z.infer<typeof CriterionScoreSchema>;
 export type ImprovementAppendixItem = z.infer<typeof ImprovementAppendixItemSchema>;
-export type Scoring = z.infer<typeof ScoringSchema>;
 
 // ---------------------------------------------------------------------------
 // Application pipeline schemas (form-based review)
