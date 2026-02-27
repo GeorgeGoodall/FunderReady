@@ -18,6 +18,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Pro-only endpoint — prevent free tier users from consuming AI credits
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("subscription_tier")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.subscription_tier !== "pro") {
+    return NextResponse.json(
+      { error: "Pro subscription required" },
+      { status: 403 }
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
