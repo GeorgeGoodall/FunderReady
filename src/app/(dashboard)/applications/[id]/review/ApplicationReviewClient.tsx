@@ -109,6 +109,7 @@ interface ApplicationReviewClientProps {
     error_message: string | null;
     created_at: string;
   } | null;
+  isHistorical?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,13 +157,14 @@ export function ApplicationReviewClient({
   questions,
   answers,
   review,
+  isHistorical = false,
 }: ApplicationReviewClientProps) {
   const router = useRouter();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const isInProgress = review && !["completed", "failed"].includes(review.status);
+  const isInProgress = !isHistorical && review && !["completed", "failed"].includes(review.status);
 
-  // Poll for updates while in progress
+  // Poll for updates while in progress (only for latest review)
   useEffect(() => {
     if (isInProgress) {
       intervalRef.current = setInterval(() => {
@@ -400,6 +402,19 @@ export function ApplicationReviewClient({
         <ImprovementAppendix items={scoring.improvement_appendix} />
       )}
 
+      {/* Historical review banner */}
+      {isHistorical && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-300">
+          You are viewing Review #{review.review_number} (historical).{" "}
+          <Link
+            href={`/applications/${application.id}/review`}
+            className="font-medium underline underline-offset-2"
+          >
+            View latest review
+          </Link>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex items-center gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
         <Link
@@ -408,6 +423,14 @@ export function ApplicationReviewClient({
         >
           Edit Answers
         </Link>
+        {application.review_count > 1 && (
+          <Link
+            href={`/applications/${application.id}/history`}
+            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            Review History
+          </Link>
+        )}
         <Link
           href="/dashboard"
           className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"

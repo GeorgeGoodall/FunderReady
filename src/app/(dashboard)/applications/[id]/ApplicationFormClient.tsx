@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { FormField } from "@/components/FormField";
 import type { Json } from "@/types/database";
 
@@ -260,17 +261,27 @@ export function ApplicationFormClient({
       {/* Reviewed notice */}
       {isReviewed && (
         <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/30 dark:bg-green-900/10">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-green-800 dark:text-green-300">
               Review #{application.review_count} complete. Edit your answers and submit again when ready.
             </p>
-            <button
-              type="button"
-              onClick={() => router.push(`/applications/${application.id}/review`)}
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
-            >
-              View Feedback
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {application.review_count > 1 && (
+                <Link
+                  href={`/applications/${application.id}/history`}
+                  className="rounded-lg border border-green-600 px-3 py-1.5 text-sm font-medium text-green-700 transition-colors hover:bg-green-100 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-900/20"
+                >
+                  View History
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => router.push(`/applications/${application.id}/review`)}
+                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+              >
+                View Feedback
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -317,6 +328,14 @@ export function ApplicationFormClient({
         >
           Back to Dashboard
         </button>
+        {application.review_count > 1 && (
+          <Link
+            href={`/applications/${application.id}/history`}
+            className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+          >
+            Review History
+          </Link>
+        )}
         {(isDraft || isReviewed) && (
           <button
             type="button"

@@ -6,10 +6,13 @@ export const dynamic = "force-dynamic";
 
 export default async function ApplicationReviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ reviewNumber?: string }>;
 }) {
   const { id } = await params;
+  const { reviewNumber: reviewNumberParam } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -58,14 +61,18 @@ export default async function ApplicationReviewPage({
     .select("question_id, answer_text, last_reviewed_text")
     .eq("application_id", id);
 
-  // Fetch latest review
-  const { data: review } = await supabase
+  // Fetch specific review if reviewNumber param is provided, otherwise latest
+  const requestedNumber = reviewNumberParam ? parseInt(reviewNumberParam, 10) : null;
+  const isHistorical = requestedNumber !== null && requestedNumber < application.review_count;
+
+  const reviewQuery = supabase
     .from("application_reviews")
     .select("id, review_number, status, progress, results, error_message, created_at")
-    .eq("application_id", id)
-    .order("review_number", { ascending: false })
-    .limit(1)
-    .single();
+    .eq("application_id", id);
+
+  const { data: review } = requestedNumber
+    ? await reviewQuery.eq("review_number", requestedNumber).single()
+    : await reviewQuery.order("review_number", { ascending: false }).limit(1).single();
 
   return (
     <ApplicationReviewClient
@@ -86,6 +93,7 @@ export default async function ApplicationReviewPage({
         error_message: review.error_message,
         created_at: review.created_at,
       } : null}
+      isHistorical={isHistorical}
     />
   );
 }
