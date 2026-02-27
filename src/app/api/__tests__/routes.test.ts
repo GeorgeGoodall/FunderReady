@@ -75,6 +75,11 @@ describe("POST /api/parse-criteria", () => {
     return mod.POST;
   }
 
+  beforeEach(() => {
+    // Default: authenticated pro user for this suite
+    mockFrom.mockReturnValue(chainMock({ data: { subscription_tier: "pro" }, error: null }));
+  });
+
   it("returns 401 when not authenticated", async () => {
     unauthenticatedUser();
     const POST = await importRoute();
