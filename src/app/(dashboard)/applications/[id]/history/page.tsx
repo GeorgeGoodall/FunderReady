@@ -25,11 +25,15 @@ export default async function ApplicationHistoryPage({
 
   if (!application) redirect("/dashboard");
 
-  const { data: fund } = await supabase
+  const { data: rawFund } = await supabase
     .from("funds")
-    .select("name, funder_organisation")
+    .select("name, organisation_id, organisations(id, name)")
     .eq("id", application.fund_id)
     .single();
+
+  const fund = rawFund
+    ? { ...rawFund, organisation: (rawFund.organisations as unknown as { id: string; name: string } | null) ?? null }
+    : null;
 
   // Fetch all reviews with results (to extract overall_score server-side)
   const { data: rawReviews } = await supabase

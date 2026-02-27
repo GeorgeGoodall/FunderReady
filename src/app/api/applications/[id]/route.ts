@@ -99,7 +99,7 @@ export async function GET(
   const [fundRes, criteriaRes, questionsRes] = await Promise.all([
     serviceClient
       .from("funds")
-      .select("id, name, funder_organisation")
+      .select("id, name, organisation_id, organisations(id, name)")
       .eq("id", application.fund_id)
       .single(),
     serviceClient

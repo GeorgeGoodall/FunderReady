@@ -7,12 +7,18 @@ export default async function FundsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: funds } = await supabase
+  const { data: rawFunds } = await supabase
     .from("funds")
-    .select("id, name, funder_organisation, url, published, created_at")
+    .select("id, name, organisation_id, organisations(id, name), url, published, created_at")
     .eq("created_by", user!.id)
     .eq("creator_hidden", false)
     .order("created_at", { ascending: false });
+
+  // Normalise Supabase join shape → { organisation: { id, name } | null }
+  const funds = (rawFunds ?? []).map((f) => {
+    const org = f.organisations as unknown as { id: string; name: string } | null;
+    return { ...f, organisation: org };
+  });
 
   return (
     <div>

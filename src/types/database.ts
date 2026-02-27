@@ -222,7 +222,7 @@ export type Database = {
         Row: {
           id: string
           name: string
-          funder_organisation: string | null
+          organisation_id: string | null
           url: string | null
           notes: string | null
           published: boolean
@@ -234,7 +234,7 @@ export type Database = {
         Insert: {
           id?: string
           name: string
-          funder_organisation?: string | null
+          organisation_id?: string | null
           url?: string | null
           notes?: string | null
           published?: boolean
@@ -246,7 +246,7 @@ export type Database = {
         Update: {
           id?: string
           name?: string
-          funder_organisation?: string | null
+          organisation_id?: string | null
           url?: string | null
           notes?: string | null
           published?: boolean
@@ -258,6 +258,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "funds_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funds_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organisations: {
+        Row: {
+          id: string
+          name: string
+          url: string | null
+          description: string | null
+          approved: boolean
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          url?: string | null
+          description?: string | null
+          approved?: boolean
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          url?: string | null
+          description?: string | null
+          approved?: boolean
+          created_by?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organisations_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"

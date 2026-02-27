@@ -34,11 +34,15 @@ export default async function ApplicationPage({
     .order("created_at", { ascending: true });
 
   // Fetch related data
-  const { data: fund } = await supabase
+  const { data: rawFund } = await supabase
     .from("funds")
-    .select("id, name, funder_organisation")
+    .select("id, name, organisation_id, organisations(id, name)")
     .eq("id", application.fund_id)
     .single();
+
+  const fund = rawFund
+    ? { ...rawFund, organisation: (rawFund.organisations as unknown as { id: string; name: string } | null) ?? null }
+    : null;
 
   const { data: questionsSet } = await supabase
     .from("questions_sets")

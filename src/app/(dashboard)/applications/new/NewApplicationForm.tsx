@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FundDetection } from "@/components/FundDetection";
+import { NewFundForm, type NewFundData } from "@/components/NewFundForm";
 import { CriteriaInput } from "@/components/CriteriaInput";
 import { CriteriaPreview } from "@/components/CriteriaPreview";
 import { QuestionsInput } from "@/components/QuestionsInput";
@@ -20,7 +21,7 @@ interface NewApplicationFormProps {
 interface FundInfo {
   id: string;
   name: string;
-  funder_organisation: string | null;
+  organisation: { id: string; name: string } | null;
   url: string | null;
   notes: string | null;
   created_at: string;
@@ -42,7 +43,7 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
 
   // Fund state
   const [selectedFund, setSelectedFund] = useState<FundInfo | null>(null);
-  const [newFundName, setNewFundName] = useState("");
+  const [pendingNewFundData, setPendingNewFundData] = useState<NewFundData | null>(null);
   const [creatingFund, setCreatingFund] = useState(false);
 
   // Criteria state
@@ -108,17 +109,8 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
     setStep("criteria");
   };
 
-  const handleNewFund = async (suggestedName: string) => {
-    if (suggestedName) setNewFundName(suggestedName);
-    setCreatingFund(true);
-  };
-
-  const handleCreateFund = () => {
-    if (!newFundName.trim()) {
-      setError("Fund name is required");
-      return;
-    }
-    setError("");
+  const handleNewFundData = (data: NewFundData) => {
+    setPendingNewFundData(data);
     setCreatingFund(false);
     setStep("criteria");
   };
@@ -176,14 +168,37 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
       // Create the fund now if it's new (deferred from step 1)
       let fund = selectedFund;
       if (!fund) {
-        if (!newFundName.trim()) {
-          setError("Fund name is required");
+        if (!pendingNewFundData) {
+          setError("Fund information is required");
           return;
         }
+
+        // Create new org first if needed
+        let organisationId = pendingNewFundData.organisationId;
+        if (!organisationId && pendingNewFundData.newOrg) {
+          const orgRes = await fetch("/api/organisations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pendingNewFundData.newOrg),
+          });
+          if (!orgRes.ok) {
+            const orgData = await orgRes.json();
+            setError(orgData.error ?? "Failed to create organisation");
+            return;
+          }
+          const orgData = await orgRes.json();
+          organisationId = orgData.organisation.id;
+        }
+
         const fundRes = await fetch("/api/funds", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: newFundName.trim() }),
+          body: JSON.stringify({
+            name: pendingNewFundData.name,
+            organisation_id: organisationId ?? null,
+            url: pendingNewFundData.url,
+            notes: pendingNewFundData.notes,
+          }),
         });
         if (!fundRes.ok) {
           const data = await fundRes.json();
@@ -240,7 +255,10 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
   const currentStepIndex = STEPS.findIndex((s) => s.key === step);
 
   const goToStep = (targetStep: Step) => {
-    if (targetStep === "fund") setCreatingFund(false);
+    if (targetStep === "fund") {
+      setCreatingFund(false);
+      setPendingNewFundData(null);
+    }
     setStep(targetStep);
     setError("");
   };
@@ -306,38 +324,14 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
             <FundDetection
               fileName=""
               onFundSelected={handleFundSelected}
-              onNewFund={handleNewFund}
+              onNewFundData={handleNewFundData}
               onSkip={() => setCreatingFund(true)}
             />
           ) : (
-            <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-              <h3 className="font-semibold">Create New Fund</h3>
-              <p className="mt-1 text-sm text-zinc-500">
-                Enter the name of the funding programme you are applying to.
-              </p>
-              <input
-                type="text"
-                value={newFundName}
-                onChange={(e) => setNewFundName(e.target.value)}
-                placeholder="e.g. Community Ownership Fund"
-                className="mt-3 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
-              />
-              <div className="mt-3 flex gap-3">
-                <button
-                  onClick={handleCreateFund}
-                  disabled={!newFundName.trim()}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Create Fund
-                </button>
-                <button
-                  onClick={() => setCreatingFund(false)}
-                  className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <NewFundForm
+              onSubmit={handleNewFundData}
+              onCancel={() => setCreatingFund(false)}
+            />
           )}
         </div>
       )}
@@ -466,7 +460,7 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
             <dl className="mt-4 space-y-3 text-sm">
               <div className="flex justify-between">
                 <dt className="text-zinc-500">Fund</dt>
-                <dd className="font-medium">{selectedFund?.name ?? "—"}</dd>
+                <dd className="font-medium">{selectedFund?.name ?? pendingNewFundData?.name ?? "—"}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-zinc-500">Criteria</dt>

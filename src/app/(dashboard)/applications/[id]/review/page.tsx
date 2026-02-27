@@ -30,11 +30,15 @@ export default async function ApplicationReviewPage({
   if (!application) redirect("/dashboard");
 
   // Fetch fund
-  const { data: fund } = await supabase
+  const { data: rawFund } = await supabase
     .from("funds")
-    .select("id, name, funder_organisation")
+    .select("id, name, organisation_id, organisations(id, name)")
     .eq("id", application.fund_id)
     .single();
+
+  const fund = rawFund
+    ? { ...rawFund, organisation: (rawFund.organisations as unknown as { id: string; name: string } | null) ?? null }
+    : null;
 
   // Fetch questions set
   const { data: app_full } = await supabase

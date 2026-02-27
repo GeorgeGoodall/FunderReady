@@ -356,7 +356,7 @@ describe("GET /api/applications/[id]", () => {
     );
     mockServiceFrom.mockImplementation(
       tableDispatch({
-        funds: { data: { id: FUND_ID, name: "Test Fund", funder_organisation: "Org" }, error: null },
+        funds: { data: { id: FUND_ID, name: "Test Fund", organisation_id: null }, error: null },
         criteria_sets: { data: { id: CRITERIA_SET_ID, name: "Criteria v1" }, error: null },
         questions_sets: { data: { id: QUESTIONS_SET_ID, questions_json: [] }, error: null },
       })

@@ -25,14 +25,25 @@ interface PendingQuestionsSet {
   funds: { name: string }[] | null;
 }
 
+interface PendingOrganisation {
+  id: string;
+  name: string;
+  url: string | null;
+  description: string | null;
+  created_at: string;
+  created_by: string;
+}
+
 interface AdminDashboardProps {
   pendingCriteriaSets: PendingCriteriaSet[];
   pendingQuestionsSets: PendingQuestionsSet[];
+  pendingOrganisations: PendingOrganisation[];
 }
 
 export function AdminDashboard({
   pendingCriteriaSets,
   pendingQuestionsSets,
+  pendingOrganisations,
 }: AdminDashboardProps) {
   const router = useRouter();
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -55,6 +66,20 @@ export function AdminDashboard({
     setApprovingId(id);
     try {
       const res = await fetch(`/api/admin/questions-sets/${id}/approve`, {
+        method: "PATCH",
+      });
+      if (res.ok) {
+        router.refresh();
+      }
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const handleApproveOrganisation = async (id: string) => {
+    setApprovingId(id);
+    try {
+      const res = await fetch(`/api/admin/organisations/${id}/approve`, {
         method: "PATCH",
       });
       if (res.ok) {
@@ -108,6 +133,41 @@ export function AdminDashboard({
                   className="ml-4 shrink-0 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
                 >
                   {approvingId === cs.id ? "Approving..." : "Approve"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Pending Organisations */}
+      <section>
+        <h2 className="text-lg font-semibold">Pending Organisations ({pendingOrganisations.length})</h2>
+        {pendingOrganisations.length === 0 ? (
+          <p className="mt-2 text-sm text-zinc-500">No pending organisations.</p>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {pendingOrganisations.map((org) => (
+              <div
+                key={org.id}
+                className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{org.name}</p>
+                  <p className="text-sm text-zinc-500">
+                    {org.description ? `${org.description} · ` : ""}
+                    {formatDate(org.created_at)}
+                    {org.url && (
+                      <> &middot; <a href={org.url} target="_blank" rel="noreferrer" className="underline">{org.url}</a></>
+                    )}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleApproveOrganisation(org.id)}
+                  disabled={approvingId === org.id}
+                  className="ml-4 shrink-0 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                >
+                  {approvingId === org.id ? "Approving..." : "Approve"}
                 </button>
               </div>
             ))}

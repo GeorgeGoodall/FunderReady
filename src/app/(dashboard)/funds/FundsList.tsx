@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 type Fund = {
   id: string;
   name: string;
-  funder_organisation: string | null;
+  organisation: { id: string; name: string } | null;
   url: string | null;
   published: boolean;
   created_at: string;
@@ -76,9 +76,9 @@ export function FundsList({ funds: initialFunds }: { funds: Fund[] }) {
                 {fund.published ? "Published" : "Unpublished"}
               </span>
             </div>
-            {fund.funder_organisation && (
+            {fund.organisation && (
               <p className="mt-0.5 truncate text-sm text-zinc-500 dark:text-zinc-400">
-                {fund.funder_organisation}
+                {fund.organisation.name}
               </p>
             )}
           </div>

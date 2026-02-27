@@ -74,13 +74,35 @@ export const SubmitReviewRequestSchema = z.object({
 export type SubmitReviewRequest = z.infer<typeof SubmitReviewRequestSchema>;
 
 // ---------------------------------------------------------------------------
+// Organisation schemas
+// ---------------------------------------------------------------------------
+
+export const OrganisationSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  url: z.string().url().optional().nullable(),
+  description: z.string().optional().nullable(),
+  approved: z.boolean(),
+});
+
+export type Organisation = z.infer<typeof OrganisationSchema>;
+
+export const CreateOrganisationSchema = z.object({
+  name: z.string().min(1),
+  url: z.string().url().optional(),
+  description: z.string().optional(),
+});
+
+export type CreateOrganisation = z.infer<typeof CreateOrganisationSchema>;
+
+// ---------------------------------------------------------------------------
 // Fund schemas
 // ---------------------------------------------------------------------------
 
 export const FundSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
-  funder_organisation: z.string().optional(),
+  organisation_id: z.string().uuid().optional().nullable(),
   url: z.string().url().optional(),
   notes: z.string().optional(),
 });

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { NewFundForm, type NewFundData } from "./NewFundForm";
 
 interface Fund {
   id: string;
   name: string;
-  funder_organisation: string | null;
+  organisation: { id: string; name: string } | null;
   url: string | null;
   notes: string | null;
   created_at: string;
@@ -15,7 +16,7 @@ interface FundDetectionProps {
   fileName: string;
   bidTextPreview?: string;
   onFundSelected: (fund: Fund) => void;
-  onNewFund: (suggestedName: string) => void;
+  onNewFundData: (data: NewFundData) => void;
   onSkip: () => void;
 }
 
@@ -23,7 +24,7 @@ export function FundDetection({
   fileName,
   bidTextPreview,
   onFundSelected,
-  onNewFund,
+  onNewFundData,
   onSkip,
 }: FundDetectionProps) {
   const [detecting, setDetecting] = useState(true);
@@ -32,6 +33,7 @@ export function FundDetection({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Fund[]>([]);
   const [searching, setSearching] = useState(false);
+  const [showNewFundForm, setShowNewFundForm] = useState(false);
 
   // Auto-detect fund on mount
   useEffect(() => {
@@ -50,7 +52,11 @@ export function FundDetection({
 
         if (!cancelled) {
           setDetectedName(data.detectedName);
-          setMatchedFund(data.matchedFund);
+          const raw = data.matchedFund;
+          if (raw) {
+            // Normalise API shape: Supabase returns { organisations: {...} }
+            setMatchedFund({ ...raw, organisation: raw.organisations ?? null });
+          }
           if (data.detectedName) {
             setSearchQuery(data.detectedName);
           }
@@ -81,7 +87,12 @@ export function FundDetection({
       const res = await fetch(`/api/funds?q=${encodeURIComponent(q.trim())}`);
       if (res.ok) {
         const data = await res.json();
-        setSearchResults(data.funds ?? []);
+        // Normalise API shape: Supabase returns { organisations: {...} }
+        const funds = (data.funds ?? []).map((f: Fund & { organisations?: { id: string; name: string } | null }) => ({
+          ...f,
+          organisation: f.organisations ?? null,
+        }));
+        setSearchResults(funds);
       }
     } catch {
       // Non-fatal
@@ -103,6 +114,19 @@ export function FundDetection({
     );
   }
 
+  if (showNewFundForm) {
+    return (
+      <NewFundForm
+        suggestedName={detectedName ?? ""}
+        onSubmit={(data) => {
+          setShowNewFundForm(false);
+          onNewFundData(data);
+        }}
+        onCancel={() => setShowNewFundForm(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Matched fund card */}
@@ -114,9 +138,9 @@ export function FundDetection({
           <div className="mt-2 flex items-center justify-between">
             <div>
               <p className="font-semibold">{matchedFund.name}</p>
-              {matchedFund.funder_organisation && (
+              {matchedFund.organisation && (
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  {matchedFund.funder_organisation}
+                  {matchedFund.organisation.name}
                 </p>
               )}
             </div>
@@ -140,7 +164,7 @@ export function FundDetection({
             No existing fund matched. You can create it as a new fund or search below.
           </p>
           <button
-            onClick={() => onNewFund(detectedName)}
+            onClick={() => setShowNewFundForm(true)}
             className="mt-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
           >
             Create &ldquo;{detectedName}&rdquo; as new fund
@@ -174,8 +198,8 @@ export function FundDetection({
                 className="w-full rounded-lg border border-zinc-200 p-3 text-left transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
               >
                 <p className="text-sm font-medium">{fund.name}</p>
-                {fund.funder_organisation && (
-                  <p className="text-xs text-zinc-500">{fund.funder_organisation}</p>
+                {fund.organisation && (
+                  <p className="text-xs text-zinc-500">{fund.organisation.name}</p>
                 )}
               </button>
             ))}
@@ -186,7 +210,7 @@ export function FundDetection({
       {/* Create new fund */}
       <div className="flex gap-3">
         <button
-          onClick={() => onNewFund(detectedName ?? "")}
+          onClick={() => setShowNewFundForm(true)}
           className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
           Create new fund

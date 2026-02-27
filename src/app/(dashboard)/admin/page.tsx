@@ -34,14 +34,22 @@ export default async function AdminPage() {
     .eq("approved", false)
     .order("created_at", { ascending: false });
 
+  // Fetch unapproved organisations
+  const { data: pendingOrganisations } = await supabase
+    .from("organisations")
+    .select("id, name, url, description, created_at, created_by")
+    .eq("approved", false)
+    .order("created_at", { ascending: false });
+
   return (
     <div>
       <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-      <p className="mt-1 text-sm text-zinc-500">Approve or review pending criteria and questions sets.</p>
+      <p className="mt-1 text-sm text-zinc-500">Approve or review pending criteria, questions sets, and organisations.</p>
       <div className="mt-6">
         <AdminDashboard
           pendingCriteriaSets={pendingCriteriaSets ?? []}
           pendingQuestionsSets={pendingQuestionsSets ?? []}
+          pendingOrganisations={pendingOrganisations ?? []}
         />
       </div>
     </div>

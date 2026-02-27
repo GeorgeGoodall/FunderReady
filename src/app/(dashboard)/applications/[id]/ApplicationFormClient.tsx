@@ -39,7 +39,7 @@ interface AnswerData {
 interface FundData {
   id: string;
   name: string;
-  funder_organisation: string | null;
+  organisation: { id: string; name: string } | null;
 }
 
 interface QuestionsSetData {
@@ -309,7 +309,7 @@ export function ApplicationFormClient({
           )}
           <p className="mt-1 text-sm text-zinc-500">
             {fund?.name}
-            {fund?.funder_organisation ? ` — ${fund.funder_organisation}` : ""}
+            {fund?.organisation ? ` — ${fund.organisation.name}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-3">

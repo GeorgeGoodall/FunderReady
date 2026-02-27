@@ -97,7 +97,7 @@ interface ApplicationReviewClientProps {
     review_count: number;
     fund_id: string;
   };
-  fund: { id: string; name: string; funder_organisation: string | null } | null;
+  fund: { id: string; name: string; organisation: { id: string; name: string } | null } | null;
   questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number }>;
   answers: Array<{ question_id: string; answer_text: string; last_reviewed_text: string | null }>;
   review: {
@@ -451,7 +451,7 @@ function Header({
   fund,
 }: {
   application: { title: string | null };
-  fund: { name: string; funder_organisation: string | null } | null;
+  fund: { name: string; organisation: { id: string; name: string } | null } | null;
 }) {
   return (
     <div>
@@ -461,7 +461,7 @@ function Header({
       {fund && (
         <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
           {fund.name}
-          {fund.funder_organisation ? ` — ${fund.funder_organisation}` : ""}
+          {fund.organisation ? ` — ${fund.organisation.name}` : ""}
         </p>
       )}
     </div>

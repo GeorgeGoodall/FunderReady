@@ -201,7 +201,7 @@ describe("FundSchema", () => {
     const result = FundSchema.safeParse({
       id: "550e8400-e29b-41d4-a716-446655440000",
       name: "Community Ownership Fund",
-      funder_organisation: "DLUHC",
+      organisation_id: "660e8400-e29b-41d4-a716-446655440001",
       url: "https://example.com/fund",
       notes: "Round 2",
     });

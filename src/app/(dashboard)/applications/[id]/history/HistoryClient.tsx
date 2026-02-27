@@ -32,7 +32,7 @@ interface HistoryClientProps {
     title: string | null;
     review_count: number;
   };
-  fund: { name: string; funder_organisation: string | null } | null;
+  fund: { name: string; organisation: { id: string; name: string } | null } | null;
   reviews: ReviewSummary[];
 }
 
@@ -201,7 +201,7 @@ export function HistoryClient({ application, fund, reviews }: HistoryClientProps
         {fund && (
           <p className="mt-0.5 text-sm text-zinc-500">
             {fund.name}
-            {fund.funder_organisation ? ` — ${fund.funder_organisation}` : ""}
+            {fund.organisation ? ` — ${fund.organisation.name}` : ""}
           </p>
         )}
       </div>
