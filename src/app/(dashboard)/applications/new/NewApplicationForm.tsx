@@ -74,7 +74,9 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
       if (res.ok) {
         const data = await res.json();
 
-        const csData = data.userDraftCriteriaSet ?? data.criteriaSet;
+        // Only pre-load approved sets — funds with only user drafts (or no sets at
+        // all) should show the AI-parse input first, not jump straight to preview.
+        const csData = data.criteriaSet;
         if (csData) {
           const criteriaArray = csData.criteria_json;
           setCriteriaSet({
@@ -87,7 +89,7 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
           setCriteriaEdited(false);
         }
 
-        const qsData = data.userDraftQuestionsSet ?? data.questionsSet;
+        const qsData = data.questionsSet;
         if (qsData) {
           const questionsArray = qsData.questions_json;
           setQuestionsSet({
@@ -111,30 +113,14 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
     setCreatingFund(true);
   };
 
-  const handleCreateFund = async () => {
+  const handleCreateFund = () => {
     if (!newFundName.trim()) {
       setError("Fund name is required");
       return;
     }
     setError("");
-    try {
-      const res = await fetch("/api/funds", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newFundName.trim() }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error ?? "Failed to create fund");
-        return;
-      }
-      const data = await res.json();
-      setSelectedFund(data.fund);
-      setCreatingFund(false);
-      setStep("criteria");
-    } catch {
-      setError("Network error. Please try again.");
-    }
+    setCreatingFund(false);
+    setStep("criteria");
   };
 
   const handleCriteriaChange = (updated: CriteriaSet) => {
@@ -147,11 +133,11 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
     if (questionsPreLoaded) setQuestionsEdited(true);
   };
 
-  const saveCriteriaSetsIfNeeded = async (): Promise<string | null> => {
-    if (!selectedFund || !criteriaSet) return null;
+  const saveCriteriaSetsIfNeeded = async (fundId: string): Promise<string | null> => {
+    if (!criteriaSet) return null;
     if (criteriaPreLoaded && !criteriaEdited && criteriaSetId) return criteriaSetId;
 
-    const res = await fetch(`/api/funds/${selectedFund.id}/criteria-sets`, {
+    const res = await fetch(`/api/funds/${fundId}/criteria-sets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(criteriaSet),
@@ -164,11 +150,11 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
     return data.criteriaSet.id;
   };
 
-  const saveQuestionsSetsIfNeeded = async (): Promise<string | null> => {
-    if (!selectedFund || !questionsSet) return null;
+  const saveQuestionsSetsIfNeeded = async (fundId: string): Promise<string | null> => {
+    if (!questionsSet) return null;
     if (questionsPreLoaded && !questionsEdited && questionsSetId) return questionsSetId;
 
-    const res = await fetch(`/api/funds/${selectedFund.id}/questions-sets`, {
+    const res = await fetch(`/api/funds/${fundId}/questions-sets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(questionsSet),
@@ -182,13 +168,35 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
   };
 
   const handleCreateApplication = async () => {
-    if (!criteriaSet || !selectedFund || !questionsSet) return;
+    if (!criteriaSet || !questionsSet) return;
     setSubmitting(true);
     setError("");
 
     try {
-      const savedCriteriaSetId = await saveCriteriaSetsIfNeeded();
-      const savedQuestionsSetId = await saveQuestionsSetsIfNeeded();
+      // Create the fund now if it's new (deferred from step 1)
+      let fund = selectedFund;
+      if (!fund) {
+        if (!newFundName.trim()) {
+          setError("Fund name is required");
+          return;
+        }
+        const fundRes = await fetch("/api/funds", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: newFundName.trim() }),
+        });
+        if (!fundRes.ok) {
+          const data = await fundRes.json();
+          setError(data.error ?? "Failed to create fund");
+          return;
+        }
+        const fundData = await fundRes.json();
+        fund = fundData.fund;
+        setSelectedFund(fundData.fund);
+      }
+
+      const savedCriteriaSetId = await saveCriteriaSetsIfNeeded(fund.id);
+      const savedQuestionsSetId = await saveQuestionsSetsIfNeeded(fund.id);
 
       if (!savedCriteriaSetId) {
         setError("Failed to save criteria set");
@@ -203,7 +211,7 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fundId: selectedFund.id,
+          fundId: fund.id,
           criteriaSetId: savedCriteriaSetId,
           questionsSetId: savedQuestionsSetId,
           ...(title.trim() && { title: title.trim() }),
@@ -226,6 +234,12 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
 
   const currentStepIndex = STEPS.findIndex((s) => s.key === step);
 
+  const goToStep = (targetStep: Step) => {
+    if (targetStep === "fund") setCreatingFund(false);
+    setStep(targetStep);
+    setError("");
+  };
+
   return (
     <div className="space-y-6">
       {/* Step indicator */}
@@ -234,13 +248,16 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
           <div key={s.key} className="flex items-center gap-2">
             {i > 0 && <div className="h-px w-8 bg-zinc-300 dark:bg-zinc-700" />}
             <div className="flex items-center gap-2">
-              <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+              <button
+                type="button"
+                onClick={() => i < currentStepIndex && goToStep(s.key)}
+                disabled={i >= currentStepIndex}
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                   i < currentStepIndex
-                    ? "bg-blue-600 text-white"
+                    ? "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
                     : i === currentStepIndex
-                      ? "bg-blue-100 text-blue-700 ring-2 ring-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                      : "bg-zinc-100 text-zinc-400 dark:bg-zinc-800"
+                      ? "bg-blue-100 text-blue-700 ring-2 ring-blue-600 dark:bg-blue-900/30 dark:text-blue-400 cursor-default"
+                      : "bg-zinc-100 text-zinc-400 dark:bg-zinc-800 cursor-default"
                 }`}
               >
                 {i < currentStepIndex ? (
@@ -250,16 +267,21 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
                 ) : (
                   i + 1
                 )}
-              </span>
-              <span
-                className={`text-sm font-medium ${
-                  i <= currentStepIndex
-                    ? "text-zinc-900 dark:text-zinc-100"
-                    : "text-zinc-400 dark:text-zinc-500"
+              </button>
+              <button
+                type="button"
+                onClick={() => i < currentStepIndex && goToStep(s.key)}
+                disabled={i >= currentStepIndex}
+                className={`text-sm font-medium transition-colors ${
+                  i < currentStepIndex
+                    ? "text-zinc-900 dark:text-zinc-100 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
+                    : i === currentStepIndex
+                      ? "text-zinc-900 dark:text-zinc-100 cursor-default"
+                      : "text-zinc-400 dark:text-zinc-500 cursor-default"
                 }`}
               >
                 {s.label}
-              </span>
+              </button>
             </div>
           </div>
         ))}
@@ -342,7 +364,7 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
                   }}
                   className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >
-                  Re-parse criteria
+                  {criteriaPreLoaded ? "Start over" : "Re-enter / Parse with AI"}
                 </button>
                 <button
                   type="button"
@@ -357,7 +379,7 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
           )}
           <button
             type="button"
-            onClick={() => setStep("fund")}
+            onClick={() => goToStep("fund")}
             className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
           >
             &larr; Back to fund selection
@@ -388,7 +410,7 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
               <QuestionsInput onParsed={setQuestionsSet} />
               <button
                 type="button"
-                onClick={() => setStep("criteria")}
+                onClick={() => goToStep("criteria")}
                 className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
               >
                 &larr; Back to criteria
@@ -400,6 +422,13 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
               <div className="flex gap-3">
                 <button
                   type="button"
+                  onClick={() => goToStep("criteria")}
+                  className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  &larr; Back to criteria
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setQuestionsSet(null);
                     setQuestionsPreLoaded(false);
@@ -408,7 +437,7 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
                   }}
                   className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >
-                  Re-parse questions
+                  {questionsPreLoaded ? "Start over" : "Re-enter / Parse with AI"}
                 </button>
                 <button
                   type="button"
