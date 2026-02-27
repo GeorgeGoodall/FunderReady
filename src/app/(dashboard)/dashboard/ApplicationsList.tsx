@@ -112,7 +112,7 @@ export function ApplicationsList({ applications }: { applications: Application[]
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
               This will permanently delete{" "}
               <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                {confirmApp?.title ?? confirmApp?.funds?.[0]?.name ?? "Untitled application"}
+                {confirmApp?.title ?? confirmApp?.funds?.name ?? "Untitled application"}
               </span>{" "}
               and all its answers and reviews. This cannot be undone.
             </p>

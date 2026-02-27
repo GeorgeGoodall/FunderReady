@@ -226,6 +226,7 @@ export type Database = {
           url: string | null
           notes: string | null
           published: boolean
+          creator_hidden: boolean
           created_by: string
           created_at: string
           updated_at: string
@@ -237,6 +238,7 @@ export type Database = {
           url?: string | null
           notes?: string | null
           published?: boolean
+          creator_hidden?: boolean
           created_by: string
           created_at?: string
           updated_at?: string
@@ -248,6 +250,7 @@ export type Database = {
           url?: string | null
           notes?: string | null
           published?: boolean
+          creator_hidden?: boolean
           created_by?: string
           created_at?: string
           updated_at?: string

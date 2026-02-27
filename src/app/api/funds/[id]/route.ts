@@ -1,6 +1,46 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Verify the fund belongs to this user
+  const { data: fund } = await supabase
+    .from("funds")
+    .select("id, created_by")
+    .eq("id", id)
+    .eq("created_by", user.id)
+    .single();
+
+  if (!fund) {
+    return NextResponse.json({ error: "Fund not found" }, { status: 404 });
+  }
+
+  const { error } = await supabase
+    .from("funds")
+    .update({ creator_hidden: true })
+    .eq("id", id)
+    .eq("created_by", user.id);
+
+  if (error) {
+    console.error("Fund unlink error:", error);
+    return NextResponse.json({ error: "Failed to remove fund" }, { status: 500 });
+  }
+
+  return new NextResponse(null, { status: 204 });
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
