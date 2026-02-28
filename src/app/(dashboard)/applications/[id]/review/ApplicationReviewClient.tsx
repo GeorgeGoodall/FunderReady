@@ -188,6 +188,34 @@ export function ApplicationReviewClient({
     };
   }, [isInProgress, router]);
 
+  const [activeSection, setActiveSection] = useState("");
+
+  // Highlight TOC link for whichever section is near the top of the viewport
+  useEffect(() => {
+    if (review?.status !== "completed") return;
+    const sectionIds = [
+      "section-score",
+      "section-criteria",
+      "section-gaps",
+      "section-answers",
+      "section-cross-ref",
+      "section-appendix",
+    ];
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveSection(entry.target.id);
+        }
+      },
+      { rootMargin: "-10% 0px -85% 0px" },
+    );
+    for (const id of sectionIds) {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    }
+    return () => observer.disconnect();
+  }, [review?.status]);
+
   // No review yet
   if (!review) {
     return (
@@ -310,212 +338,255 @@ export function ApplicationReviewClient({
     (disabled_questions ?? []).map((q) => q.question_id)
   );
 
+  const tocSections = [
+    { id: "section-score", label: "Overview" },
+    { id: "section-criteria", label: "Criteria Scores" },
+    ...(gapCriteria.length > 0 ? [{ id: "section-gaps", label: "Coverage Gaps" }] : []),
+    { id: "section-answers", label: "Answer Feedback" },
+    ...(cross_reference?.findings?.length > 0 ? [{ id: "section-cross-ref", label: "Cross-Reference" }] : []),
+    ...((scoring.improvement_appendix?.length ?? 0) > 0 ? [{ id: "section-appendix", label: "Improvement Appendix" }] : []),
+  ];
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Header application={application} fund={fund} />
 
-      {/* Score + readiness */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-baseline gap-2">
-          <span className="text-4xl font-bold">{scoring.overall_score}</span>
-          <span className="text-sm text-zinc-500">/100</span>
-        </div>
-        {hasGaps && projected_score !== undefined && (
-          <>
-            <span className="text-zinc-400">&rarr;</span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{Math.round(projected_score)}</span>
-              <span className="text-sm text-zinc-500">/100</span>
-            </div>
-            <span className="text-xs text-blue-600 dark:text-blue-400">
-              projected if {gap_count} gap{gap_count === 1 ? "" : "s"} addressed
-            </span>
-          </>
-        )}
-        <span className={`rounded-full px-3 py-1 text-sm font-medium ${READINESS_COLOURS[scoring.submission_readiness] ?? ""}`}>
-          {scoring.submission_readiness}
-        </span>
-        <Link
-          href={`/applications/${application.id}`}
-          className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-        >
-          Edit Answers
-        </Link>
-      </div>
+      <div className="lg:flex lg:gap-8">
+        {/* Sticky table of contents — desktop only */}
+        <aside className="hidden lg:block lg:w-44 shrink-0">
+          <nav className="sticky top-6">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">On this page</p>
+            <ul className="space-y-1">
+              {tocSections.map((s) => (
+                <li key={s.id}>
+                  <a
+                    href={`#${s.id}`}
+                    className={`block rounded px-2 py-1 text-sm transition-colors ${
+                      activeSection === s.id
+                        ? "border-l-2 border-blue-500 pl-1.5 font-medium text-zinc-900 dark:text-zinc-100"
+                        : "border-l-2 border-transparent pl-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                    }`}
+                  >
+                    {s.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </aside>
 
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">{scoring.overall_descriptor}</p>
+        {/* Main content */}
+        <div className="min-w-0 flex-1 space-y-8">
 
-      {/* Strengths + improvements */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <h3 className="font-semibold text-green-700 dark:text-green-400">Top Strengths</h3>
-          <ul className="mt-3 space-y-2">
-            {scoring.top_strengths.map((s, i) => (
-              <li key={i} className="flex gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                <span className="mt-0.5 text-green-500">+</span>{s}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <h3 className="font-semibold text-amber-700 dark:text-amber-400">Top Improvements</h3>
-          <ul className="mt-3 space-y-2">
-            {scoring.top_improvements.map((s, i) => (
-              <li key={i} className="flex gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                <span className="mt-0.5 text-amber-500">!</span>{s}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      {/* Criteria scores */}
-      <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="border-b border-zinc-200 px-5 py-3 dark:border-zinc-800">
-          <h3 className="font-semibold">Criteria Scores</h3>
-        </div>
-        <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-          {scoring.criteria_scores.map((cs) => (
-            <div key={cs.criterion_id} className="flex items-center justify-between px-5 py-3">
-              <div className="min-w-0 flex-1 pr-4">
-                <p className="text-sm font-medium">{cs.criterion}</p>
-                <p className="mt-0.5 text-xs text-zinc-500">{cs.summary}</p>
+          {/* Score + readiness */}
+          <div id="section-score">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold">{scoring.overall_score}</span>
+                <span className="text-sm text-zinc-500">/100</span>
               </div>
-              <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${SCORE_COLOURS[cs.score] ?? ""}`}>
-                {cs.score}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Coverage Gaps section */}
-      {gapCriteria.length > 0 && (
-        <div>
-          <h3 className="mb-1 text-lg font-semibold">
-            Coverage Gaps{" "}
-            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-sm font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-              {gapCriteria.length}
-            </span>
-          </h3>
-          <p className="mb-3 text-sm text-zinc-500">
-            These criteria have no coverage in your enabled answers. If applicable, re-enable or fill in the related questions and re-submit.
-          </p>
-          <div className="space-y-3">
-            {gapCriteria.map((gap) => (
-              <div key={gap.criterion_id} className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/30 dark:bg-amber-900/10">
-                <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{gap.criterion}</p>
-                {gap.related_disabled_question_texts.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Related excluded questions:</p>
-                    <ul className="mt-1 space-y-0.5">
-                      {gap.related_disabled_question_texts.map((qt, i) => (
-                        <li key={i} className="text-xs text-amber-700 dark:text-amber-400">
-                          <span className="mr-1 rounded bg-zinc-200 px-1 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">N/A</span>
-                          {qt}
-                        </li>
-                      ))}
-                    </ul>
+              {hasGaps && projected_score !== undefined && (
+                <>
+                  <span className="text-zinc-400">&rarr;</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{Math.round(projected_score)}</span>
+                    <span className="text-sm text-zinc-500">/100</span>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Answer-by-answer feedback */}
-      <div>
-        <h3 className="mb-4 text-lg font-semibold">Answer Feedback</h3>
-        <div className="space-y-4">
-          {questions.map((q) => {
-            const isQDisabled = disabledQuestionIds.has(q.id);
-            const feedback = answer_feedback?.[q.id];
-            const answer = answers.find((a) => a.question_id === q.id);
-            const isOutdated = outdatedMap[q.id] ?? false;
-
-            if (isQDisabled) {
-              return (
-                <div key={q.id} className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-5 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
-                  <span className="shrink-0 rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
-                    N/A
+                  <span className="text-xs text-blue-600 dark:text-blue-400">
+                    projected if {gap_count} gap{gap_count === 1 ? "" : "s"} addressed
                   </span>
-                  <span className="text-sm text-zinc-400 dark:text-zinc-500">{q.question}</span>
-                </div>
-              );
-            }
+                </>
+              )}
+              <span className={`rounded-full px-3 py-1 text-sm font-medium ${READINESS_COLOURS[scoring.submission_readiness] ?? ""}`}>
+                {scoring.submission_readiness}
+              </span>
+              <Link
+                href={`/applications/${application.id}`}
+                className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              >
+                Edit Answers
+              </Link>
+            </div>
 
-            if (!feedback) return null;
+            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">{scoring.overall_descriptor}</p>
 
-            return (
-              <AnswerFeedbackCard
-                key={q.id}
-                question={q}
-                answer={answer?.answer_text ?? ""}
-                feedback={feedback}
-                isOutdated={isOutdated}
-              />
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Cross-reference findings */}
-      {cross_reference?.findings?.length > 0 && (
-        <div>
-          <h3 className="mb-4 text-lg font-semibold">Cross-Reference Findings</h3>
-          <p className="mb-3 text-sm text-zinc-500">
-            Overall coherence: <span className="font-medium capitalize">{cross_reference.overall_coherence}</span>
-            {" — "}{cross_reference.summary}
-          </p>
-          <div className="space-y-3">
-            {cross_reference.findings.map((finding, i) => (
-              <CrossReferenceFindingCard key={i} finding={finding} />
-            ))}
+            {/* Strengths + improvements */}
+            <div className="mt-6 grid gap-6 md:grid-cols-2">
+              <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="font-semibold text-green-700 dark:text-green-400">Top Strengths</h3>
+                <ul className="mt-3 space-y-2">
+                  {scoring.top_strengths.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                      <span className="mt-0.5 text-green-500">+</span>{s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="font-semibold text-amber-700 dark:text-amber-400">Top Improvements</h3>
+                <ul className="mt-3 space-y-2">
+                  {scoring.top_improvements.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                      <span className="mt-0.5 text-amber-500">!</span>{s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
+
+          {/* Criteria scores */}
+          <div id="section-criteria" className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="border-b border-zinc-200 px-5 py-3 dark:border-zinc-800">
+              <h3 className="font-semibold">Criteria Scores</h3>
+            </div>
+            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {scoring.criteria_scores.map((cs) => (
+                <div key={cs.criterion_id} className="flex items-center justify-between px-5 py-3">
+                  <div className="min-w-0 flex-1 pr-4">
+                    <p className="text-sm font-medium">{cs.criterion}</p>
+                    <p className="mt-0.5 text-xs text-zinc-500">{cs.summary}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${SCORE_COLOURS[cs.score] ?? ""}`}>
+                    {cs.score}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Coverage Gaps section */}
+          {gapCriteria.length > 0 && (
+            <div id="section-gaps">
+              <h3 className="mb-1 text-lg font-semibold">
+                Coverage Gaps{" "}
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-sm font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  {gapCriteria.length}
+                </span>
+              </h3>
+              <p className="mb-3 text-sm text-zinc-500">
+                These criteria have no coverage in your enabled answers. If applicable, re-enable or fill in the related questions and re-submit.
+              </p>
+              <div className="space-y-3">
+                {gapCriteria.map((gap) => (
+                  <div key={gap.criterion_id} className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/30 dark:bg-amber-900/10">
+                    <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{gap.criterion}</p>
+                    {gap.related_disabled_question_texts.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Related excluded questions:</p>
+                        <ul className="mt-1 space-y-0.5">
+                          {gap.related_disabled_question_texts.map((qt, i) => (
+                            <li key={i} className="text-xs text-amber-700 dark:text-amber-400">
+                              <span className="mr-1 rounded bg-zinc-200 px-1 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">N/A</span>
+                              {qt}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Answer-by-answer feedback */}
+          <div id="section-answers">
+            <h3 className="mb-4 text-lg font-semibold">Answer Feedback</h3>
+            <div className="space-y-4">
+              {questions.map((q) => {
+                const isQDisabled = disabledQuestionIds.has(q.id);
+                const feedback = answer_feedback?.[q.id];
+                const answer = answers.find((a) => a.question_id === q.id);
+                const isOutdated = outdatedMap[q.id] ?? false;
+
+                if (isQDisabled) {
+                  return (
+                    <div key={q.id} className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-5 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+                      <span className="shrink-0 rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
+                        N/A
+                      </span>
+                      <span className="text-sm text-zinc-400 dark:text-zinc-500">{q.question}</span>
+                    </div>
+                  );
+                }
+
+                if (!feedback) return null;
+
+                return (
+                  <AnswerFeedbackCard
+                    key={q.id}
+                    question={q}
+                    answer={answer?.answer_text ?? ""}
+                    feedback={feedback}
+                    isOutdated={isOutdated}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Cross-reference findings */}
+          {cross_reference?.findings?.length > 0 && (
+            <div id="section-cross-ref">
+              <h3 className="mb-4 text-lg font-semibold">Cross-Reference Findings</h3>
+              <p className="mb-3 text-sm text-zinc-500">
+                Overall coherence: <span className="font-medium capitalize">{cross_reference.overall_coherence}</span>
+                {" — "}{cross_reference.summary}
+              </p>
+              <div className="space-y-3">
+                {cross_reference.findings.map((finding, i) => (
+                  <CrossReferenceFindingCard key={i} finding={finding} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Improvement appendix */}
+          {scoring.improvement_appendix && scoring.improvement_appendix.length > 0 && (
+            <div id="section-appendix">
+              <ImprovementAppendix items={scoring.improvement_appendix} />
+            </div>
+          )}
+
+          {/* Historical review banner */}
+          {isHistorical && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-300">
+              You are viewing Review #{review.review_number} (historical).{" "}
+              <Link
+                href={`/applications/${application.id}/review`}
+                className="font-medium underline underline-offset-2"
+              >
+                View latest review
+              </Link>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+            <Link
+              href={`/applications/${application.id}`}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              Edit Answers
+            </Link>
+            {application.review_count > 1 && (
+              <Link
+                href={`/applications/${application.id}/history`}
+                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Review History
+              </Link>
+            )}
+            <Link
+              href="/dashboard"
+              className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
+
         </div>
-      )}
-
-      {/* Improvement appendix */}
-      {scoring.improvement_appendix && scoring.improvement_appendix.length > 0 && (
-        <ImprovementAppendix items={scoring.improvement_appendix} />
-      )}
-
-      {/* Historical review banner */}
-      {isHistorical && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-300">
-          You are viewing Review #{review.review_number} (historical).{" "}
-          <Link
-            href={`/applications/${application.id}/review`}
-            className="font-medium underline underline-offset-2"
-          >
-            View latest review
-          </Link>
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex items-center gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-        <Link
-          href={`/applications/${application.id}`}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-        >
-          Edit Answers
-        </Link>
-        {application.review_count > 1 && (
-          <Link
-            href={`/applications/${application.id}/history`}
-            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            Review History
-          </Link>
-        )}
-        <Link
-          href="/dashboard"
-          className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-        >
-          Back to Dashboard
-        </Link>
       </div>
     </div>
   );
@@ -837,43 +908,29 @@ function ImprovementAppendix({
 }: {
   items: NonNullable<ApplicationScoring["improvement_appendix"]>;
 }) {
-  const [expanded, setExpanded] = useState(false);
-
   return (
     <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between px-5 py-3 text-left"
-      >
+      <div className="px-5 py-3">
         <h3 className="font-semibold">Improvement Appendix</h3>
-        <svg
-          className={`h-4 w-4 text-zinc-400 transition-transform ${expanded ? "rotate-180" : ""}`}
-          fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-        </svg>
-      </button>
-      {expanded && (
-        <div className="divide-y divide-zinc-100 border-t border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-          {items.map((item) => (
-            <div key={item.criterion_id} className="px-5 py-4">
-              <h4 className="text-sm font-semibold">{item.criterion}</h4>
-              <div className="mt-2 space-y-1.5 text-xs text-zinc-600 dark:text-zinc-400">
-                <p><span className="font-medium">What the funder wants:</span> {item.what_funder_wants}</p>
-                <p><span className="font-medium">How you address it:</span> {item.how_bid_addresses}</p>
-                <p><span className="font-medium">What&apos;s missing:</span> {item.whats_missing}</p>
-                {item.example_language && (
-                  <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Suggested language</p>
-                    <p className="text-xs text-zinc-700 dark:text-zinc-300">{item.example_language}</p>
-                  </div>
-                )}
-              </div>
+      </div>
+      <div className="divide-y divide-zinc-100 border-t border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+        {items.map((item) => (
+          <div key={item.criterion_id} className="px-5 py-4">
+            <h4 className="text-sm font-semibold">{item.criterion}</h4>
+            <div className="mt-2 space-y-1.5 text-xs text-zinc-600 dark:text-zinc-400">
+              <p><span className="font-medium">What the funder wants:</span> {item.what_funder_wants}</p>
+              <p><span className="font-medium">How you address it:</span> {item.how_bid_addresses}</p>
+              <p><span className="font-medium">What&apos;s missing:</span> {item.whats_missing}</p>
+              {item.example_language && (
+                <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Suggested language</p>
+                  <p className="text-xs text-zinc-700 dark:text-zinc-300">{item.example_language}</p>
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
