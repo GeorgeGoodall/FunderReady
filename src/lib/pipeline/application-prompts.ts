@@ -107,47 +107,13 @@ ${answer.question_text}${prioritySection}${fieldTypeSection}${guidanceSection}${
 
 ${answer.answer_text}
 
-## Required Output
+## Guidelines
 
-Return a JSON object matching this exact structure:
-
-\`\`\`json
-{
-  "question_id": "${answer.question_id}",
-  "inline_comments": [
-    {
-      "target_text": "exact quote from the answer text",
-      "category": "EVIDENCE",
-      "issue": "Clear description of the problem (1-2 sentences)",
-      "suggestion": "Specific, actionable fix with example language where appropriate"
-    }
-  ],
-  "criteria_relevance": [
-    {
-      "criterion_id": "c1",
-      "relevance": "directly_addresses|partially_addresses|not_relevant",
-      "notes": "Brief explanation"
-    }
-  ],
-  "strengths": ["Specific strength 1", "Specific strength 2"],
-  "weaknesses": ["Specific weakness 1", "Specific weakness 2"],
-  "answer_score": "Strong|Fair|Needs Improvement|Missing",
-  "word_count_assessment": {
-    "actual": ${wordCount},
-    "limit": ${answer.word_count_max ?? "null"},
-    "status": "${answer.word_count_max ? (wordCount > answer.word_count_max ? "over_limit" : "within_limit") : "no_limit"}"
-  }
-}
-\`\`\`
-
-Guidelines:
 - Aim for 2-6 inline comments depending on answer length and quality
 - target_text must be an EXACT quote from the answer text (at least 5 words)
 - Cover all relevant criteria in criteria_relevance
 - Be specific — avoid generic feedback
-- Score the answer holistically based on how well it addresses the question AND the funder's criteria
-
-Return ONLY the JSON object, no other text.`;
+- Score the answer holistically based on how well it addresses the question AND the funder's criteria`;
 }
 
 // ---------------------------------------------------------------------------
