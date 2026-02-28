@@ -6,6 +6,7 @@ import {
   AnswerScoreSchema,
   ApplicationScoringSchema,
 } from "../schemas";
+import { SaveAnswersRequestSchema } from "../../schemas/criteria";
 
 describe("CrossReferenceSchema", () => {
   it("validates cross-reference findings", () => {
@@ -33,6 +34,53 @@ describe("CrossReferenceSchema", () => {
       summary: "No cross-reference issues found.",
     };
     expect(CrossReferenceSchema.parse(data)).toEqual(data);
+  });
+
+  it("validates with gap_criteria array", () => {
+    const data = {
+      findings: [],
+      overall_coherence: "adequate" as const,
+      summary: "Some criteria uncovered.",
+      gap_criteria: [
+        {
+          criterion_id: "c3",
+          criterion: "Financial sustainability",
+          related_disabled_question_ids: ["q5"],
+          related_disabled_question_texts: ["Do you have trading subsidiaries?"],
+        },
+      ],
+    };
+    expect(CrossReferenceSchema.parse(data)).toEqual(data);
+  });
+
+  it("validates without gap_criteria (backward compatibility)", () => {
+    const data = {
+      findings: [],
+      overall_coherence: "strong" as const,
+      summary: "All good.",
+    };
+    // gap_criteria is optional — should parse cleanly
+    const result = CrossReferenceSchema.parse(data);
+    expect(result.gap_criteria).toBeUndefined();
+  });
+});
+
+describe("SaveAnswersRequestSchema", () => {
+  it("accepts is_disabled field on answers", () => {
+    const data = {
+      answers: [
+        { question_id: "q1", answer_text: "Some answer", is_disabled: false },
+        { question_id: "q2", answer_text: "", is_disabled: true },
+      ],
+    };
+    expect(() => SaveAnswersRequestSchema.parse(data)).not.toThrow();
+  });
+
+  it("accepts answers without is_disabled (optional)", () => {
+    const data = {
+      answers: [{ question_id: "q1", answer_text: "Some answer" }],
+    };
+    expect(() => SaveAnswersRequestSchema.parse(data)).not.toThrow();
   });
 });
 

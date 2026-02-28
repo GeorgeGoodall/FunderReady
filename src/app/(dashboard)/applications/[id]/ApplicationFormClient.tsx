@@ -34,6 +34,7 @@ interface AnswerData {
   field_type: string;
   selected_options: Json | null;
   last_reviewed_text: string | null;
+  is_disabled?: boolean | null;
 }
 
 interface FundData {
@@ -129,6 +130,16 @@ export function ApplicationFormClient({
     return map;
   });
 
+  const [disabledMap, setDisabledMap] = useState<Record<string, boolean>>(() => {
+    const map: Record<string, boolean> = {};
+    for (const a of initialAnswers) {
+      if (a.is_disabled) {
+        map[a.question_id] = true;
+      }
+    }
+    return map;
+  });
+
   // Track last_reviewed_text per question
   const reviewedTextMap: Record<string, string | null> = {};
   for (const a of initialAnswers) {
@@ -143,10 +154,11 @@ export function ApplicationFormClient({
     if (!dirtyRef.current) return;
 
     const answersToSave = questions
-      .filter((q) => answerMap[q.id] !== undefined)
+      .filter((q) => answerMap[q.id] !== undefined || disabledMap[q.id] !== undefined)
       .map((q) => ({
         question_id: q.id,
         answer_text: answerMap[q.id] ?? "",
+        is_disabled: disabledMap[q.id] ?? false,
         ...(optionsMap[q.id] && { selected_options: optionsMap[q.id] }),
       }));
 
@@ -173,7 +185,7 @@ export function ApplicationFormClient({
     } finally {
       setSaving(false);
     }
-  }, [answerMap, optionsMap, application.id, questions]);
+  }, [answerMap, optionsMap, disabledMap, application.id, questions]);
 
   // Auto-save every 30s if dirty
   useEffect(() => {
@@ -194,6 +206,11 @@ export function ApplicationFormClient({
 
   const handleOptionsChange = (questionId: string, options: string[]) => {
     setOptionsMap((prev) => ({ ...prev, [questionId]: options }));
+    dirtyRef.current = true;
+  };
+
+  const handleDisabledChange = (questionId: string, disabled: boolean) => {
+    setDisabledMap((prev) => ({ ...prev, [questionId]: disabled }));
     dirtyRef.current = true;
   };
 
@@ -391,8 +408,10 @@ export function ApplicationFormClient({
               value={answerMap[q.id] ?? ""}
               selectedOptions={optionsMap[q.id]}
               lastReviewedText={reviewedTextMap[q.id]}
+              isDisabled={disabledMap[q.id] ?? false}
               onChange={(v) => handleChange(q.id, v)}
               onOptionsChange={(opts) => handleOptionsChange(q.id, opts)}
+              onDisabledChange={(disabled) => handleDisabledChange(q.id, disabled)}
               onBlur={handleBlur}
             />
           ))}
@@ -404,6 +423,7 @@ export function ApplicationFormClient({
         <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <TotalWordCount
             answerMap={answerMap}
+            disabledMap={disabledMap}
             limit={questionsSet.overall_word_limit}
           />
         </div>
@@ -514,13 +534,15 @@ function ApplicationStatusBadge({ status }: { status: string }) {
 
 function TotalWordCount({
   answerMap,
+  disabledMap,
   limit,
 }: {
   answerMap: Record<string, string>;
+  disabledMap: Record<string, boolean>;
   limit: number;
 }) {
-  const total = Object.values(answerMap).reduce(
-    (sum, text) => sum + (text.trim() ? text.trim().split(/\s+/).length : 0),
+  const total = Object.entries(answerMap).reduce(
+    (sum, [id, text]) => (disabledMap[id] ? sum : sum + (text.trim() ? text.trim().split(/\s+/).length : 0)),
     0
   );
   const ratio = total / limit;

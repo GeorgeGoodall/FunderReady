@@ -63,8 +63,7 @@ export function buildAnswerAnalysisSystemPrompt(criteria: Criterion[]): CacheBlo
 // ---------------------------------------------------------------------------
 
 export function buildAnswerAnalysisPrompt(
-  answer: AnswerContext,
-  otherQuestionTitles: string[]
+  answer: AnswerContext
 ): string {
   const wordCount = answer.answer_text.trim().split(/\s+/).length;
 
@@ -92,10 +91,6 @@ export function buildAnswerAnalysisPrompt(
     prioritySection = `\nPriority/weight: ${answer.priority}/5`;
   }
 
-  const otherQuestionsSection = otherQuestionTitles.length > 0
-    ? `\n## Other Questions in This Application\n\n${otherQuestionTitles.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n\nNote: If the applicant covers content here that belongs in another question, flag it as a structural issue.`
-    : "";
-
   return `## Task: Analyse Answer to Question "${answer.question_id}"
 
 ## Question
@@ -105,7 +100,7 @@ ${answer.question_text}${prioritySection}${guidanceSection}${wordLimitSection}
 ## Answer Text
 
 ${answer.answer_text}
-${otherQuestionsSection}
+
 ## Required Output
 
 Return a JSON object matching this exact structure:
@@ -186,7 +181,8 @@ export function formatAnswerAnalysesSummary(
 export function buildApplicationCrossReferencePrompt(
   analyses: AnswerAnalysis[],
   questions: Array<{ id: string; question: string }>,
-  criteria: Criterion[]
+  criteria: Criterion[],
+  disabledQuestions: Array<{ question_id: string; question_text: string }> = []
 ): string {
   const criteriaText = formatCriteria(criteria);
   const analysesText = formatAnswerAnalysesSummary(analyses, questions);
@@ -194,6 +190,14 @@ export function buildApplicationCrossReferencePrompt(
   const questionsList = questions
     .map((q) => `${q.id}: "${q.question}"`)
     .join("\n");
+
+  let disabledSection = "";
+  if (disabledQuestions.length > 0) {
+    const list = disabledQuestions
+      .map((q, i) => `${i + 1}. ${q.question_id}: "${q.question_text}"`)
+      .join("\n");
+    disabledSection = `\n## Questions Marked Not Applicable\n\nThe following questions were marked not applicable by the applicant and excluded from the review:\n\n${list}\n\nIf any criteria appear unaddressed, it may be because the relevant question was disabled. Do not flag the absence of these questions as a gap or missing criterion — they were intentionally excluded.\n`;
+  }
 
   return `${SYSTEM_PERSONA}
 
@@ -208,7 +212,7 @@ ${criteriaText}
 ## Application Questions
 
 ${questionsList}
-
+${disabledSection}
 ## Answer Analyses (from prior review)
 
 ${analysesText}
@@ -257,7 +261,8 @@ export function buildApplicationScoringPrompt(
   crossReference: unknown,
   questions: Array<{ id: string; question: string }>,
   criteria: Criterion[],
-  overallWordLimit?: number
+  overallWordLimit?: number,
+  disabledQuestions: Array<{ question_id: string; question_text: string }> = []
 ): string {
   const criteriaText = formatCriteria(criteria);
   const analysesText = formatAnswerAnalysesSummary(analyses, questions);
@@ -276,6 +281,12 @@ export function buildApplicationScoringPrompt(
       0
     );
     wordCountSection = `\n## Word Count Summary\n\nTotal words across all answers: ${totalWords}\nOverall word limit: ${overallWordLimit}\nUsage: ${Math.round((totalWords / overallWordLimit) * 100)}%\n`;
+  }
+
+  let disabledNote = "";
+  if (disabledQuestions.length > 0) {
+    const list = disabledQuestions.map((q) => `- ${q.question_id}: "${q.question_text}"`).join("\n");
+    disabledNote = `\n## Excluded Questions (Not Applicable)\n\nThe following questions were marked not applicable and excluded from this review:\n\n${list}\n\nScore criteria based only on enabled answers. Criteria with no coverage from enabled answers will score as Missing — this is expected when related questions have been disabled.\n`;
   }
 
   return `${SYSTEM_PERSONA}
@@ -297,7 +308,7 @@ ${analysesText}
 ## Cross-Reference Findings
 
 ${crossRefText}
-${wordCountSection}
+${disabledNote}${wordCountSection}
 ## Required Output
 
 Return a JSON object:

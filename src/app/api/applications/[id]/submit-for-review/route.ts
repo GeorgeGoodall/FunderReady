@@ -88,13 +88,15 @@ export async function POST(
     );
   }
 
-  // Check there are non-empty answers
+  // Check there are non-empty, non-disabled answers
   const { data: answers } = await supabase
     .from("application_answers")
-    .select("question_id, answer_text")
+    .select("question_id, answer_text, is_disabled")
     .eq("application_id", id);
 
-  const nonEmptyCount = (answers ?? []).filter((a) => a.answer_text.trim().length > 0).length;
+  const nonEmptyCount = (answers ?? []).filter(
+    (a) => !a.is_disabled && a.answer_text.trim().length > 0
+  ).length;
   if (nonEmptyCount === 0) {
     return NextResponse.json(
       { error: "At least one answer must be filled in" },

@@ -29,7 +29,7 @@ export default async function ApplicationPage({
   // Fetch answers
   const { data: answers } = await supabase
     .from("application_answers")
-    .select("id, question_id, answer_text, field_type, selected_options, last_reviewed_text, updated_at")
+    .select("id, question_id, answer_text, field_type, selected_options, last_reviewed_text, is_disabled, updated_at")
     .eq("application_id", id)
     .order("created_at", { ascending: true });
 

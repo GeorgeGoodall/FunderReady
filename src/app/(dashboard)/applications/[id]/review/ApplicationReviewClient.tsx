@@ -59,10 +59,18 @@ interface CrossReferenceFinding {
   suggestion?: string;
 }
 
+interface GapCriterion {
+  criterion_id: string;
+  criterion: string;
+  related_disabled_question_ids: string[];
+  related_disabled_question_texts: string[];
+}
+
 interface CrossReference {
   findings: CrossReferenceFinding[];
   overall_coherence: string;
   summary: string;
+  gap_criteria?: GapCriterion[];
 }
 
 interface ApplicationScoring {
@@ -87,6 +95,10 @@ interface ReviewResults {
   answer_feedback: Record<string, AnswerAnalysis>;
   cross_reference: CrossReference;
   scoring: ApplicationScoring;
+  projected_score?: number;
+  gap_count?: number;
+  total_criteria_count?: number;
+  disabled_questions?: Array<{ question_id: string; question_text: string }>;
 }
 
 interface ApplicationReviewClientProps {
@@ -99,7 +111,7 @@ interface ApplicationReviewClientProps {
   };
   fund: { id: string; name: string; organisation: { id: string; name: string } | null } | null;
   questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number }>;
-  answers: Array<{ question_id: string; answer_text: string; last_reviewed_text: string | null }>;
+  answers: Array<{ question_id: string; answer_text: string; last_reviewed_text: string | null; is_disabled?: boolean | null }>;
   review: {
     id: string;
     review_number: number;
@@ -279,16 +291,24 @@ export function ApplicationReviewClient({
     );
   }
 
-  const { scoring, answer_feedback, cross_reference } = results;
+  const { scoring, answer_feedback, cross_reference, projected_score, gap_count, disabled_questions } = results;
+  const gapCriteria = cross_reference?.gap_criteria ?? [];
+  const hasGaps = (gap_count ?? 0) > 0 && projected_score !== undefined;
 
-  // Build outdated map
+  // Build outdated map (only for enabled questions)
   const outdatedMap: Record<string, boolean> = {};
   for (const a of answers) {
+    if (a.is_disabled) continue;
     outdatedMap[a.question_id] =
       a.last_reviewed_text !== null &&
       a.last_reviewed_text !== undefined &&
       a.answer_text !== a.last_reviewed_text;
   }
+
+  // Set of disabled question IDs for filtering feedback
+  const disabledQuestionIds = new Set(
+    (disabled_questions ?? []).map((q) => q.question_id)
+  );
 
   return (
     <div className="space-y-8">
@@ -300,6 +320,18 @@ export function ApplicationReviewClient({
           <span className="text-4xl font-bold">{scoring.overall_score}</span>
           <span className="text-sm text-zinc-500">/100</span>
         </div>
+        {hasGaps && projected_score !== undefined && (
+          <>
+            <span className="text-zinc-400">&rarr;</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{Math.round(projected_score)}</span>
+              <span className="text-sm text-zinc-500">/100</span>
+            </div>
+            <span className="text-xs text-blue-600 dark:text-blue-400">
+              projected if {gap_count} gap{gap_count === 1 ? "" : "s"} addressed
+            </span>
+          </>
+        )}
         <span className={`rounded-full px-3 py-1 text-sm font-medium ${READINESS_COLOURS[scoring.submission_readiness] ?? ""}`}>
           {scoring.submission_readiness}
         </span>
@@ -357,14 +389,61 @@ export function ApplicationReviewClient({
         </div>
       </div>
 
+      {/* Coverage Gaps section */}
+      {gapCriteria.length > 0 && (
+        <div>
+          <h3 className="mb-1 text-lg font-semibold">
+            Coverage Gaps{" "}
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-sm font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              {gapCriteria.length}
+            </span>
+          </h3>
+          <p className="mb-3 text-sm text-zinc-500">
+            These criteria have no coverage in your enabled answers. If applicable, re-enable or fill in the related questions and re-submit.
+          </p>
+          <div className="space-y-3">
+            {gapCriteria.map((gap) => (
+              <div key={gap.criterion_id} className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/30 dark:bg-amber-900/10">
+                <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{gap.criterion}</p>
+                {gap.related_disabled_question_texts.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Related excluded questions:</p>
+                    <ul className="mt-1 space-y-0.5">
+                      {gap.related_disabled_question_texts.map((qt, i) => (
+                        <li key={i} className="text-xs text-amber-700 dark:text-amber-400">
+                          <span className="mr-1 rounded bg-zinc-200 px-1 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">N/A</span>
+                          {qt}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Answer-by-answer feedback */}
       <div>
         <h3 className="mb-4 text-lg font-semibold">Answer Feedback</h3>
         <div className="space-y-4">
           {questions.map((q) => {
+            const isQDisabled = disabledQuestionIds.has(q.id);
             const feedback = answer_feedback?.[q.id];
             const answer = answers.find((a) => a.question_id === q.id);
             const isOutdated = outdatedMap[q.id] ?? false;
+
+            if (isQDisabled) {
+              return (
+                <div key={q.id} className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-5 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+                  <span className="shrink-0 rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
+                    N/A
+                  </span>
+                  <span className="text-sm text-zinc-400 dark:text-zinc-500">{q.question}</span>
+                </div>
+              );
+            }
 
             if (!feedback) return null;
 

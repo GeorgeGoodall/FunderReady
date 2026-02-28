@@ -56,6 +56,7 @@ export async function PATCH(
     application_id: id,
     question_id: a.question_id,
     answer_text: a.answer_text,
+    is_disabled: a.is_disabled ?? false,
     ...(a.selected_options && { selected_options: a.selected_options }),
   }));
 

@@ -20,8 +20,10 @@ interface FormFieldProps {
   value: string;
   selectedOptions?: string[];
   lastReviewedText?: string | null;
+  isDisabled?: boolean;
   onChange: (value: string) => void;
   onOptionsChange?: (options: string[]) => void;
+  onDisabledChange?: (disabled: boolean) => void;
   onBlur: () => void;
 }
 
@@ -56,43 +58,62 @@ export function FormField({
   value,
   selectedOptions,
   lastReviewedText,
+  isDisabled = false,
   onChange,
   onOptionsChange,
+  onDisabledChange,
   onBlur,
 }: FormFieldProps) {
   const fieldType = question.field_type ?? "text_long";
   const isOutdated =
+    !isDisabled &&
     lastReviewedText !== null &&
     lastReviewedText !== undefined &&
     value !== lastReviewedText;
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+    <div className={`rounded-lg border p-5 dark:bg-zinc-900 ${isDisabled ? "border-zinc-200 bg-zinc-50 dark:border-zinc-800 opacity-75" : "border-zinc-200 bg-white dark:border-zinc-800"}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
-          <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          <label className={`block text-sm font-semibold ${isDisabled ? "text-zinc-400 dark:text-zinc-500" : "text-zinc-900 dark:text-zinc-100"}`}>
             {question.question}
-            {question.required !== false && (
+            {question.required !== false && !isDisabled && (
               <span className="ml-1 text-red-500">*</span>
             )}
           </label>
-          {question.guidance && (
+          {question.guidance && !isDisabled && (
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
               {question.guidance}
             </p>
           )}
         </div>
         <div className="flex items-center gap-2">
+          {isDisabled && (
+            <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
+              N/A
+            </span>
+          )}
           {isOutdated && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
               Changed since review
             </span>
           )}
-          {value.trim() && <CopyButton text={value} />}
+          {value.trim() && !isDisabled && <CopyButton text={value} />}
+          {onDisabledChange && (
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+              <input
+                type="checkbox"
+                checked={isDisabled}
+                onChange={(e) => onDisabledChange(e.target.checked)}
+                className="rounded text-zinc-500 focus:ring-zinc-400"
+              />
+              N/A
+            </label>
+          )}
         </div>
       </div>
 
-      <div className="mt-3">
+      <div className={`mt-3 ${isDisabled ? "pointer-events-none opacity-50" : ""}`}>
         {fieldType === "text_short" && (
           <input
             type="text"
@@ -177,8 +198,8 @@ export function FormField({
         )}
       </div>
 
-      {/* Word counter for text fields */}
-      {(fieldType === "text_long" || fieldType === "text_short") && (
+      {/* Word counter for text fields — hidden when disabled */}
+      {!isDisabled && (fieldType === "text_long" || fieldType === "text_short") && (
         <div className="mt-1.5 flex items-center justify-between">
           <WordCounter
             text={value}

@@ -49,10 +49,20 @@ export const CrossReferenceFindingSchema = z.object({
   suggestion: z.string().optional(),
 });
 
+export const GapCriterionSchema = z.object({
+  criterion_id: z.string(),
+  criterion: z.string(),
+  related_disabled_question_ids: z.array(z.string()),
+  related_disabled_question_texts: z.array(z.string()),
+});
+
+export type GapCriterion = z.infer<typeof GapCriterionSchema>;
+
 export const CrossReferenceSchema = z.object({
   findings: z.array(CrossReferenceFindingSchema),
   overall_coherence: z.enum(["strong", "adequate", "weak"]),
   summary: z.string(),
+  gap_criteria: z.array(GapCriterionSchema).optional(),
 });
 
 // ---------------------------------------------------------------------------

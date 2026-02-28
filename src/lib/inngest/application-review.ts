@@ -16,6 +16,7 @@ import {
   type AnswerAnalysis,
   type CrossReference,
   type ApplicationScoring,
+  type GapCriterion,
 } from "@/lib/pipeline/schemas";
 import {
   buildAnswerAnalysisSystemPrompt,
@@ -99,6 +100,19 @@ async function markAppReviewFailed(
 }
 
 // ---------------------------------------------------------------------------
+// Projected score utility
+// ---------------------------------------------------------------------------
+
+export function computeProjectedScore(
+  currentScore: number,
+  gapCount: number,
+  totalCriteriaCount: number
+): number {
+  if (gapCount <= 0 || totalCriteriaCount <= 0) return currentScore;
+  return Math.min(100, currentScore + gapCount * (100 / totalCriteriaCount));
+}
+
+// ---------------------------------------------------------------------------
 // Pipeline function
 // ---------------------------------------------------------------------------
 
@@ -139,10 +153,10 @@ export const applicationReviewRequested = inngest.createFunction(
         throw new NonRetriableError(`Application not found: ${applicationId}`);
       }
 
-      // Load answers
+      // Load answers (including is_disabled)
       const { data: answers, error: answersError } = await supabase
         .from("application_answers")
-        .select("question_id, answer_text, field_type, selected_options")
+        .select("question_id, answer_text, field_type, selected_options, is_disabled")
         .eq("application_id", applicationId);
 
       if (answersError) {
@@ -181,28 +195,46 @@ export const applicationReviewRequested = inngest.createFunction(
         load_completed: Date.now(),
       });
 
+      const allAnswers = answers ?? [];
+
+      // Split into enabled (non-disabled, non-empty) and disabled
+      const enabledAnswers = allAnswers.filter(
+        (a) => !a.is_disabled && a.answer_text.trim().length > 0
+      );
+
+      const questions = questionsSet.questions_json as unknown as Array<{
+        id: string;
+        question: string;
+        word_count_min?: number;
+        word_count_max?: number;
+        guidance?: string;
+        priority?: number;
+        field_type?: string;
+      }>;
+
+      // Build disabled questions metadata list
+      const disabledAnswerIds = new Set(
+        allAnswers.filter((a) => a.is_disabled).map((a) => a.question_id)
+      );
+      const disabledQuestions = questions
+        .filter((q) => disabledAnswerIds.has(q.id))
+        .map((q) => ({ question_id: q.id, question_text: q.question }));
+
       return {
         title: app.title,
         criteria: criteriaSet.criteria_json as unknown as Criterion[],
-        questions: questionsSet.questions_json as unknown as Array<{
-          id: string;
-          question: string;
-          word_count_min?: number;
-          word_count_max?: number;
-          guidance?: string;
-          priority?: number;
-          field_type?: string;
-        }>,
+        questions,
         overallWordLimit: questionsSet.overall_word_limit ?? undefined,
-        answers: (answers ?? []).filter((a) => a.answer_text.trim().length > 0),
+        enabledAnswers,
+        disabledQuestions,
       };
     });
 
-    const { criteria, questions, answers, overallWordLimit } = appData;
+    const { criteria, questions, enabledAnswers, disabledQuestions, overallWordLimit } = appData;
 
-    // Build answer contexts
+    // Build answer contexts from enabled answers only
     const answerContexts: AnswerContext[] = [];
-    for (const a of answers) {
+    for (const a of enabledAnswers) {
       const q = questions.find((q) => q.id === a.question_id);
       if (!q) continue;
       answerContexts.push({
@@ -229,11 +261,10 @@ export const applicationReviewRequested = inngest.createFunction(
     }
 
     // -----------------------------------------------------------------------
-    // Step 2: Answer analysis (sequential, per non-empty answer)
+    // Step 2: Answer analysis (sequential, per non-empty enabled answer)
     // -----------------------------------------------------------------------
     const answerAnalyses: AnswerAnalysis[] = [];
     const systemPrompt = buildAnswerAnalysisSystemPrompt(criteria);
-    const otherQuestionTitles = questions.map((q) => q.question);
 
     for (let i = 0; i < answerContexts.length; i++) {
       const ctx = answerContexts[i];
@@ -247,12 +278,7 @@ export const applicationReviewRequested = inngest.createFunction(
             answers_total: answerContexts.length,
           });
 
-          // Exclude current question from "other questions" list
-          const otherTitles = otherQuestionTitles.filter(
-            (_, idx) => questions[idx].id !== ctx.question_id
-          );
-
-          const prompt = buildAnswerAnalysisPrompt(ctx, otherTitles);
+          const prompt = buildAnswerAnalysisPrompt(ctx);
           const result = await callClaude({
             prompt,
             systemPrompt,
@@ -283,7 +309,8 @@ export const applicationReviewRequested = inngest.createFunction(
       const prompt = buildApplicationCrossReferencePrompt(
         answerAnalyses,
         questions.map((q) => ({ id: q.id, question: q.question })),
-        criteria
+        criteria,
+        disabledQuestions
       );
 
       const result = await callClaude({
@@ -301,6 +328,29 @@ export const applicationReviewRequested = inngest.createFunction(
     });
 
     // -----------------------------------------------------------------------
+    // Compute gap_criteria server-side (no AI call)
+    // -----------------------------------------------------------------------
+    const coveredCriteriaIds = new Set<string>();
+    for (const analysis of answerAnalyses) {
+      for (const r of analysis.criteria_relevance) {
+        if (r.relevance === "directly_addresses" || r.relevance === "partially_addresses") {
+          coveredCriteriaIds.add(r.criterion_id);
+        }
+      }
+    }
+
+    const gapCriteria: GapCriterion[] = criteria
+      .filter((c) => !coveredCriteriaIds.has(c.id))
+      .map((c) => ({
+        criterion_id: c.id,
+        criterion: c.criterion,
+        related_disabled_question_ids: disabledQuestions.map((q) => q.question_id),
+        related_disabled_question_texts: disabledQuestions.map((q) => q.question_text),
+      }));
+
+    const crossReferenceWithGaps = { ...crossReference, gap_criteria: gapCriteria };
+
+    // -----------------------------------------------------------------------
     // Step 4: Scoring
     // -----------------------------------------------------------------------
     await step.run("scoring-progress", async () => {
@@ -312,10 +362,11 @@ export const applicationReviewRequested = inngest.createFunction(
     const scoring: ApplicationScoring = await step.run("scoring", async () => {
       const prompt = buildApplicationScoringPrompt(
         answerAnalyses,
-        crossReference,
+        crossReferenceWithGaps,
         questions.map((q) => ({ id: q.id, question: q.question })),
         criteria,
-        overallWordLimit
+        overallWordLimit,
+        disabledQuestions
       );
 
       const result = await callClaude({
@@ -338,6 +389,11 @@ export const applicationReviewRequested = inngest.createFunction(
     await step.run("save-results", async () => {
       const supabase = createServiceClient();
 
+      // Compute projected score mechanically
+      const gapCount = gapCriteria.length;
+      const totalCriteriaCount = criteria.length;
+      const projectedScore = computeProjectedScore(scoring.overall_score, gapCount, totalCriteriaCount);
+
       // Save results JSONB to application_reviews
       const { error: resultsError } = await supabase
         .from("application_reviews")
@@ -347,8 +403,12 @@ export const applicationReviewRequested = inngest.createFunction(
             answer_feedback: Object.fromEntries(
               answerAnalyses.map((a) => [a.question_id, a])
             ),
-            cross_reference: crossReference,
+            cross_reference: crossReferenceWithGaps,
             scoring,
+            projected_score: projectedScore,
+            gap_count: gapCount,
+            total_criteria_count: totalCriteriaCount,
+            disabled_questions: disabledQuestions,
           },
         })
         .eq("id", reviewId);
@@ -357,8 +417,8 @@ export const applicationReviewRequested = inngest.createFunction(
         throw new Error(`Failed to save review results: ${resultsError.message}`);
       }
 
-      // Stamp last_reviewed_text on all answers
-      for (const answer of answers) {
+      // Stamp last_reviewed_text on enabled answers only (skip disabled)
+      for (const answer of enabledAnswers) {
         await supabase
           .from("application_answers")
           .update({ last_reviewed_text: answer.answer_text })

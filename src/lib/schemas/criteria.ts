@@ -173,6 +173,7 @@ export const SaveAnswersRequestSchema = z.object({
       question_id: z.string().min(1),
       answer_text: z.string(),
       selected_options: z.array(z.string()).optional(),
+      is_disabled: z.boolean().optional(),
     })
   ).min(1),
 });
