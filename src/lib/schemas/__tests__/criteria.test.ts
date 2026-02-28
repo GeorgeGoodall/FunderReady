@@ -354,7 +354,7 @@ describe("ExtendedQuestionSchema", () => {
   });
 
   it("accepts all valid field types", () => {
-    const types = ["text_short", "text_long", "dropdown", "radio", "checkbox"] as const;
+    const types = ["text_short", "text_long", "dropdown", "radio", "checkbox", "email", "url", "phone", "number"] as const;
     for (const ft of types) {
       const result = ExtendedQuestionSchema.safeParse({
         id: "q1",
@@ -369,7 +369,7 @@ describe("ExtendedQuestionSchema", () => {
     const result = ExtendedQuestionSchema.safeParse({
       id: "q1",
       question: "Test",
-      field_type: "number",
+      field_type: "textarea",
     });
     expect(result.success).toBe(false);
   });

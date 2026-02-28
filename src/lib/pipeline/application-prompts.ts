@@ -67,8 +67,16 @@ export function buildAnswerAnalysisPrompt(
 ): string {
   const wordCount = answer.answer_text.trim().split(/\s+/).length;
 
+  const factualFieldTypes = new Set(["email", "url", "phone", "number"]);
+  const constrainedFieldTypes = new Set(["dropdown", "select", "radio", "checkbox", "yes_no", "date"]);
+  const isFactualField = answer.field_type && factualFieldTypes.has(answer.field_type);
+  const isShortTextField = answer.field_type === "text_short";
+  const isConstrainedField = answer.field_type && constrainedFieldTypes.has(answer.field_type);
+
   let wordLimitSection = "";
-  if (answer.word_count_max) {
+  // Suppress word count for non-narrative fields — word budget utilisation is meaningless
+  // for single-value answers (email, number), short factual fields, and constrained inputs.
+  if (answer.word_count_max && !isFactualField && !isShortTextField && !isConstrainedField) {
     const pct = wordCount / answer.word_count_max;
     wordLimitSection = `\n## Word Count\n\nThis answer is ${wordCount} words out of a ${answer.word_count_max}-word limit (${Math.round(pct * 100)}% utilised).`;
     if (answer.word_count_min && wordCount < answer.word_count_min) {
@@ -91,10 +99,11 @@ export function buildAnswerAnalysisPrompt(
     prioritySection = `\nPriority/weight: ${answer.priority}/5`;
   }
 
-  const constrainedFieldTypes = new Set(["dropdown", "select", "radio", "checkbox", "yes_no", "date", "number"]);
   let fieldTypeSection = "";
-  if (answer.field_type && constrainedFieldTypes.has(answer.field_type)) {
+  if (isConstrainedField) {
     fieldTypeSection = `\n## Field Type: ${answer.field_type}\n\nIMPORTANT: This question used a constrained input (${answer.field_type}). The applicant selected from predefined options and could NOT provide additional free-text detail. Do NOT criticise the answer for being brief, lacking detail, or failing to elaborate — the applicant had no ability to do so. Evaluate only whether the selected option is appropriate for the question. Keep inline_comments minimal or empty for constrained fields.`;
+  } else if (isFactualField) {
+    fieldTypeSection = `\n## Field Type: ${answer.field_type}\n\nIMPORTANT: This is a factual single-value field (${answer.field_type}). The applicant was asked to supply one specific value. Do NOT criticise the answer for being brief, lacking detail, or failing to address criteria — none of those expectations apply here. Evaluate ONLY whether the value provided is present and plausible. Set inline_comments to an empty array and keep strengths/weaknesses to one line each at most.`;
   }
 
   return `## Task: Analyse Answer to Question "${answer.question_id}"

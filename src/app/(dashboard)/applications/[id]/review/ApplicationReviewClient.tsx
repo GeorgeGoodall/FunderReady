@@ -404,7 +404,7 @@ export function ApplicationReviewClient({
                 href={`/applications/${application.id}`}
                 className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
               >
-                Edit Answers
+                Edit Current Draft
               </Link>
             </div>
 
@@ -517,7 +517,7 @@ export function ApplicationReviewClient({
                   <AnswerFeedbackCard
                     key={q.id}
                     question={q}
-                    answer={answer?.answer_text ?? ""}
+                    answer={answer?.last_reviewed_text ?? answer?.answer_text ?? ""}
                     feedback={feedback}
                     isOutdated={isOutdated}
                   />
@@ -568,7 +568,7 @@ export function ApplicationReviewClient({
               href={`/applications/${application.id}`}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
             >
-              Edit Answers
+              Edit Current Draft
             </Link>
             {application.review_count > 1 && (
               <Link

@@ -29,9 +29,13 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
   dropdown: "Dropdown",
   radio: "Radio buttons",
   checkbox: "Checkboxes",
+  email: "Email address",
+  url: "Website / URL",
+  phone: "Phone number",
+  number: "Number / Amount",
 };
 
-const FIELD_TYPES = ["text_long", "text_short", "dropdown", "radio", "checkbox"] as const;
+const FIELD_TYPES = ["text_long", "text_short", "dropdown", "radio", "checkbox", "email", "url", "phone", "number"] as const;
 
 export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewProps) {
   const sensors = useSensors(useSensor(PointerSensor));

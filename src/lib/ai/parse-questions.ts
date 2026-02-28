@@ -34,8 +34,12 @@ Rules:
 - If a section has a heading but no explicit question, use the heading as the question
 
 Field type detection rules:
+- "email": Use when the question clearly asks for an email address. Clues: "email", "e-mail", "email address", "contact email". Do NOT set word_count_min or word_count_max for this type.
+- "url": Use when the question asks for a website or web address. Clues: "website", "URL", "web address", "online presence", "social media link". Do NOT set word_count_min or word_count_max for this type.
+- "phone": Use when the question asks for a phone or telephone number. Clues: "phone", "telephone", "mobile", "contact number". Do NOT set word_count_min or word_count_max for this type.
+- "number": Use when the question asks for a single numeric value — amounts, counts, percentages, year. Clues: "how many", "total amount", "number of", "year established", "charity number", "registration number", "£", "budget". Do NOT set word_count_min or word_count_max for this type.
+- "text_short": Use for questions expecting a brief free-text answer that is NOT one of the factual types above — names, titles, addresses, postcodes, single-sentence responses. Clues: "Name of organisation", "Project title", "Lead contact name", "Postcode", character/word limits under ~30. Do NOT set word_count_min or word_count_max for this type.
 - "text_long": Default. Use for questions asking for descriptions, explanations, or narratives (typically 50+ words expected). Also use when word limits suggest a substantial answer.
-- "text_short": Use for questions expecting brief answers — names, titles, dates, amounts, reference numbers, postcodes, single-line responses. Clues: "Name of organisation", "Project title", "Total amount requested", character/word limits under ~50, or clearly factual short answers.
 - "dropdown": Use when the funder presents a single-select list like "Select one:", "Choose from:", or a defined set of mutually exclusive options (e.g. regions, categories, funding bands). Include the options in the "options" array.
 - "radio": Use when the funder presents yes/no questions or a small set of mutually exclusive choices (e.g. "Yes / No / Not applicable"). Include the options in the "options" array.
 - "checkbox": Use when the funder asks to "select all that apply", "tick all that apply", or presents a multi-select list. Include the options in the "options" array.
