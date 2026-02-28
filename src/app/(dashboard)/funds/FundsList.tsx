@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type Fund = {
   id: string;
@@ -65,7 +66,7 @@ export function FundsList({ funds: initialFunds }: { funds: Fund[] }) {
         <li key={fund.id} className="flex items-center justify-between gap-4 py-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="truncate font-medium">{fund.name}</span>
+              <Link href={`/funds/${fund.id}`} className="truncate font-medium hover:underline">{fund.name}</Link>
               <span
                 className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
                   fund.published

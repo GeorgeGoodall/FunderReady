@@ -46,7 +46,7 @@ export default async function ApplicationPage({
 
   const { data: questionsSet } = await supabase
     .from("questions_sets")
-    .select("id, questions_json, overall_word_limit")
+    .select("id, questions_json, overall_word_limit, created_at, approved")
     .eq("id", application.questions_set_id)
     .single();
 

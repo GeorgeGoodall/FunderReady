@@ -69,7 +69,7 @@ export async function PATCH(
   // Validate new questions set: exists, same fund, approved
   const { data: newSet } = await serviceClient
     .from("questions_sets")
-    .select("id, fund_id, approved, questions_json")
+    .select("id, fund_id, approved, created_by, questions_json")
     .eq("id", questionsSetId)
     .single();
 
@@ -84,7 +84,7 @@ export async function PATCH(
     );
   }
 
-  if (!newSet.approved) {
+  if (!newSet.approved && newSet.created_by !== user.id) {
     return NextResponse.json(
       { error: "Questions set is not approved" },
       { status: 400 }

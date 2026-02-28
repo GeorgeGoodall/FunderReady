@@ -55,6 +55,8 @@ interface QuestionsSetData {
   id: string;
   questions_json: Json;
   overall_word_limit: number | null;
+  created_at: string | null;
+  approved: boolean | null;
 }
 
 interface ApplicationFormClientProps {
@@ -87,8 +89,12 @@ export function ApplicationFormClient({
   const [swapResult, setSwapResult] = useState<{ added: number; removed: number; kept: number } | null>(null);
 
   const otherSets = availableQuestionsSets.filter((s) => s.id !== application.questions_set_id);
-  const currentSetCreatedAt = availableQuestionsSets.find((s) => s.id === application.questions_set_id)?.created_at ?? "";
-  const hasNewerSet = otherSets.length > 0 && (otherSets[0]?.created_at ?? "") > currentSetCreatedAt;
+  // Show banner when the newest approved set is newer than the user's current set
+  // (handles both approved and unapproved current sets)
+  const newestApprovedSet = otherSets[0] ?? null;
+  const hasNewerApprovedSet =
+    newestApprovedSet !== null &&
+    (newestApprovedSet.created_at ?? "") > (questionsSet?.created_at ?? "");
 
   const handleSwapQuestionsSet = async () => {
     if (!selectedSwapSetId) return;
@@ -462,21 +468,26 @@ export function ApplicationFormClient({
       )}
 
       {/* Updated questions set banner */}
-      {hasNewerSet && (isDraft || isReviewed) && (
+      {hasNewerApprovedSet && (isDraft || isReviewed) && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/30 dark:bg-amber-900/10">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-amber-800 dark:text-amber-300">
-              A newer version of the questions is available for this fund.
-            </p>
+            <div>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                An updated official questions set has been published for this fund.
+              </p>
+              <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                Switch to use the latest approved questions. Your existing answers for matching questions will be kept.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => {
-                setSelectedSwapSetId(otherSets[0]?.id ?? "");
+                setSelectedSwapSetId(newestApprovedSet?.id ?? "");
                 setShowSwapConfirm(true);
               }}
               className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700"
             >
-              Update Questions
+              Switch to Latest
             </button>
           </div>
         </div>
@@ -574,6 +585,14 @@ export function ApplicationFormClient({
         >
           Back to Dashboard
         </button>
+        {(isDraft || isReviewed) && fund && (
+          <Link
+            href={`/funds/${fund.id}/questions-sets/new?from=${application.questions_set_id}&applicationId=${application.id}&returnTo=/applications/${application.id}`}
+            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            Update Questions
+          </Link>
+        )}
         {application.review_count > 1 && (
           <Link
             href={`/applications/${application.id}/history`}
