@@ -25,6 +25,14 @@ interface ApplicationData {
   status: string;
   review_count: number;
   fund_id: string;
+  questions_set_id: string;
+}
+
+interface AvailableQuestionsSet {
+  id: string;
+  label: string | null;
+  created_at: string;
+  questionCount: number;
 }
 
 interface AnswerData {
@@ -54,6 +62,7 @@ interface ApplicationFormClientProps {
   answers: AnswerData[];
   fund: FundData | null;
   questionsSet: QuestionsSetData | null;
+  availableQuestionsSets?: AvailableQuestionsSet[];
 }
 
 export function ApplicationFormClient({
@@ -61,6 +70,7 @@ export function ApplicationFormClient({
   answers: initialAnswers,
   fund,
   questionsSet,
+  availableQuestionsSets = [],
 }: ApplicationFormClientProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -69,6 +79,48 @@ export function ApplicationFormClient({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState("");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  // Questions set swap
+  const [showSwapConfirm, setShowSwapConfirm] = useState(false);
+  const [selectedSwapSetId, setSelectedSwapSetId] = useState("");
+  const [swapping, setSwapping] = useState(false);
+  const [swapResult, setSwapResult] = useState<{ added: number; removed: number; kept: number } | null>(null);
+
+  const otherSets = availableQuestionsSets.filter((s) => s.id !== application.questions_set_id);
+  const currentSetCreatedAt = availableQuestionsSets.find((s) => s.id === application.questions_set_id)?.created_at ?? "";
+  const hasNewerSet = otherSets.length > 0 && (otherSets[0]?.created_at ?? "") > currentSetCreatedAt;
+
+  const handleSwapQuestionsSet = async () => {
+    if (!selectedSwapSetId) return;
+    setSwapping(true);
+    setError("");
+    try {
+      // Save any pending answers first
+      await saveAnswers();
+
+      const res = await fetch(`/api/applications/${application.id}/questions-set`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionsSetId: selectedSwapSetId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to swap questions set");
+        return;
+      }
+
+      setSwapResult(data);
+      setShowSwapConfirm(false);
+      setSelectedSwapSetId("");
+      // Reload to get new questions + answers
+      router.refresh();
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSwapping(false);
+    }
+  };
 
   // Title editing
   const [editingTitle, setEditingTitle] = useState(false);
@@ -393,6 +445,90 @@ export function ApplicationFormClient({
         </div>
       )}
 
+      {/* Swap result notice */}
+      {swapResult && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900/30 dark:bg-blue-900/10">
+          <p className="text-sm text-blue-800 dark:text-blue-300">
+            Questions set updated: {swapResult.kept} answers kept, {swapResult.added} new questions added{swapResult.removed > 0 ? `, ${swapResult.removed} removed` : ""}.
+          </p>
+          <button
+            type="button"
+            onClick={() => setSwapResult(null)}
+            className="mt-1 text-xs text-blue-600 underline hover:text-blue-800 dark:text-blue-400"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Updated questions set banner */}
+      {hasNewerSet && (isDraft || isReviewed) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/30 dark:bg-amber-900/10">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-amber-800 dark:text-amber-300">
+              A newer version of the questions is available for this fund.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedSwapSetId(otherSets[0]?.id ?? "");
+                setShowSwapConfirm(true);
+              }}
+              className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700"
+            >
+              Update Questions
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Questions set selector (when multiple sets available) */}
+      {otherSets.length > 0 && (isDraft || isReviewed) && (
+        <details className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <summary className="cursor-pointer text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Switch to a different questions set ({availableQuestionsSets.length} available)
+          </summary>
+          <div className="mt-3 space-y-2">
+            {availableQuestionsSets.map((s) => (
+              <div
+                key={s.id}
+                className={`flex items-center justify-between rounded-lg border p-3 ${
+                  s.id === application.questions_set_id
+                    ? "border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
+                    : "border-zinc-200 dark:border-zinc-700"
+                }`}
+              >
+                <div>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    {s.label || "Untitled set"}
+                  </span>
+                  <span className="ml-2 text-xs text-zinc-500">
+                    {s.questionCount} questions
+                  </span>
+                  {s.id === application.questions_set_id && (
+                    <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                      Current
+                    </span>
+                  )}
+                </div>
+                {s.id !== application.questions_set_id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSwapSetId(s.id);
+                      setShowSwapConfirm(true);
+                    }}
+                    className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    Switch
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
       {/* Questions form */}
       {sections.map((section, si) => (
         <div key={si} className="space-y-4">
@@ -499,6 +635,50 @@ export function ApplicationFormClient({
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Swap questions set confirmation modal */}
+      {showSwapConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+            <h2 className="text-lg font-semibold">Switch questions set?</h2>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              Answers for matching questions will be kept. New questions will be added as blank, and questions no longer in the new set will be removed.
+            </p>
+            {selectedSwapSetId && (() => {
+              const selected = availableQuestionsSets.find((s) => s.id === selectedSwapSetId);
+              return selected ? (
+                <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    {selected.label || "Untitled set"}
+                  </p>
+                  <p className="text-xs text-zinc-500">{selected.questionCount} questions</p>
+                </div>
+              ) : null;
+            })()}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSwapConfirm(false);
+                  setSelectedSwapSetId("");
+                }}
+                disabled={swapping}
+                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSwapQuestionsSet}
+                disabled={swapping}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {swapping ? "Switching..." : "Switch"}
               </button>
             </div>
           </div>

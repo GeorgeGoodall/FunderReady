@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ApplicationFormClient } from "./ApplicationFormClient";
 
@@ -50,12 +50,29 @@ export default async function ApplicationPage({
     .eq("id", application.questions_set_id)
     .single();
 
+  // Fetch all approved questions sets for this fund (for swap UI)
+  const serviceClient = createServiceClient();
+  const { data: availableSetsRaw } = await serviceClient
+    .from("questions_sets")
+    .select("id, label, created_at, questions_json")
+    .eq("fund_id", application.fund_id)
+    .eq("approved", true)
+    .order("created_at", { ascending: false });
+
+  const availableQuestionsSets = (availableSetsRaw ?? []).map((s) => ({
+    id: s.id,
+    label: s.label,
+    created_at: s.created_at,
+    questionCount: Array.isArray(s.questions_json) ? s.questions_json.length : 0,
+  }));
+
   return (
     <ApplicationFormClient
       application={application}
       answers={answers ?? []}
       fund={fund}
       questionsSet={questionsSet}
+      availableQuestionsSets={availableQuestionsSets}
     />
   );
 }

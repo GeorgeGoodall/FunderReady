@@ -135,6 +135,8 @@ export type Database = {
           progress: Json
           results: Json | null
           error_message: string | null
+          questions_set_id: string | null
+          criteria_set_id: string | null
           created_at: string
         }
         Insert: {
@@ -145,6 +147,8 @@ export type Database = {
           progress?: Json
           results?: Json | null
           error_message?: string | null
+          questions_set_id?: string | null
+          criteria_set_id?: string | null
           created_at?: string
         }
         Update: {
@@ -155,6 +159,8 @@ export type Database = {
           progress?: Json
           results?: Json | null
           error_message?: string | null
+          questions_set_id?: string | null
+          criteria_set_id?: string | null
           created_at?: string
         }
         Relationships: [
@@ -163,6 +169,20 @@ export type Database = {
             columns: ["application_id"]
             isOneToOne: false
             referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_reviews_questions_set_id_fkey"
+            columns: ["questions_set_id"]
+            isOneToOne: false
+            referencedRelation: "questions_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_reviews_criteria_set_id_fkey"
+            columns: ["criteria_set_id"]
+            isOneToOne: false
+            referencedRelation: "criteria_sets"
             referencedColumns: ["id"]
           },
         ]

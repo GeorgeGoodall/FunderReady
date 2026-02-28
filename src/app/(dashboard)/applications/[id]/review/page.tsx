@@ -40,24 +40,12 @@ export default async function ApplicationReviewPage({
     ? { ...rawFund, organisation: (rawFund.organisations as unknown as { id: string; name: string } | null) ?? null }
     : null;
 
-  // Fetch questions set
+  // Fetch application's questions_set_id (fallback for old reviews)
   const { data: app_full } = await supabase
     .from("applications")
     .select("questions_set_id")
     .eq("id", id)
     .single();
-
-  let questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number }> = [];
-  if (app_full?.questions_set_id) {
-    const { data: qs } = await supabase
-      .from("questions_sets")
-      .select("questions_json")
-      .eq("id", app_full.questions_set_id)
-      .single();
-    if (qs?.questions_json && Array.isArray(qs.questions_json)) {
-      questions = qs.questions_json as unknown as typeof questions;
-    }
-  }
 
   // Fetch answers for outdated detection
   const { data: answers } = await supabase
@@ -71,12 +59,26 @@ export default async function ApplicationReviewPage({
 
   const reviewQuery = supabase
     .from("application_reviews")
-    .select("id, review_number, status, progress, results, error_message, created_at")
+    .select("id, review_number, status, progress, results, error_message, questions_set_id, created_at")
     .eq("application_id", id);
 
   const { data: review } = requestedNumber
     ? await reviewQuery.eq("review_number", requestedNumber).single()
     : await reviewQuery.order("review_number", { ascending: false }).limit(1).single();
+
+  // Use review's questions_set_id if available, otherwise fall back to application's
+  const questionsSetId = review?.questions_set_id ?? app_full?.questions_set_id;
+  let questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number }> = [];
+  if (questionsSetId) {
+    const { data: qs } = await supabase
+      .from("questions_sets")
+      .select("questions_json")
+      .eq("id", questionsSetId)
+      .single();
+    if (qs?.questions_json && Array.isArray(qs.questions_json)) {
+      questions = qs.questions_json as unknown as typeof questions;
+    }
+  }
 
   return (
     <ApplicationReviewClient

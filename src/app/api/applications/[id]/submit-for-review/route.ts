@@ -114,6 +114,8 @@ export async function POST(
       review_number: reviewNumber,
       status: "pending",
       progress: {},
+      questions_set_id: application.questions_set_id,
+      criteria_set_id: application.criteria_set_id,
     })
     .select("id")
     .single();
