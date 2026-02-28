@@ -91,11 +91,17 @@ export function buildAnswerAnalysisPrompt(
     prioritySection = `\nPriority/weight: ${answer.priority}/5`;
   }
 
+  const constrainedFieldTypes = new Set(["dropdown", "select", "radio", "checkbox", "yes_no", "date", "number"]);
+  let fieldTypeSection = "";
+  if (answer.field_type && constrainedFieldTypes.has(answer.field_type)) {
+    fieldTypeSection = `\n## Field Type: ${answer.field_type}\n\nIMPORTANT: This question used a constrained input (${answer.field_type}). The applicant selected from predefined options and could NOT provide additional free-text detail. Do NOT criticise the answer for being brief, lacking detail, or failing to elaborate — the applicant had no ability to do so. Evaluate only whether the selected option is appropriate for the question. Keep inline_comments minimal or empty for constrained fields.`;
+  }
+
   return `## Task: Analyse Answer to Question "${answer.question_id}"
 
 ## Question
 
-${answer.question_text}${prioritySection}${guidanceSection}${wordLimitSection}
+${answer.question_text}${prioritySection}${fieldTypeSection}${guidanceSection}${wordLimitSection}
 
 ## Answer Text
 
