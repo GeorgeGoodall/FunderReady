@@ -261,38 +261,75 @@ export const applicationReviewRequested = inngest.createFunction(
     }
 
     // -----------------------------------------------------------------------
-    // Step 2: Answer analysis (sequential, per non-empty enabled answer)
+    // Step 2: Answer analysis (parallel Claude calls inside a single step)
+    //
+    // Runs up to MAX_CONCURRENT analyses at a time to stay within API rate
+    // limits (Tier 1: 50 RPM, 8k OTPM). If any fail transiently we retry
+    // only the failures (up to 2 retries) to avoid re-spending tokens on
+    // calls that already succeeded.
     // -----------------------------------------------------------------------
-    const answerAnalyses: AnswerAnalysis[] = [];
-    const systemPrompt = buildAnswerAnalysisSystemPrompt(criteria);
+    const MAX_CONCURRENT = 5;
 
-    for (let i = 0; i < answerContexts.length; i++) {
-      const ctx = answerContexts[i];
+    const answerAnalyses: AnswerAnalysis[] = await step.run(
+      "answer-analyses",
+      async () => {
+        const systemPrompt = buildAnswerAnalysisSystemPrompt(criteria);
 
-      const analysis = await step.run(
-        `answer-analysis-${ctx.question_id}`,
-        async () => {
-          await updateAppReviewProgress(reviewId, "analysing", {
-            current_answer: ctx.question_id,
-            answers_completed: i,
-            answers_total: answerContexts.length,
-          });
-
+        const analyseAnswer = (ctx: AnswerContext) => {
           const prompt = buildAnswerAnalysisPrompt(ctx);
-          const result = await callClaude({
+          return callClaude({
             prompt,
             systemPrompt,
             schema: LenientAnswerAnalysisSchema,
             model: MODEL,
             maxTokens: 8192,
           });
+        };
 
-          return result;
+        // Run in batches of MAX_CONCURRENT to respect rate limits
+        async function runBatched(
+          contexts: AnswerContext[]
+        ): Promise<PromiseSettledResult<AnswerAnalysis>[]> {
+          const results: PromiseSettledResult<AnswerAnalysis>[] = [];
+          for (let i = 0; i < contexts.length; i += MAX_CONCURRENT) {
+            const batch = contexts.slice(i, i + MAX_CONCURRENT);
+            const batchResults = await Promise.allSettled(
+              batch.map((ctx) => analyseAnswer(ctx))
+            );
+            results.push(...batchResults);
+          }
+          return results;
         }
-      );
 
-      answerAnalyses.push(analysis);
-    }
+        // First pass
+        let settled = await runBatched(answerContexts);
+
+        // Retry only failures (up to 2 additional attempts)
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const failedIndices = settled
+            .map((r, i) => (r.status === "rejected" ? i : -1))
+            .filter((i) => i !== -1);
+          if (failedIndices.length === 0) break;
+
+          // Backoff before retrying (1s, then 2s)
+          await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 1000));
+
+          const retryContexts = failedIndices.map((i) => answerContexts[i]);
+          const retryResults = await runBatched(retryContexts);
+
+          // Merge retry results back into settled
+          failedIndices.forEach((originalIdx, retryIdx) => {
+            settled[originalIdx] = retryResults[retryIdx];
+          });
+        }
+
+        // Collect results — throw on any remaining failures
+        return settled.map((result) => {
+          if (result.status === "fulfilled") return result.value;
+          throw result.reason;
+        });
+      }
+    );
 
     // -----------------------------------------------------------------------
     // Step 3: Cross-reference
@@ -300,8 +337,6 @@ export const applicationReviewRequested = inngest.createFunction(
     await step.run("cross-reference-progress", async () => {
       await updateAppReviewProgress(reviewId, "cross_referencing", {
         crossref_started: Date.now(),
-        answers_completed: answerContexts.length,
-        answers_total: answerContexts.length,
       });
     });
 
