@@ -207,6 +207,13 @@ ${analysesText}
 5. **Repetition without new evidence** — Restating the same point in multiple answers without strengthening it
 6. **Misplaced content** — Content in one answer that belongs in another question's answer
 
+## Critical Rules
+
+1. Base findings ONLY on evidence present in the answer analyses above. Do not infer content that is not stated in the summaries.
+2. If you are unsure whether something is covered, use language like "appears to be absent — verify" rather than definitive claims like "is not addressed."
+3. Distinguish between "the answer explicitly states X is not included" and "the answer does not mention X" — these are different.
+4. For optional funder requirements (e.g., advance payments, optional sub-criteria), rate absent responses as medium severity with a note to confirm intent, not high severity.
+
 ## Required Output
 
 Return a JSON object:
@@ -270,6 +277,18 @@ export function buildApplicationScoringPrompt(
     disabledNote = `\n## Excluded Questions (Not Applicable)\n\nThe following questions were marked not applicable and excluded from this review:\n\n${list}\n\nScore criteria based only on enabled answers. Criteria with no coverage from enabled answers will score as Missing — this is expected when related questions have been disabled.\n`;
   }
 
+  // Build per-question word limits section from analyses
+  const perQuestionLimits = analyses
+    .filter((a) => a.word_count_assessment?.limit)
+    .map((a) => {
+      const wc = a.word_count_assessment!;
+      const q = questions.find((q) => q.id === a.question_id);
+      return `- ${a.question_id} ("${q?.question ?? "Unknown"}"): ${wc.actual} / ${wc.limit} words (${wc.status.replace(/_/g, " ")})`;
+    });
+  const perQuestionWordLimitsSection = perQuestionLimits.length > 0
+    ? `\n## Per-Question Word Limits\n\n${perQuestionLimits.join("\n")}\n\nWhen suggesting improvements or example language, consider the available word budget for each question. Do not suggest additions that would exceed the word limit.\n`
+    : "";
+
   return `${SYSTEM_PERSONA}
 
 ${SCORING_RUBRIC}
@@ -289,7 +308,7 @@ ${analysesText}
 ## Cross-Reference Findings
 
 ${crossRefText}
-${disabledNote}${wordCountSection}
+${disabledNote}${wordCountSection}${perQuestionWordLimitsSection}
 ## Required Output
 
 Return a JSON object:
@@ -300,7 +319,7 @@ Return a JSON object:
     {
       "question_id": "q1",
       "question_text": "The question text",
-      "score": "Strong|Fair|Needs Improvement|Missing",
+      "score": "Excellent|Strong|Fair|Needs Improvement|Poor|Missing",
       "summary": "1-2 sentence summary of this answer's quality"
     }
   ],
@@ -308,7 +327,7 @@ Return a JSON object:
     {
       "criterion_id": "c1",
       "criterion": "Name of the criterion",
-      "score": "Strong|Fair|Needs Improvement|Missing",
+      "score": "Excellent|Strong|Fair|Needs Improvement|Poor|Missing",
       "bid_evidence": ["Answer q1: specific evidence cited"],
       "gaps": ["What's missing or weak"],
       "summary": "1-2 sentence summary of how the application addresses this criterion"
@@ -336,10 +355,13 @@ Guidelines:
 - Include an answer_score for EVERY question that was analysed
 - Score each criterion based on ALL evidence across answers, not just one answer
 - overall_score should be 0-100, reflecting the weighted assessment
+- Use the numeric ranges in the scoring rubric to guide your overall_score. The overall_score should be consistent with the distribution of individual criteria scores.
 - top_strengths and top_improvements should be the 3 highest-impact items
-- improvement_appendix should cover every criterion, even those scored Strong
+- improvement_appendix should cover criteria scored Fair or below. For criteria scored Excellent or Strong, only include an entry if there is a meaningful, specific refinement — do not force suggestions where none are needed.
 - Be specific with example language — give the applicant something they can use
 - Reference answers by question_id (e.g., "Answer q1: ...")
+- A criterion CANNOT score "Excellent" if any cross-reference finding of medium or high severity involves that criterion. Downgrade to "Strong" and note the cross-reference issue in the summary.
+- CRITICAL: In example_language, NEVER invent specific statistics, percentages, outcome figures, or data source names. Use placeholder brackets for any data the applicant must supply, e.g., "[YOUR FIGURE]", "[X]%", "[CITE SOURCE, YEAR]". The applicant will replace these with their real data. Inventing plausible-sounding numbers or sources risks the applicant submitting fabricated evidence.
 
 Return ONLY the JSON object, no other text.`;
 }

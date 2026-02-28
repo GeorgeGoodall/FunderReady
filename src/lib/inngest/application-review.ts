@@ -26,6 +26,7 @@ import {
   type AnswerContext,
 } from "@/lib/pipeline/application-prompts";
 import type { Criterion } from "@/lib/pipeline/prompt-templates";
+import type { ImprovementAppendixItem } from "@/lib/pipeline/schemas";
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
@@ -97,6 +98,46 @@ async function markAppReviewFailed(
     .from("applications")
     .update({ status: "draft" })
     .eq("id", applicationId);
+}
+
+// ---------------------------------------------------------------------------
+// Post-processing: sanitize fabricated stats in example_language
+// ---------------------------------------------------------------------------
+
+function extractKnownNumbers(texts: string[]): Set<string> {
+  const known = new Set<string>();
+  for (const text of texts) {
+    // Extract percentages like "78%"
+    for (const m of text.matchAll(/\b(\d{1,3})%/g)) {
+      known.add(m[1] + "%");
+    }
+    // Extract standalone numbers (2+ digits)
+    for (const m of text.matchAll(/\b(\d{2,})\b/g)) {
+      known.add(m[1]);
+    }
+  }
+  return known;
+}
+
+export function sanitizeExampleLanguage(
+  appendix: ImprovementAppendixItem[],
+  knownNumbers: Set<string>
+): ImprovementAppendixItem[] {
+  return appendix.map((item) => {
+    if (!item.example_language) return item;
+    let text = item.example_language;
+    // Replace percentages not in original answers
+    text = text.replace(/\b(\d{1,3})%/g, (match, num) =>
+      knownNumbers.has(num + "%") ? match : "[X]%"
+    );
+    // Replace specific counts (2+ digits) not in original answers
+    text = text.replace(/\b(\d{2,})\b/g, (match) =>
+      knownNumbers.has(match) ? match : "[X]"
+    );
+    // Replace parenthetical citations that look fabricated (Name, Year)
+    text = text.replace(/\(([A-Z][^)]*(?:19|20)\d{2}[^)]*)\)/g, "[cite source, year]");
+    return { ...item, example_language: text };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -417,6 +458,18 @@ export const applicationReviewRequested = inngest.createFunction(
 
       return result;
     });
+
+    // -----------------------------------------------------------------------
+    // Post-processing: sanitize fabricated stats in example_language
+    // -----------------------------------------------------------------------
+    const answerTexts = enabledAnswers.map((a) => a.answer_text);
+    const knownNumbers = extractKnownNumbers(answerTexts);
+    if (scoring.improvement_appendix) {
+      scoring.improvement_appendix = sanitizeExampleLanguage(
+        scoring.improvement_appendix,
+        knownNumbers
+      );
+    }
 
     // -----------------------------------------------------------------------
     // Step 5: Save results

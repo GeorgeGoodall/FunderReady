@@ -17,7 +17,7 @@ describe("parseCriteriaWithAI", () => {
     mockCreate.mockReset();
   });
 
-  it("returns a valid CriteriaSet from AI response", async () => {
+  it("returns a valid CriteriaSet from AI response with object sub_questions", async () => {
     mockCreate.mockResolvedValue({
       content: [
         {
@@ -30,7 +30,10 @@ describe("parseCriteriaWithAI", () => {
                 id: "c1",
                 criterion: "Demonstrates clear need",
                 weight: "25%",
-                sub_questions: ["What evidence of need?"],
+                sub_questions: [
+                  { text: "What evidence of need?", required: true },
+                  { text: "If applicable, who benefits?", required: false },
+                ],
               },
               {
                 id: "c2",
@@ -49,6 +52,31 @@ describe("parseCriteriaWithAI", () => {
     expect(result.criteria).toHaveLength(2);
     expect(result.criteria[0].id).toBe("c1");
     expect(result.criteria[0].weight).toBe("25%");
+    expect(result.criteria[0].sub_questions[0]).toEqual({ text: "What evidence of need?", required: true });
+    expect(result.criteria[0].sub_questions[1]).toEqual({ text: "If applicable, who benefits?", required: false });
+  });
+
+  it("handles backward-compatible string sub_questions", async () => {
+    mockCreate.mockResolvedValue({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            name: "Legacy Fund",
+            criteria: [
+              {
+                id: "c1",
+                criterion: "Clear need",
+                sub_questions: ["What evidence?"],
+              },
+            ],
+          }),
+        },
+      ],
+    });
+
+    const result = await parseCriteriaWithAI("1. Clear need");
+    expect(result.criteria[0].sub_questions[0]).toEqual({ text: "What evidence?", required: true });
   });
 
   it("handles markdown-wrapped JSON from AI", async () => {

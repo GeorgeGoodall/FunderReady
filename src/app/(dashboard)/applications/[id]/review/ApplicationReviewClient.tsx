@@ -129,9 +129,11 @@ interface ApplicationReviewClientProps {
 // ---------------------------------------------------------------------------
 
 const SCORE_COLOURS: Record<string, string> = {
-  Strong: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  Excellent: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  Strong: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
   Fair: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  "Needs Improvement": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  "Needs Improvement": "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  Poor: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   Missing: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
 };
 
@@ -924,6 +926,9 @@ function ImprovementAppendix({
               {item.example_language && (
                 <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">
                   <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Suggested language</p>
+                  <p className="mb-1.5 text-[10px] text-amber-600 dark:text-amber-400">
+                    AI-generated example — verify all facts, figures, and sources before use
+                  </p>
                   <p className="text-xs text-zinc-700 dark:text-zinc-300">{item.example_language}</p>
                 </div>
               )}

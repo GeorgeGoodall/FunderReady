@@ -51,14 +51,25 @@ export function CriteriaPreview({ criteriaSet, onChange }: CriteriaPreviewProps)
   const addSubQuestion = (criterionIndex: number) => {
     const criterion = criteriaSet.criteria[criterionIndex];
     updateCriterion(criterionIndex, {
-      sub_questions: [...criterion.sub_questions, ""],
+      sub_questions: [...criterion.sub_questions, { text: "", required: true }],
     });
   };
 
   const updateSubQuestion = (criterionIndex: number, sqIndex: number, value: string) => {
     const criterion = criteriaSet.criteria[criterionIndex];
     const sub_questions = [...criterion.sub_questions];
-    sub_questions[sqIndex] = value;
+    const existing = sub_questions[sqIndex];
+    sub_questions[sqIndex] = { text: value, required: typeof existing === "object" && "required" in existing ? existing.required : true };
+    updateCriterion(criterionIndex, { sub_questions });
+  };
+
+  const toggleSubQuestionRequired = (criterionIndex: number, sqIndex: number) => {
+    const criterion = criteriaSet.criteria[criterionIndex];
+    const sub_questions = [...criterion.sub_questions];
+    const existing = sub_questions[sqIndex];
+    const text = typeof existing === "string" ? existing : existing.text;
+    const required = typeof existing === "string" ? true : existing.required;
+    sub_questions[sqIndex] = { text, required: !required };
     updateCriterion(criterionIndex, { sub_questions });
   };
 
@@ -109,6 +120,7 @@ export function CriteriaPreview({ criteriaSet, onChange }: CriteriaPreviewProps)
                 onRemove={() => removeCriterion(ci)}
                 onAddSubQuestion={() => addSubQuestion(ci)}
                 onUpdateSubQuestion={(sqi, val) => updateSubQuestion(ci, sqi, val)}
+                onToggleSubQuestionRequired={(sqi) => toggleSubQuestionRequired(ci, sqi)}
                 onRemoveSubQuestion={(sqi) => removeSubQuestion(ci, sqi)}
               />
             ))}
@@ -127,6 +139,7 @@ function SortableCriterionCard({
   onRemove,
   onAddSubQuestion,
   onUpdateSubQuestion,
+  onToggleSubQuestionRequired,
   onRemoveSubQuestion,
 }: {
   criterion: Criterion;
@@ -136,6 +149,7 @@ function SortableCriterionCard({
   onRemove: () => void;
   onAddSubQuestion: () => void;
   onUpdateSubQuestion: (sqIndex: number, value: string) => void;
+  onToggleSubQuestionRequired: (sqIndex: number) => void;
   onRemoveSubQuestion: (sqIndex: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -191,23 +205,38 @@ function SortableCriterionCard({
           {criterion.sub_questions.length > 0 && (
             <div className="space-y-1.5 pl-2">
               <p className="text-xs font-medium text-zinc-500">Sub-questions:</p>
-              {criterion.sub_questions.map((sq, sqi) => (
-                <div key={sqi} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={sq}
-                    onChange={(e) => onUpdateSubQuestion(sqi, e.target.value)}
-                    className="flex-1 rounded border border-zinc-200 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onRemoveSubQuestion(sqi)}
-                    className="text-xs text-zinc-400 hover:text-red-500"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
+              {criterion.sub_questions.map((sq, sqi) => {
+                const sqText = typeof sq === "string" ? sq : sq.text;
+                const sqRequired = typeof sq === "string" ? true : sq.required;
+                return (
+                  <div key={sqi} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={sqText}
+                      onChange={(e) => onUpdateSubQuestion(sqi, e.target.value)}
+                      className="flex-1 rounded border border-zinc-200 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onToggleSubQuestionRequired(sqi)}
+                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                        sqRequired
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                      }`}
+                    >
+                      {sqRequired ? "Required" : "Optional"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveSubQuestion(sqi)}
+                      className="text-xs text-zinc-400 hover:text-red-500"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
 

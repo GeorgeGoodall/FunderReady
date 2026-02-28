@@ -1,6 +1,20 @@
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
+// Sub-question — backward-compatible: accepts plain strings or {text, required}
+// ---------------------------------------------------------------------------
+
+export const SubQuestionSchema = z.union([
+  z.string().transform((text) => ({ text, required: true as const })),
+  z.object({
+    text: z.string().min(1),
+    required: z.boolean().default(true),
+  }),
+]);
+
+export type SubQuestion = { text: string; required: boolean };
+
+// ---------------------------------------------------------------------------
 // Criterion — a single evaluation criterion
 // ---------------------------------------------------------------------------
 
@@ -8,7 +22,7 @@ export const CriterionSchema = z.object({
   id: z.string().min(1),
   criterion: z.string().min(1),
   weight: z.string().optional(),
-  sub_questions: z.array(z.string()).default([]),
+  sub_questions: z.array(SubQuestionSchema).default([]),
 });
 
 export type Criterion = z.infer<typeof CriterionSchema>;

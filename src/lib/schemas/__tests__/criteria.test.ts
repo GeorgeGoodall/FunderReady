@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  SubQuestionSchema,
   CriterionSchema,
   CriteriaSetSchema,
   ParseCriteriaRequestSchema,
@@ -12,8 +13,30 @@ import {
   SaveAnswersRequestSchema,
 } from "../criteria";
 
+describe("SubQuestionSchema", () => {
+  it("transforms a plain string to {text, required: true}", () => {
+    const result = SubQuestionSchema.parse("What evidence of need?");
+    expect(result).toEqual({ text: "What evidence of need?", required: true });
+  });
+
+  it("passes through an object with text and required", () => {
+    const result = SubQuestionSchema.parse({ text: "Is this optional?", required: false });
+    expect(result).toEqual({ text: "Is this optional?", required: false });
+  });
+
+  it("defaults required to true for object input", () => {
+    const result = SubQuestionSchema.parse({ text: "Default required?" });
+    expect(result).toEqual({ text: "Default required?", required: true });
+  });
+
+  it("rejects object with empty text", () => {
+    const result = SubQuestionSchema.safeParse({ text: "", required: true });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("CriterionSchema", () => {
-  it("accepts a valid criterion with all fields", () => {
+  it("accepts a valid criterion with string sub_questions (backward compat)", () => {
     const result = CriterionSchema.safeParse({
       id: "c1",
       criterion: "Demonstrates clear need for the project",
@@ -24,6 +47,25 @@ describe("CriterionSchema", () => {
       ],
     });
     expect(result.success).toBe(true);
+    if (result.success) {
+      // Strings are transformed to objects
+      expect(result.data.sub_questions[0]).toEqual({ text: "What evidence is there of the need?", required: true });
+    }
+  });
+
+  it("accepts a criterion with object sub_questions", () => {
+    const result = CriterionSchema.safeParse({
+      id: "c1",
+      criterion: "Demonstrates clear need",
+      sub_questions: [
+        { text: "What evidence?", required: true },
+        { text: "If applicable, who benefits?", required: false },
+      ],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sub_questions[1]).toEqual({ text: "If applicable, who benefits?", required: false });
+    }
   });
 
   it("accepts a criterion without optional fields", () => {

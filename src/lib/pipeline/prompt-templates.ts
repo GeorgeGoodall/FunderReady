@@ -11,12 +11,14 @@ export const SYSTEM_PERSONA = `You are an experienced grant reviewer who has ass
 export const SCORING_RUBRIC = `
 ## Scoring Rubric
 
-| Rating | Definition |
-|--------|-----------|
-| **Strong** | Fully addresses the criterion with specific evidence, clear logic, and appropriate detail. A panel member would be satisfied with no follow-up questions. |
-| **Fair** | Addresses the criterion but with gaps — missing specifics, vague language, or incomplete reasoning. Would likely prompt follow-up questions from a reviewer. |
-| **Needs Improvement** | Mentions the topic but fails to make a convincing case. Major gaps in evidence or logic. A panel member would score this poorly. |
-| **Missing** | The criterion is not addressed in the bid at all. |`;
+| Rating | Range | Definition |
+|--------|-------|-----------|
+| **Excellent** | 86-100 | Fully addresses the criterion with specific evidence, clear logic, and thorough detail. A panel member would be satisfied — no follow-up questions. |
+| **Strong** | 71-85 | Addresses the criterion well with only minor gaps. One or two follow-up questions at most. |
+| **Fair** | 51-70 | Addresses the criterion but with notable gaps — missing specifics, vague language, or incomplete reasoning. Multiple follow-up questions likely. |
+| **Needs Improvement** | 26-50 | Mentions the topic but fails to make a convincing case. Major gaps in evidence or logic. A panel member would score this poorly. |
+| **Poor** | 1-25 | Barely touches the criterion. Critical evidence or logic absent. A panel member would likely reject this section. |
+| **Missing** | 0 | The criterion is not addressed in the bid at all. |`;
 
 export const FEW_SHOT_COMMENTS = `
 ## Comment Examples
@@ -68,7 +70,7 @@ export interface Criterion {
   id: string;
   criterion: string;
   weight?: string;
-  sub_questions?: string[];
+  sub_questions?: Array<string | { text: string; required: boolean }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +83,11 @@ export function formatCriteria(criteria: Criterion[]): string {
       let text = `${c.id}. ${c.criterion}`;
       if (c.weight) text += ` (Weight: ${c.weight})`;
       if (c.sub_questions && c.sub_questions.length > 0) {
-        text += "\n" + c.sub_questions.map((q) => `   - ${q}`).join("\n");
+        text += "\n" + c.sub_questions.map((q) => {
+          if (typeof q === "string") return `   - ${q}`;
+          const marker = q.required ? "[Required]" : "[Optional]";
+          return `   - ${marker} ${q.text}`;
+        }).join("\n");
       }
       return text;
     })

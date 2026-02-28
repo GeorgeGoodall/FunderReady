@@ -157,6 +157,21 @@ describe("AnswerAnalysisSchema", () => {
     expect(AnswerAnalysisSchema.parse(data)).toMatchObject(data);
   });
 
+  it("accepts Excellent and Poor as valid answer_scores", () => {
+    for (const score of ["Excellent", "Poor"]) {
+      expect(
+        AnswerAnalysisSchema.parse({
+          question_id: "q1",
+          inline_comments: [],
+          criteria_relevance: [],
+          strengths: ["Good"],
+          weaknesses: [],
+          answer_score: score,
+        })
+      ).toMatchObject({ answer_score: score });
+    }
+  });
+
   it("rejects invalid answer_score", () => {
     expect(() =>
       AnswerAnalysisSchema.parse({
@@ -165,7 +180,7 @@ describe("AnswerAnalysisSchema", () => {
         criteria_relevance: [],
         strengths: [],
         weaknesses: [],
-        answer_score: "Excellent",
+        answer_score: "Superb",
       })
     ).toThrow();
   });

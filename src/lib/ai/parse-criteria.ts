@@ -14,7 +14,10 @@ Return ONLY valid JSON matching this schema:
       "id": "c1",
       "criterion": "Clear statement of what the funder is looking for",
       "weight": "25%" (if mentioned, otherwise omit),
-      "sub_questions": ["Specific sub-question 1", "Specific sub-question 2"]
+      "sub_questions": [
+        { "text": "Specific sub-question 1", "required": true },
+        { "text": "Specific sub-question 2", "required": false }
+      ]
     }
   ]
 }
@@ -24,6 +27,8 @@ Rules:
 - Use sequential IDs: c1, c2, c3, etc.
 - Each criterion should be a clear, assessable statement
 - Include sub-questions only if they are explicitly stated or strongly implied
+- For each sub_question, set "required" to true if the funder explicitly requires it (uses language like "must", "should", "required", "essential") or false if it is optional, nice-to-have, or conditional (uses language like "if applicable", "where relevant", "optional", "may")
+- Default to required: true if the intent is ambiguous
 - Include weight only if a percentage or score weighting is mentioned
 - If the text is vague, infer reasonable criteria from context
 - Do NOT invent criteria that aren't supported by the text`;
