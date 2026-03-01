@@ -57,6 +57,27 @@ function scoreColour(score: number): string {
 // Chart
 // ---------------------------------------------------------------------------
 
+const REFERENCE_LINES = [50, 75] as const;
+
+function computeYDomain(scores: number[]): [number, number] {
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+
+  // Start with data range + 5pt padding, snapped to nearest 5
+  let floor = Math.floor((min - 5) / 5) * 5;
+  let ceil = Math.ceil((max + 5) / 5) * 5;
+
+  // Include reference lines that are close to the data range (within 10pts)
+  for (const ref of REFERENCE_LINES) {
+    if (ref >= min - 10 && ref <= max + 10) {
+      floor = Math.min(floor, ref - 5);
+      ceil = Math.max(ceil, ref + 5);
+    }
+  }
+
+  return [Math.max(0, floor), Math.min(100, ceil)];
+}
+
 function ScoreChart({ reviews }: { reviews: ReviewSummary[] }) {
   const completed = reviews.filter(
     (r) => r.status === "completed" && r.overall_score !== null
@@ -68,6 +89,12 @@ function ScoreChart({ reviews }: { reviews: ReviewSummary[] }) {
     review: `#${r.review_number}`,
     score: r.overall_score as number,
   }));
+
+  const scores = data.map((d) => d.score);
+  const [yMin, yMax] = computeYDomain(scores);
+
+  // Only show reference lines that fall within the visible domain
+  const visibleRefLines = REFERENCE_LINES.filter((v) => v >= yMin && v <= yMax);
 
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
@@ -81,7 +108,7 @@ function ScoreChart({ reviews }: { reviews: ReviewSummary[] }) {
             stroke="var(--color-axis, #a1a1aa)"
           />
           <YAxis
-            domain={[0, 100]}
+            domain={[yMin, yMax]}
             tick={{ fontSize: 12 }}
             stroke="var(--color-axis, #a1a1aa)"
             width={32}
@@ -94,8 +121,12 @@ function ScoreChart({ reviews }: { reviews: ReviewSummary[] }) {
             }}
             labelFormatter={(label) => `Review ${label}`}
           />
-          <ReferenceLine y={75} stroke="#16a34a" strokeDasharray="4 4" opacity={0.4} />
-          <ReferenceLine y={50} stroke="#d97706" strokeDasharray="4 4" opacity={0.4} />
+          {visibleRefLines.includes(75) && (
+            <ReferenceLine y={75} stroke="#16a34a" strokeDasharray="4 4" opacity={0.4} />
+          )}
+          {visibleRefLines.includes(50) && (
+            <ReferenceLine y={50} stroke="#d97706" strokeDasharray="4 4" opacity={0.4} />
+          )}
           <Line
             type="monotone"
             dataKey="score"
@@ -106,9 +137,15 @@ function ScoreChart({ reviews }: { reviews: ReviewSummary[] }) {
           />
         </LineChart>
       </ResponsiveContainer>
-      <p className="mt-2 text-xs text-zinc-400">
-        Dashed lines: 75 (green) and 50 (amber) thresholds
-      </p>
+      {visibleRefLines.length > 0 && (
+        <p className="mt-2 text-xs text-zinc-400">
+          Dashed lines:{" "}
+          {visibleRefLines.includes(75) && "75 (green)"}
+          {visibleRefLines.includes(75) && visibleRefLines.includes(50) && " and "}
+          {visibleRefLines.includes(50) && "50 (amber)"}
+          {" "}threshold{visibleRefLines.length > 1 ? "s" : ""}
+        </p>
+      )}
     </div>
   );
 }
