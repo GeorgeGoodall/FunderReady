@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CopyButton } from "@/components/CopyButton";
@@ -121,6 +121,7 @@ interface ApplicationReviewClientProps {
   };
   fund: { id: string; name: string; organisation: { id: string; name: string } | null } | null;
   questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number }>;
+  criteria: Array<{ id: string; criterion: string }>;
   answers: Array<{ question_id: string; answer_text: string; last_reviewed_text: string | null; is_disabled?: boolean | null }>;
   review: {
     id: string;
@@ -179,6 +180,7 @@ export function ApplicationReviewClient({
   application,
   fund,
   questions,
+  criteria,
   answers,
   review,
   isHistorical = false,
@@ -227,6 +229,19 @@ export function ApplicationReviewClient({
     }
     return () => observer.disconnect();
   }, [review?.status]);
+
+  // Lookup maps for reference tags in cross-reference findings
+  const questionMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const q of questions) map.set(q.id, q.question);
+    return map;
+  }, [questions]);
+
+  const criteriaMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of criteria) map.set(c.id, c.criterion);
+    return map;
+  }, [criteria]);
 
   // No review yet
   if (!review) {
@@ -420,7 +435,9 @@ export function ApplicationReviewClient({
               </Link>
             </div>
 
-            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">{scoring.overall_descriptor}</p>
+            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+              <InlineRefs text={scoring.overall_descriptor} questionMap={questionMap} criteriaMap={criteriaMap} />
+            </p>
 
             {/* Quality dimensions */}
             {scoring.quality_dimensions && scoring.quality_dimensions.length > 0 && (
@@ -434,7 +451,7 @@ export function ApplicationReviewClient({
                 <ul className="mt-3 space-y-2">
                   {scoring.top_strengths.map((s, i) => (
                     <li key={i} className="flex gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                      <span className="mt-0.5 text-green-500">+</span>{s}
+                      <span className="mt-0.5 text-green-500">+</span><span><InlineRefs text={s} questionMap={questionMap} criteriaMap={criteriaMap} /></span>
                     </li>
                   ))}
                 </ul>
@@ -444,7 +461,7 @@ export function ApplicationReviewClient({
                 <ul className="mt-3 space-y-2">
                   {scoring.top_improvements.map((s, i) => (
                     <li key={i} className="flex gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                      <span className="mt-0.5 text-amber-500">!</span>{s}
+                      <span className="mt-0.5 text-amber-500">!</span><span><InlineRefs text={s} questionMap={questionMap} criteriaMap={criteriaMap} /></span>
                     </li>
                   ))}
                 </ul>
@@ -459,10 +476,12 @@ export function ApplicationReviewClient({
             </div>
             <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {scoring.criteria_scores.map((cs) => (
-                <div key={cs.criterion_id} className="flex items-center justify-between px-5 py-3">
+                <div key={cs.criterion_id} id={`criterion-${cs.criterion_id}`} className="flex items-center justify-between px-5 py-3">
                   <div className="min-w-0 flex-1 pr-4">
                     <p className="text-sm font-medium">{cs.criterion}</p>
-                    <p className="mt-0.5 text-xs text-zinc-500">{cs.summary}</p>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      <InlineRefs text={cs.summary} questionMap={questionMap} criteriaMap={criteriaMap} />
+                    </p>
                   </div>
                   <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${SCORE_COLOURS[cs.score] ?? ""}`}>
                     {cs.score}
@@ -519,7 +538,7 @@ export function ApplicationReviewClient({
 
                 if (isQDisabled) {
                   return (
-                    <div key={q.id} className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-5 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+                    <div key={q.id} id={`answer-${q.id}`} className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-5 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
                       <span className="shrink-0 rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
                         N/A
                       </span>
@@ -531,13 +550,14 @@ export function ApplicationReviewClient({
                 if (!feedback) return null;
 
                 return (
-                  <AnswerFeedbackCard
-                    key={q.id}
-                    question={q}
-                    answer={answer?.last_reviewed_text ?? answer?.answer_text ?? ""}
-                    feedback={feedback}
-                    isOutdated={isOutdated}
-                  />
+                  <div key={q.id} id={`answer-${q.id}`}>
+                    <AnswerFeedbackCard
+                      question={q}
+                      answer={answer?.last_reviewed_text ?? answer?.answer_text ?? ""}
+                      feedback={feedback}
+                      isOutdated={isOutdated}
+                    />
+                  </div>
                 );
               })}
             </div>
@@ -553,7 +573,7 @@ export function ApplicationReviewClient({
               </p>
               <div className="space-y-3">
                 {cross_reference.findings.map((finding, i) => (
-                  <CrossReferenceFindingCard key={i} finding={finding} />
+                  <CrossReferenceFindingCard key={i} finding={finding} questionMap={questionMap} criteriaMap={criteriaMap} />
                 ))}
               </div>
             </div>
@@ -562,7 +582,7 @@ export function ApplicationReviewClient({
           {/* Improvement appendix */}
           {scoring.improvement_appendix && scoring.improvement_appendix.length > 0 && (
             <div id="section-appendix">
-              <ImprovementAppendix items={scoring.improvement_appendix} />
+              <ImprovementAppendix items={scoring.improvement_appendix} questionMap={questionMap} criteriaMap={criteriaMap} />
             </div>
           )}
 
@@ -884,10 +904,106 @@ function CommentHighlight({
 }
 
 // ---------------------------------------------------------------------------
+// Reference tag — clickable chip with tooltip for q/c references
+// ---------------------------------------------------------------------------
+
+function ReferenceTag({
+  id,
+  type,
+  fullText,
+  variant = "inline",
+}: {
+  id: string;
+  type: "question" | "criteria";
+  fullText?: string;
+  variant?: "inline" | "chip";
+}) {
+  const number = id.replace(/^[qc]/, "");
+  const label = type === "question" ? `Question ${number}` : `Criteria ${number}`;
+  const anchorId = type === "question" ? `answer-${id}` : `criterion-${id}`;
+
+  const className = variant === "chip"
+    ? "group relative inline-flex items-center rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-50 hover:text-blue-800 dark:bg-zinc-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+    : "group relative inline text-inherit rounded px-0.5 -mx-0.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800";
+
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={() => {
+        document.getElementById(anchorId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }}
+    >
+      {label}
+      {fullText && (
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 whitespace-normal rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-normal text-zinc-700 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 w-64 max-w-xs">
+          {fullText}
+        </span>
+      )}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inline reference replacer — replaces q1/c3 in text with ReferenceTag chips
+// ---------------------------------------------------------------------------
+
+const REF_PATTERN = /\b([qc])(\d+)\b/g;
+
+function InlineRefs({
+  text,
+  questionMap,
+  criteriaMap,
+}: {
+  text: string;
+  questionMap: Map<string, string>;
+  criteriaMap: Map<string, string>;
+}) {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  // Reset lastIndex in case regex was used before
+  REF_PATTERN.lastIndex = 0;
+  while ((match = REF_PATTERN.exec(text)) !== null) {
+    const [full, prefix, num] = match;
+    const id = `${prefix}${num}`;
+    const isQuestion = prefix === "q";
+    const map = isQuestion ? questionMap : criteriaMap;
+    // Only replace if the id exists in our data
+    if (map.has(id) || map.size === 0) {
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index));
+      }
+      parts.push(
+        <ReferenceTag
+          key={`${id}-${match.index}`}
+          id={id}
+          type={isQuestion ? "question" : "criteria"}
+          fullText={map.get(id)}
+        />
+      );
+      lastIndex = match.index + full.length;
+    }
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return <>{parts}</>;
+}
+
+// ---------------------------------------------------------------------------
 // Cross-reference finding card
 // ---------------------------------------------------------------------------
 
-function CrossReferenceFindingCard({ finding }: { finding: CrossReferenceFinding }) {
+function CrossReferenceFindingCard({
+  finding,
+  questionMap,
+  criteriaMap,
+}: {
+  finding: CrossReferenceFinding;
+  questionMap: Map<string, string>;
+  criteriaMap: Map<string, string>;
+}) {
   return (
     <div className={`rounded-lg border p-4 ${SEVERITY_COLOURS[finding.severity] ?? SEVERITY_COLOURS.low}`}>
       <div className="flex items-center gap-2">
@@ -902,16 +1018,23 @@ function CrossReferenceFindingCard({ finding }: { finding: CrossReferenceFinding
           {finding.severity}
         </span>
       </div>
-      <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{finding.description}</p>
+      <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
+        <InlineRefs text={finding.description} questionMap={questionMap} criteriaMap={criteriaMap} />
+      </p>
       {finding.suggestion && (
         <p className="mt-1 text-xs text-zinc-500">
-          <span className="font-medium">Fix:</span> {finding.suggestion}
+          <span className="font-medium">Fix:</span>{" "}
+          <InlineRefs text={finding.suggestion} questionMap={questionMap} criteriaMap={criteriaMap} />
         </p>
       )}
-      <p className="mt-1 text-xs text-zinc-400">
-        Answers: {finding.sections_involved.join(", ")}
-        {finding.criteria_involved?.length ? ` | Criteria: ${finding.criteria_involved.join(", ")}` : ""}
-      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {finding.sections_involved.map((qId) => (
+          <ReferenceTag key={qId} id={qId} type="question" fullText={questionMap.get(qId)} variant="chip" />
+        ))}
+        {finding.criteria_involved?.map((cId) => (
+          <ReferenceTag key={cId} id={cId} type="criteria" fullText={criteriaMap.get(cId)} variant="chip" />
+        ))}
+      </div>
     </div>
   );
 }
@@ -981,8 +1104,12 @@ function QualityDimensionBars({ dimensions }: { dimensions: QualityDimension[] }
 
 function ImprovementAppendix({
   items,
+  questionMap,
+  criteriaMap,
 }: {
   items: NonNullable<ApplicationScoring["improvement_appendix"]>;
+  questionMap: Map<string, string>;
+  criteriaMap: Map<string, string>;
 }) {
   return (
     <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
@@ -1006,9 +1133,9 @@ function ImprovementAppendix({
               )}
             </div>
             <div className="mt-2 space-y-1.5 text-xs text-zinc-600 dark:text-zinc-400">
-              <p><span className="font-medium">What the funder wants:</span> {item.what_funder_wants}</p>
-              <p><span className="font-medium">How you address it:</span> {item.how_bid_addresses}</p>
-              <p><span className="font-medium">What&apos;s missing:</span> {item.whats_missing}</p>
+              <p><span className="font-medium">What the funder wants:</span> <InlineRefs text={item.what_funder_wants} questionMap={questionMap} criteriaMap={criteriaMap} /></p>
+              <p><span className="font-medium">How you address it:</span> <InlineRefs text={item.how_bid_addresses} questionMap={questionMap} criteriaMap={criteriaMap} /></p>
+              <p><span className="font-medium">What&apos;s missing:</span> <InlineRefs text={item.whats_missing} questionMap={questionMap} criteriaMap={criteriaMap} /></p>
               {item.example_language && (
                 <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">
                   <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Suggested language</p>

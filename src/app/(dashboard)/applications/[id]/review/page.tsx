@@ -40,10 +40,10 @@ export default async function ApplicationReviewPage({
     ? { ...rawFund, organisation: (rawFund.organisations as unknown as { id: string; name: string } | null) ?? null }
     : null;
 
-  // Fetch application's questions_set_id (fallback for old reviews)
+  // Fetch application's questions_set_id and criteria_set_id (fallback for old reviews)
   const { data: app_full } = await supabase
     .from("applications")
-    .select("questions_set_id")
+    .select("questions_set_id, criteria_set_id")
     .eq("id", id)
     .single();
 
@@ -80,11 +80,26 @@ export default async function ApplicationReviewPage({
     }
   }
 
+  // Fetch criteria for reference tags in cross-reference findings
+  const criteriaSetId = app_full?.criteria_set_id;
+  let criteria: Array<{ id: string; criterion: string }> = [];
+  if (criteriaSetId) {
+    const { data: cs } = await supabase
+      .from("criteria_sets")
+      .select("criteria_json")
+      .eq("id", criteriaSetId)
+      .single();
+    if (cs?.criteria_json && Array.isArray(cs.criteria_json)) {
+      criteria = cs.criteria_json as unknown as typeof criteria;
+    }
+  }
+
   return (
     <ApplicationReviewClient
       application={application}
       fund={fund}
       questions={questions}
+      criteria={criteria}
       answers={(answers ?? []).map((a) => ({
         question_id: a.question_id,
         answer_text: a.answer_text,
