@@ -312,11 +312,10 @@ export const applicationReviewRequested = inngest.createFunction(
     // -----------------------------------------------------------------------
     const MAX_CONCURRENT = 5;
 
-    const usageEvents: LogAiUsageParams[] = [];
-
-    const answerAnalyses: AnswerAnalysis[] = await step.run(
+    const answerAnalysisResult = await step.run(
       "answer-analyses",
       async () => {
+        const stepUsage: LogAiUsageParams[] = [];
         const systemPrompt = buildAnswerAnalysisSystemPrompt(criteria);
 
         const analyseAnswer = (ctx: AnswerContext) => {
@@ -328,7 +327,7 @@ export const applicationReviewRequested = inngest.createFunction(
             model: MODEL,
             maxTokens: 8192,
             onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
-              usageEvents.push({
+              stepUsage.push({
                 applicationReviewId: reviewId,
                 userId,
                 pipelineStep: "answer_analysis",
@@ -378,12 +377,16 @@ export const applicationReviewRequested = inngest.createFunction(
         }
 
         // Collect results — throw on any remaining failures
-        return settled.map((result) => {
+        const analyses = settled.map((result) => {
           if (result.status === "fulfilled") return result.value;
           throw result.reason;
         });
+
+        return { analyses, usage: stepUsage };
       }
     );
+
+    const answerAnalyses = answerAnalysisResult.analyses;
 
     // -----------------------------------------------------------------------
     // Step 3: Cross-reference
@@ -395,7 +398,8 @@ export const applicationReviewRequested = inngest.createFunction(
       return { status: "Cross-referencing answers against criteria" };
     });
 
-    const crossReference: CrossReference = await step.run("cross-reference", async () => {
+    const crossRefResult = await step.run("cross-reference", async () => {
+      const stepUsage: LogAiUsageParams[] = [];
       const prompt = buildApplicationCrossReferencePrompt(
         answerAnalyses,
         questions.map((q) => ({ id: q.id, question: q.question })),
@@ -409,7 +413,7 @@ export const applicationReviewRequested = inngest.createFunction(
         model: MODEL,
         maxTokens: 16384,
         onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
-          usageEvents.push({
+          stepUsage.push({
             applicationReviewId: reviewId,
             userId,
             pipelineStep: "cross_reference",
@@ -424,8 +428,10 @@ export const applicationReviewRequested = inngest.createFunction(
         crossref_completed: Date.now(),
       });
 
-      return result;
+      return { result, usage: stepUsage };
     });
+
+    const crossReference: CrossReference = crossRefResult.result;
 
     // -----------------------------------------------------------------------
     // Compute gap_criteria server-side (no AI call)
@@ -460,7 +466,8 @@ export const applicationReviewRequested = inngest.createFunction(
       return { status: "Scoring application against fund criteria" };
     });
 
-    const scoring: ApplicationScoring = await step.run("scoring", async () => {
+    const scoringResult = await step.run("scoring", async () => {
+      const stepUsage: LogAiUsageParams[] = [];
       const prompt = buildApplicationScoringPrompt(
         answerAnalyses,
         crossReferenceWithGaps,
@@ -476,7 +483,7 @@ export const applicationReviewRequested = inngest.createFunction(
         model: MODEL,
         maxTokens: 16384,
         onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
-          usageEvents.push({
+          stepUsage.push({
             applicationReviewId: reviewId,
             userId,
             pipelineStep: "scoring",
@@ -491,8 +498,10 @@ export const applicationReviewRequested = inngest.createFunction(
         scoring_completed: Date.now(),
       });
 
-      return result;
+      return { result, usage: stepUsage };
     });
+
+    const scoring: ApplicationScoring = scoringResult.result;
 
     // -----------------------------------------------------------------------
     // Post-processing: sanitize fabricated stats in example_language
@@ -512,9 +521,16 @@ export const applicationReviewRequested = inngest.createFunction(
     await step.run("save-results", async () => {
       const supabase = createServiceClient();
 
+      // Aggregate usage from all pipeline steps
+      const allUsageEvents = [
+        ...answerAnalysisResult.usage,
+        ...crossRefResult.usage,
+        ...scoringResult.usage,
+      ];
+
       // Flush all usage log events
-      if (usageEvents.length > 0) {
-        await Promise.allSettled(usageEvents.map((e) => logAiUsage(e)));
+      if (allUsageEvents.length > 0) {
+        await Promise.allSettled(allUsageEvents.map((e) => logAiUsage(e)));
       }
 
       // Compute aggregates from usage events
@@ -525,7 +541,7 @@ export const applicationReviewRequested = inngest.createFunction(
       let totalCostUsd = 0;
       let totalCostGbp = 0;
 
-      for (const e of usageEvents) {
+      for (const e of allUsageEvents) {
         totalInputTokens += e.usage.input_tokens;
         totalOutputTokens += e.usage.output_tokens;
         totalCacheCreationTokens += e.usage.cache_creation_input_tokens ?? 0;
@@ -534,7 +550,7 @@ export const applicationReviewRequested = inngest.createFunction(
 
       // Recompute costs from the logged events' calculated values
       const { calculateCost } = await import("@/lib/ai/pricing");
-      for (const e of usageEvents) {
+      for (const e of allUsageEvents) {
         const { cost_usd, cost_gbp } = calculateCost(e.model, e.usage);
         totalCostUsd += cost_usd;
         totalCostGbp += cost_gbp;
