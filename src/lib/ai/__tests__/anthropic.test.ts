@@ -22,6 +22,13 @@ const TestSchema = z.object({
   value: z.number(),
 });
 
+const mockUsage = {
+  input_tokens: 100,
+  output_tokens: 50,
+  cache_creation_input_tokens: 10,
+  cache_read_input_tokens: 5,
+};
+
 describe("callClaude", () => {
   beforeEach(() => {
     mockCreate.mockReset();
@@ -32,6 +39,7 @@ describe("callClaude", () => {
       content: [
         { type: "tool_use", id: "t1", name: "structured_output", input: { name: "test", value: 42 } },
       ],
+      usage: mockUsage,
     });
 
     const result = await callClaude({
@@ -57,12 +65,14 @@ describe("callClaude", () => {
       content: [
         { type: "tool_use", id: "t1", name: "structured_output", input: { name: "test" } }, // missing value
       ],
+      usage: mockUsage,
     });
     // Retry returns valid
     mockCreate.mockResolvedValueOnce({
       content: [
         { type: "tool_use", id: "t2", name: "structured_output", input: { name: "test", value: 42 } },
       ],
+      usage: mockUsage,
     });
 
     const result = await callClaude({
@@ -89,6 +99,7 @@ describe("callClaude", () => {
       content: [
         { type: "tool_use", id: "t1", name: "structured_output", input: { name: "test" } }, // always missing value
       ],
+      usage: mockUsage,
     });
 
     await expect(
@@ -106,6 +117,7 @@ describe("callClaude", () => {
   it("falls back to text parsing when no tool block returned", async () => {
     mockCreate.mockResolvedValue({
       content: [{ type: "text", text: '{"name": "fallback", "value": 7}' }],
+      usage: mockUsage,
     });
 
     const result = await callClaude({
@@ -138,6 +150,7 @@ describe("callClaude", () => {
       content: [
         { type: "tool_use", id: "t1", name: "structured_output", input: { name: "sys", value: 1 } },
       ],
+      usage: mockUsage,
     });
 
     await callClaude({
@@ -192,6 +205,7 @@ describe("callClaude", () => {
       content: [
         { type: "tool_use", id: "t1", name: "structured_output", input: { name: "cached", value: 99 } },
       ],
+      usage: mockUsage,
     });
 
     const systemBlocks = [
@@ -213,6 +227,83 @@ describe("callClaude", () => {
     const call = mockCreate.mock.calls[0][0];
     expect(call.system).toEqual(systemBlocks);
     expect(call.system[0].cache_control).toEqual({ type: "ephemeral" });
+  });
+
+  it("calls onUsage with usage data on successful first call", async () => {
+    mockCreate.mockResolvedValue({
+      content: [
+        { type: "tool_use", id: "t1", name: "structured_output", input: { name: "test", value: 1 } },
+      ],
+      usage: mockUsage,
+    });
+
+    const onUsage = vi.fn();
+    await callClaude({
+      prompt: "test",
+      schema: TestSchema,
+      model: "claude-haiku-4-5-20251001",
+      maxTokens: 512,
+      onUsage,
+    });
+
+    expect(onUsage).toHaveBeenCalledOnce();
+    expect(onUsage).toHaveBeenCalledWith(
+      {
+        input_tokens: 100,
+        output_tokens: 50,
+        cache_creation_input_tokens: 10,
+        cache_read_input_tokens: 5,
+      },
+      false
+    );
+  });
+
+  it("calls onUsage twice when validation retry occurs", async () => {
+    mockCreate.mockResolvedValueOnce({
+      content: [
+        { type: "tool_use", id: "t1", name: "structured_output", input: { name: "test" } },
+      ],
+      usage: { input_tokens: 100, output_tokens: 50 },
+    });
+    mockCreate.mockResolvedValueOnce({
+      content: [
+        { type: "tool_use", id: "t2", name: "structured_output", input: { name: "test", value: 42 } },
+      ],
+      usage: { input_tokens: 200, output_tokens: 60 },
+    });
+
+    const onUsage = vi.fn();
+    await callClaude({
+      prompt: "test",
+      schema: TestSchema,
+      model: "claude-haiku-4-5-20251001",
+      maxTokens: 512,
+      onUsage,
+    });
+
+    expect(onUsage).toHaveBeenCalledTimes(2);
+    // First call — not retry
+    expect(onUsage.mock.calls[0][1]).toBe(false);
+    // Second call — is retry
+    expect(onUsage.mock.calls[1][1]).toBe(true);
+  });
+
+  it("does not break when onUsage is not provided", async () => {
+    mockCreate.mockResolvedValue({
+      content: [
+        { type: "tool_use", id: "t1", name: "structured_output", input: { name: "test", value: 1 } },
+      ],
+      usage: mockUsage,
+    });
+
+    const result = await callClaude({
+      prompt: "test",
+      schema: TestSchema,
+      model: "claude-haiku-4-5-20251001",
+      maxTokens: 512,
+    });
+
+    expect(result).toEqual({ name: "test", value: 1 });
   });
 });
 

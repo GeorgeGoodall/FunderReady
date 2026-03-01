@@ -8,7 +8,8 @@
 import { NonRetriableError } from "inngest";
 import { inngest } from "./client";
 import { createServiceClient } from "@/lib/supabase/server";
-import { callClaude } from "@/lib/ai/anthropic";
+import { callClaude, type ClaudeUsageData } from "@/lib/ai/anthropic";
+import { logAiUsage, type LogAiUsageParams } from "@/lib/ai/log-usage";
 import {
   AnswerAnalysisSchema,
   CrossReferenceSchema,
@@ -311,6 +312,8 @@ export const applicationReviewRequested = inngest.createFunction(
     // -----------------------------------------------------------------------
     const MAX_CONCURRENT = 5;
 
+    const usageEvents: LogAiUsageParams[] = [];
+
     const answerAnalyses: AnswerAnalysis[] = await step.run(
       "answer-analyses",
       async () => {
@@ -324,6 +327,16 @@ export const applicationReviewRequested = inngest.createFunction(
             schema: LenientAnswerAnalysisSchema,
             model: MODEL,
             maxTokens: 8192,
+            onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
+              usageEvents.push({
+                applicationReviewId: reviewId,
+                userId,
+                pipelineStep: "answer_analysis",
+                model: MODEL,
+                usage,
+                isRetry,
+              });
+            },
           });
         };
 
@@ -394,6 +407,16 @@ export const applicationReviewRequested = inngest.createFunction(
         schema: CrossReferenceSchema,
         model: MODEL,
         maxTokens: 16384,
+        onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
+          usageEvents.push({
+            applicationReviewId: reviewId,
+            userId,
+            pipelineStep: "cross_reference",
+            model: MODEL,
+            usage,
+            isRetry,
+          });
+        },
       });
 
       await updateAppReviewProgress(reviewId, "cross_referencing", {
@@ -450,6 +473,16 @@ export const applicationReviewRequested = inngest.createFunction(
         schema: ApplicationScoringSchema,
         model: MODEL,
         maxTokens: 16384,
+        onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
+          usageEvents.push({
+            applicationReviewId: reviewId,
+            userId,
+            pipelineStep: "scoring",
+            model: MODEL,
+            usage,
+            isRetry,
+          });
+        },
       });
 
       await updateAppReviewProgress(reviewId, "scoring", {
@@ -477,6 +510,34 @@ export const applicationReviewRequested = inngest.createFunction(
     await step.run("save-results", async () => {
       const supabase = createServiceClient();
 
+      // Flush all usage log events
+      if (usageEvents.length > 0) {
+        await Promise.allSettled(usageEvents.map((e) => logAiUsage(e)));
+      }
+
+      // Compute aggregates from usage events
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      let totalCacheCreationTokens = 0;
+      let totalCacheReadTokens = 0;
+      let totalCostUsd = 0;
+      let totalCostGbp = 0;
+
+      for (const e of usageEvents) {
+        totalInputTokens += e.usage.input_tokens;
+        totalOutputTokens += e.usage.output_tokens;
+        totalCacheCreationTokens += e.usage.cache_creation_input_tokens ?? 0;
+        totalCacheReadTokens += e.usage.cache_read_input_tokens ?? 0;
+      }
+
+      // Recompute costs from the logged events' calculated values
+      const { calculateCost } = await import("@/lib/ai/pricing");
+      for (const e of usageEvents) {
+        const { cost_usd, cost_gbp } = calculateCost(e.model, e.usage);
+        totalCostUsd += cost_usd;
+        totalCostGbp += cost_gbp;
+      }
+
       // Compute projected score mechanically
       const gapCount = gapCriteria.length;
       const totalCriteriaCount = criteria.length;
@@ -487,6 +548,12 @@ export const applicationReviewRequested = inngest.createFunction(
         .from("application_reviews")
         .update({
           status: "completed",
+          total_input_tokens: totalInputTokens,
+          total_output_tokens: totalOutputTokens,
+          total_cache_creation_tokens: totalCacheCreationTokens,
+          total_cache_read_tokens: totalCacheReadTokens,
+          total_cost_usd: totalCostUsd,
+          total_cost_gbp: totalCostGbp,
           results: {
             answer_feedback: Object.fromEntries(
               answerAnalyses.map((a) => [a.question_id, a])

@@ -130,7 +130,7 @@ describe("POST /api/parse-criteria", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.criteria).toEqual(mockCriteria);
-    expect(mockParseCriteriaWithAI).toHaveBeenCalledWith("Quality of delivery — 30%");
+    expect(mockParseCriteriaWithAI).toHaveBeenCalledWith("Quality of delivery — 30%", "user-123");
   });
 
   it("returns 422 when AI returns invalid Zod structure", async () => {

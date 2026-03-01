@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const criteria = await parseCriteriaWithAI(parsed.data.rawText);
+    const criteria = await parseCriteriaWithAI(parsed.data.rawText, user.id);
     return NextResponse.json({ criteria });
   } catch (err) {
     if (err instanceof ZodError) {

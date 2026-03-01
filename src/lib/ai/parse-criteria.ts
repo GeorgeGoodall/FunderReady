@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { CriteriaSetSchema, type CriteriaSet } from "@/lib/schemas/criteria";
+import { logAiUsage } from "./log-usage";
 
 const SYSTEM_PROMPT = `You are an expert at analysing funder criteria for bid/tender applications.
 
@@ -33,11 +34,12 @@ Rules:
 - If the text is vague, infer reasonable criteria from context
 - Do NOT invent criteria that aren't supported by the text`;
 
-export async function parseCriteriaWithAI(rawText: string): Promise<CriteriaSet> {
+export async function parseCriteriaWithAI(rawText: string, userId?: string): Promise<CriteriaSet> {
   const client = new Anthropic();
+  const model = "claude-sonnet-4-6";
 
   const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    model,
     max_tokens: 2048,
     system: SYSTEM_PROMPT,
     messages: [
@@ -46,6 +48,18 @@ export async function parseCriteriaWithAI(rawText: string): Promise<CriteriaSet>
         content: `Extract structured evaluation criteria from this funder guidance:\n\n${rawText}`,
       },
     ],
+  });
+
+  void logAiUsage({
+    userId,
+    pipelineStep: "parse_criteria",
+    model,
+    usage: {
+      input_tokens: message.usage.input_tokens,
+      output_tokens: message.usage.output_tokens,
+      cache_creation_input_tokens: (message.usage as unknown as Record<string, number>).cache_creation_input_tokens ?? 0,
+      cache_read_input_tokens: (message.usage as unknown as Record<string, number>).cache_read_input_tokens ?? 0,
+    },
   });
 
   const textBlock = message.content.find((block) => block.type === "text");

@@ -10,7 +10,13 @@ vi.mock("@anthropic-ai/sdk", () => {
   };
 });
 
+vi.mock("../log-usage", () => ({
+  logAiUsage: vi.fn(),
+}));
+
 import { parseCriteriaWithAI } from "../parse-criteria";
+
+const mockUsage = { input_tokens: 100, output_tokens: 50 };
 
 describe("parseCriteriaWithAI", () => {
   beforeEach(() => {
@@ -19,6 +25,7 @@ describe("parseCriteriaWithAI", () => {
 
   it("returns a valid CriteriaSet from AI response with object sub_questions", async () => {
     mockCreate.mockResolvedValue({
+      usage: mockUsage,
       content: [
         {
           type: "text",
@@ -58,6 +65,7 @@ describe("parseCriteriaWithAI", () => {
 
   it("handles backward-compatible string sub_questions", async () => {
     mockCreate.mockResolvedValue({
+      usage: mockUsage,
       content: [
         {
           type: "text",
@@ -81,6 +89,7 @@ describe("parseCriteriaWithAI", () => {
 
   it("handles markdown-wrapped JSON from AI", async () => {
     mockCreate.mockResolvedValue({
+      usage: mockUsage,
       content: [
         {
           type: "text",
@@ -96,6 +105,7 @@ describe("parseCriteriaWithAI", () => {
 
   it("throws on invalid AI response", async () => {
     mockCreate.mockResolvedValue({
+      usage: mockUsage,
       content: [{ type: "text", text: "not json" }],
     });
 
@@ -104,6 +114,7 @@ describe("parseCriteriaWithAI", () => {
 
   it("throws when AI returns no text block", async () => {
     mockCreate.mockResolvedValue({
+      usage: mockUsage,
       content: [{ type: "tool_use", id: "x", name: "y", input: {} }],
     });
 
@@ -112,6 +123,7 @@ describe("parseCriteriaWithAI", () => {
 
   it("throws when AI returns valid JSON but invalid schema", async () => {
     mockCreate.mockResolvedValue({
+      usage: mockUsage,
       content: [
         {
           type: "text",

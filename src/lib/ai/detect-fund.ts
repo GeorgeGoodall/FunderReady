@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { logAiUsage } from "./log-usage";
 
 const SYSTEM_PROMPT = `You extract the name of the funding programme or grant scheme from bid/tender documents.
 
@@ -21,11 +22,12 @@ function getClient(): Anthropic {
   return _client;
 }
 
-export async function detectFundName(text: string): Promise<string | null> {
+export async function detectFundName(text: string, userId?: string): Promise<string | null> {
   const client = getClient();
+  const model = "claude-haiku-4-5-20251001";
 
   const message = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model,
     max_tokens: 100,
     system: SYSTEM_PROMPT,
     messages: [
@@ -34,6 +36,18 @@ export async function detectFundName(text: string): Promise<string | null> {
         content: `Identify the fund/programme name from this bid document content:\n\n${text.slice(0, 2000)}`,
       },
     ],
+  });
+
+  void logAiUsage({
+    userId,
+    pipelineStep: "detect_fund",
+    model,
+    usage: {
+      input_tokens: message.usage.input_tokens,
+      output_tokens: message.usage.output_tokens,
+      cache_creation_input_tokens: (message.usage as unknown as Record<string, number>).cache_creation_input_tokens ?? 0,
+      cache_read_input_tokens: (message.usage as unknown as Record<string, number>).cache_read_input_tokens ?? 0,
+    },
   });
 
   const textBlock = message.content.find((block) => block.type === "text");

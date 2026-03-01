@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
   let detectedName: string | null = null;
   try {
-    detectedName = await detectFundName(detectionText);
+    detectedName = await detectFundName(detectionText, user.id);
   } catch (error) {
     console.error("Fund detection AI error:", error);
     // Non-fatal — continue without AI detection

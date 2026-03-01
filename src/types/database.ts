@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_usage_logs: {
+        Row: {
+          id: string
+          application_review_id: string | null
+          user_id: string | null
+          pipeline_step: string
+          model: string
+          input_tokens: number
+          output_tokens: number
+          cache_creation_input_tokens: number
+          cache_read_input_tokens: number
+          cost_usd: number
+          cost_gbp: number
+          is_retry: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          application_review_id?: string | null
+          user_id?: string | null
+          pipeline_step: string
+          model: string
+          input_tokens?: number
+          output_tokens?: number
+          cache_creation_input_tokens?: number
+          cache_read_input_tokens?: number
+          cost_usd?: number
+          cost_gbp?: number
+          is_retry?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          application_review_id?: string | null
+          user_id?: string | null
+          pipeline_step?: string
+          model?: string
+          input_tokens?: number
+          output_tokens?: number
+          cache_creation_input_tokens?: number
+          cache_read_input_tokens?: number
+          cost_usd?: number
+          cost_gbp?: number
+          is_retry?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_logs_application_review_id_fkey"
+            columns: ["application_review_id"]
+            isOneToOne: false
+            referencedRelation: "application_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       applications: {
         Row: {
           id: string
@@ -137,6 +193,12 @@ export type Database = {
           error_message: string | null
           questions_set_id: string | null
           criteria_set_id: string | null
+          total_input_tokens: number
+          total_output_tokens: number
+          total_cache_creation_tokens: number
+          total_cache_read_tokens: number
+          total_cost_usd: number
+          total_cost_gbp: number
           created_at: string
         }
         Insert: {
@@ -149,6 +211,12 @@ export type Database = {
           error_message?: string | null
           questions_set_id?: string | null
           criteria_set_id?: string | null
+          total_input_tokens?: number
+          total_output_tokens?: number
+          total_cache_creation_tokens?: number
+          total_cache_read_tokens?: number
+          total_cost_usd?: number
+          total_cost_gbp?: number
           created_at?: string
         }
         Update: {
@@ -161,6 +229,12 @@ export type Database = {
           error_message?: string | null
           questions_set_id?: string | null
           criteria_set_id?: string | null
+          total_input_tokens?: number
+          total_output_tokens?: number
+          total_cache_creation_tokens?: number
+          total_cache_read_tokens?: number
+          total_cost_usd?: number
+          total_cost_gbp?: number
           created_at?: string
         }
         Relationships: [

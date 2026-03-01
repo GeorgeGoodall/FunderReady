@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { QuestionsSetSchema, type QuestionsSet } from "@/lib/schemas/criteria";
+import { logAiUsage } from "./log-usage";
 
 const SYSTEM_PROMPT = `You are an expert at analysing funder application forms and guidance documents.
 
@@ -45,11 +46,12 @@ Field type detection rules:
 - "checkbox": Use when the funder asks to "select all that apply", "tick all that apply", or presents a multi-select list. Include the options in the "options" array.
 - When in doubt, default to "text_long" — it's always safe.`;
 
-export async function parseQuestionsWithAI(rawText: string): Promise<QuestionsSet> {
+export async function parseQuestionsWithAI(rawText: string, userId?: string): Promise<QuestionsSet> {
   const client = new Anthropic();
+  const model = "claude-sonnet-4-6";
 
   const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    model,
     max_tokens: 8192,
     system: SYSTEM_PROMPT,
     messages: [
@@ -58,6 +60,18 @@ export async function parseQuestionsWithAI(rawText: string): Promise<QuestionsSe
         content: `Extract structured questions and word count limits from this funder guidance:\n\n${rawText}`,
       },
     ],
+  });
+
+  void logAiUsage({
+    userId,
+    pipelineStep: "parse_questions",
+    model,
+    usage: {
+      input_tokens: message.usage.input_tokens,
+      output_tokens: message.usage.output_tokens,
+      cache_creation_input_tokens: (message.usage as unknown as Record<string, number>).cache_creation_input_tokens ?? 0,
+      cache_read_input_tokens: (message.usage as unknown as Record<string, number>).cache_read_input_tokens ?? 0,
+    },
   });
 
   console.log(`[parse-questions] stop_reason=${message.stop_reason}, usage: input=${message.usage.input_tokens} output=${message.usage.output_tokens}`);

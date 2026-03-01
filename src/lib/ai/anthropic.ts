@@ -109,6 +109,13 @@ export function parseJsonPermissive(text: string): unknown {
 
 type CacheBlock = { type: "text"; text: string; cache_control?: { type: "ephemeral" } };
 
+export interface ClaudeUsageData {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens: number;
+  cache_read_input_tokens: number;
+}
+
 interface CallClaudeOptions<T> {
   prompt: string;
   systemPrompt?: string | CacheBlock[];
@@ -117,6 +124,8 @@ interface CallClaudeOptions<T> {
   maxTokens: number;
   /** When true, return null on max_tokens truncation instead of throwing */
   allowPartial?: boolean;
+  /** Called after each Claude API call with token usage data */
+  onUsage?: (usage: ClaudeUsageData, isRetry: boolean) => void;
 }
 
 const TOOL_NAME = "structured_output";
@@ -159,10 +168,24 @@ function isTransientError(error: unknown): boolean {
 export async function callClaude<T>(options: CallClaudeOptions<T> & { allowPartial: true }): Promise<T | null>;
 export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T>;
 export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | null> {
-  const { prompt, systemPrompt, schema, model, maxTokens, allowPartial } = options;
+  const { prompt, systemPrompt, schema, model, maxTokens, allowPartial, onUsage } = options;
 
   const client = getClient();
   const tool = buildTool(schema);
+
+  function emitUsage(msg: Anthropic.Message, isRetry: boolean) {
+    if (onUsage && msg.usage) {
+      onUsage(
+        {
+          input_tokens: msg.usage.input_tokens,
+          output_tokens: msg.usage.output_tokens,
+          cache_creation_input_tokens: (msg.usage as unknown as Record<string, number>).cache_creation_input_tokens ?? 0,
+          cache_read_input_tokens: (msg.usage as unknown as Record<string, number>).cache_read_input_tokens ?? 0,
+        },
+        isRetry
+      );
+    }
+  }
 
   let message: Anthropic.Message;
   try {
@@ -174,6 +197,7 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
       tools: [tool],
       tool_choice: { type: "tool", name: TOOL_NAME },
     });
+    emitUsage(message, false);
   } catch (error) {
     if (isTransientError(error)) {
       throw error; // Let Inngest retry
@@ -240,6 +264,8 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
         { cause: error instanceof Error ? error : undefined }
       );
     }
+
+    emitUsage(retryMessage, true);
 
     const retryToolBlock = retryMessage.content.find((block) => block.type === "tool_use");
     if (retryToolBlock && retryToolBlock.type === "tool_use") {

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AdminDashboard } from "./AdminDashboard";
+import { AdminMetrics } from "./AdminMetrics";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,13 @@ export default async function AdminPage() {
           pendingQuestionsSets={pendingQuestionsSets ?? []}
           pendingOrganisations={pendingOrganisations ?? []}
         />
+      </div>
+      <div className="mt-10">
+        <h2 className="text-lg font-semibold">AI Usage Metrics</h2>
+        <p className="mt-1 text-sm text-zinc-500">Token consumption, costs, and platform statistics.</p>
+        <div className="mt-4">
+          <AdminMetrics />
+        </div>
       </div>
     </div>
   );

@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const questions = await parseQuestionsWithAI(parsed.data.rawText);
+    const questions = await parseQuestionsWithAI(parsed.data.rawText, user.id);
     return NextResponse.json({ questions });
   } catch (err) {
     if (err instanceof ZodError) {
