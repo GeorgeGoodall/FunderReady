@@ -388,10 +388,11 @@ export const applicationReviewRequested = inngest.createFunction(
     // -----------------------------------------------------------------------
     // Step 3: Cross-reference
     // -----------------------------------------------------------------------
-    await step.run("cross-reference-progress", async () => {
+    await step.run("cross-reference-started", async () => {
       await updateAppReviewProgress(reviewId, "cross_referencing", {
         crossref_started: Date.now(),
       });
+      return { status: "Cross-referencing answers against criteria" };
     });
 
     const crossReference: CrossReference = await step.run("cross-reference", async () => {
@@ -452,10 +453,11 @@ export const applicationReviewRequested = inngest.createFunction(
     // -----------------------------------------------------------------------
     // Step 4: Scoring
     // -----------------------------------------------------------------------
-    await step.run("scoring-progress", async () => {
+    await step.run("scoring-started", async () => {
       await updateAppReviewProgress(reviewId, "scoring", {
         scoring_started: Date.now(),
       });
+      return { status: "Scoring application against fund criteria" };
     });
 
     const scoring: ApplicationScoring = await step.run("scoring", async () => {
