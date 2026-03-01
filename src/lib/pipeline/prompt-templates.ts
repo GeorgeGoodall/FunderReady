@@ -47,6 +47,18 @@ export const ANTI_HALLUCINATION = `
 4. Every paragraph_id MUST correspond to a paragraph ID from the document map provided.
 5. Weight your feedback toward the highest-impact improvements. If you identify many issues, make clear which 3-5 would most improve the bid's chances.`;
 
+export const QUALITY_DIMENSIONS = `
+## Quality Dimensions
+
+Score 7 quality dimensions across the ENTIRE application (all answers combined), using the same 0-100 scale:
+- **Language & Grammar**: Quality of spelling, grammar, punctuation, and professional presentation. Typos, formatting errors, and language issues.
+- **Evidence**: Are claims backed by specific data, figures, historical outcomes, and named examples? Score based on both presence and quality of evidence.
+- **Completeness**: Are word limits appropriately used? Are all questions fully answered? Are all required sub-elements present? Score based on what is missing.
+- **Persuasiveness**: How well does the writing persuade and convince? Does it build a compelling case, or just state facts? Consider narrative strength and argument quality.
+- **Relevance**: How relevant are the answers to the specific questions asked and the funder's criteria? Does the content address what was asked, or drift off-topic?
+- **Financial Accuracy**: Accuracy of budget figures, missing financial values, incorrect sums, reconciliation between financial answers. Score only across answers containing financial content. If no financial content exists, score null.
+- **Conciseness**: How concise are the answers? Is there bloat, filler, needless repetition, or content that wastes word count without adding value?`;
+
 export const COMMENT_CATEGORIES_DESC = `
 ## Comment Categories
 

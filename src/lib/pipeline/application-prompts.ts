@@ -9,6 +9,7 @@ import {
   SCORING_RUBRIC,
   FEW_SHOT_COMMENTS,
   COMMENT_CATEGORIES_DESC,
+  QUALITY_DIMENSIONS,
   ANTI_HALLUCINATION,
   formatCriteria,
   type Criterion,
@@ -115,6 +116,14 @@ ${answer.question_text}${prioritySection}${fieldTypeSection}${guidanceSection}${
 ## Answer Text
 
 ${answer.answer_text}
+
+## Evidence Distinction
+
+When identifying EVIDENCE, MISSING, or SPECIFICITY issues, distinguish between:
+- **Omitted evidence**: data that likely exists but wasn't included (e.g., the answer discusses a mature programme but cites no outcomes). Suggestion: "Add [specific data]."
+- **Structural evidence gaps**: data that likely doesn't exist yet (e.g., answer says "outcomes continuing to build", "relationships yet to be established", uses future tense for activities that should have past results, or the organisation is clearly early-stage in a geography). Suggestion: "Acknowledge this limitation explicitly, explain why the data isn't available, and provide proxy evidence such as [specific alternatives]."
+
+Signals of structural gaps: future tense ("we will develop"), explicit acknowledgments ("programme still live"), new geography expansion, early-stage indicators.
 
 ## Guidelines
 
@@ -293,6 +302,8 @@ export function buildApplicationScoringPrompt(
 
 ${SCORING_RUBRIC}
 
+${QUALITY_DIMENSIONS}
+
 ## Task: Final Scoring & Synthesis
 
 You have completed a detailed answer-by-answer analysis and a cross-reference pass. Now produce the final scoring.
@@ -345,8 +356,18 @@ Return a JSON object:
       "what_funder_wants": "What the funder is looking for",
       "how_bid_addresses": "How the application currently addresses it",
       "whats_missing": "What's missing or weak",
-      "example_language": "Suggested text the applicant could use or adapt"
+      "example_language": "Suggested text the applicant could use or adapt",
+      "gap_type": "quick_fix|structural_gap"
     }
+  ],
+  "quality_dimensions": [
+    { "dimension": "Language & Grammar", "score": 85, "summary": "1-2 sentences" },
+    { "dimension": "Evidence", "score": 60, "summary": "1-2 sentences" },
+    { "dimension": "Completeness", "score": 70, "summary": "1-2 sentences" },
+    { "dimension": "Persuasiveness", "score": 65, "summary": "1-2 sentences" },
+    { "dimension": "Relevance", "score": 80, "summary": "1-2 sentences" },
+    { "dimension": "Financial Accuracy", "score": null, "summary": "No financial content in this application" },
+    { "dimension": "Conciseness", "score": 75, "summary": "1-2 sentences" }
   ]
 }
 \`\`\`
@@ -358,6 +379,11 @@ Guidelines:
 - Use the numeric ranges in the scoring rubric to guide your overall_score. The overall_score should be consistent with the distribution of individual criteria scores.
 - top_strengths and top_improvements should be the 3 highest-impact items
 - improvement_appendix should cover criteria scored Fair or below. For criteria scored Excellent or Strong, only include an entry if there is a meaningful, specific refinement — do not force suggestions where none are needed.
+- For each improvement_appendix item, set gap_type:
+  - "quick_fix": the applicant likely has this information and just needs to add it (e.g., using more word limit, adding details they clearly possess, restructuring content)
+  - "structural_gap": the evidence likely doesn't exist or isn't available (e.g., outcomes from a programme still running, relationships in a new geography, financial data not yet generated)
+  For structural_gap items, example_language should focus on mitigation: acknowledging the limitation, explaining why data isn't available, offering proxy evidence, framing partial data with caveats. Do NOT suggest adding data that doesn't exist.
+- Score all 7 quality dimensions as described in the Quality Dimensions section above. Use null for Financial Accuracy score if the application contains no budget or financial content.
 - Be specific with example language — give the applicant something they can use
 - Reference answers by question_id (e.g., "Answer q1: ...")
 - A criterion CANNOT score "Excellent" if any cross-reference finding of medium or high severity involves that criterion. Downgrade to "Strong" and note the cross-reference issue in the summary.

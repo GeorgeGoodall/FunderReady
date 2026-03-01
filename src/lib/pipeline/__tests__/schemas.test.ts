@@ -5,6 +5,8 @@ import {
   AnswerAnalysisSchema,
   AnswerScoreSchema,
   ApplicationScoringSchema,
+  QualityDimensionSchema,
+  ImprovementAppendixItemSchema,
 } from "../schemas";
 import { SaveAnswersRequestSchema } from "../../schemas/criteria";
 
@@ -252,6 +254,123 @@ describe("ApplicationScoringSchema", () => {
         submission_readiness: "Needs revisions",
         top_strengths: [],
         top_improvements: ["Something"],
+      })
+    ).toThrow();
+  });
+
+  it("validates with quality_dimensions", () => {
+    const data = {
+      answer_scores: [
+        { question_id: "q1", question_text: "Need", score: "Strong" as const, summary: "Good" },
+      ],
+      criteria_scores: [
+        { criterion_id: "c1", criterion: "Need", score: "Strong" as const, bid_evidence: ["Q1"], gaps: [], summary: "Good" },
+      ],
+      overall_score: 75,
+      overall_descriptor: "Good",
+      submission_readiness: "Nearly ready" as const,
+      top_strengths: ["Clear need"],
+      top_improvements: ["Add metrics"],
+      quality_dimensions: [
+        { dimension: "Language & Grammar", score: 85, summary: "Well written" },
+        { dimension: "Evidence", score: 60, summary: "Some gaps" },
+        { dimension: "Financial Accuracy", score: null, summary: "No financial content" },
+      ],
+    };
+    const result = ApplicationScoringSchema.parse(data);
+    expect(result.quality_dimensions).toHaveLength(3);
+    expect(result.quality_dimensions![2].score).toBeNull();
+  });
+
+  it("validates without quality_dimensions (backward compat)", () => {
+    const data = {
+      answer_scores: [
+        { question_id: "q1", question_text: "Need", score: "Strong" as const, summary: "Good" },
+      ],
+      criteria_scores: [
+        { criterion_id: "c1", criterion: "Need", score: "Strong" as const, bid_evidence: ["Q1"], gaps: [], summary: "Good" },
+      ],
+      overall_score: 75,
+      overall_descriptor: "Good",
+      submission_readiness: "Nearly ready" as const,
+      top_strengths: ["Clear need"],
+      top_improvements: ["Add metrics"],
+    };
+    const result = ApplicationScoringSchema.parse(data);
+    expect(result.quality_dimensions).toBeUndefined();
+  });
+});
+
+describe("QualityDimensionSchema", () => {
+  it("validates a dimension with numeric score", () => {
+    const data = { dimension: "Evidence", score: 72, summary: "Mostly well-evidenced" };
+    expect(QualityDimensionSchema.parse(data)).toEqual(data);
+  });
+
+  it("validates a dimension with null score (N/A)", () => {
+    const data = { dimension: "Financial Accuracy", score: null, summary: "No financial content" };
+    expect(QualityDimensionSchema.parse(data)).toEqual(data);
+  });
+
+  it("rejects score above 100", () => {
+    expect(() =>
+      QualityDimensionSchema.parse({ dimension: "Evidence", score: 105, summary: "Too high" })
+    ).toThrow();
+  });
+
+  it("rejects score below 0", () => {
+    expect(() =>
+      QualityDimensionSchema.parse({ dimension: "Evidence", score: -1, summary: "Negative" })
+    ).toThrow();
+  });
+});
+
+describe("ImprovementAppendixItemSchema", () => {
+  it("validates with gap_type quick_fix", () => {
+    const data = {
+      criterion_id: "c1",
+      criterion: "Need",
+      what_funder_wants: "Clear evidence",
+      how_bid_addresses: "Mentions need",
+      whats_missing: "Specific data",
+      gap_type: "quick_fix" as const,
+    };
+    expect(ImprovementAppendixItemSchema.parse(data)).toMatchObject({ gap_type: "quick_fix" });
+  });
+
+  it("validates with gap_type structural_gap", () => {
+    const data = {
+      criterion_id: "c2",
+      criterion: "Outcomes",
+      what_funder_wants: "Track record",
+      how_bid_addresses: "Programme still running",
+      whats_missing: "Outcome data not yet available",
+      gap_type: "structural_gap" as const,
+    };
+    expect(ImprovementAppendixItemSchema.parse(data)).toMatchObject({ gap_type: "structural_gap" });
+  });
+
+  it("validates without gap_type (backward compat)", () => {
+    const data = {
+      criterion_id: "c1",
+      criterion: "Need",
+      what_funder_wants: "Clear evidence",
+      how_bid_addresses: "Mentions need",
+      whats_missing: "Specific data",
+    };
+    const result = ImprovementAppendixItemSchema.parse(data);
+    expect(result.gap_type).toBeUndefined();
+  });
+
+  it("rejects invalid gap_type value", () => {
+    expect(() =>
+      ImprovementAppendixItemSchema.parse({
+        criterion_id: "c1",
+        criterion: "Need",
+        what_funder_wants: "X",
+        how_bid_addresses: "Y",
+        whats_missing: "Z",
+        gap_type: "invalid",
       })
     ).toThrow();
   });

@@ -85,6 +85,7 @@ export const ImprovementAppendixItemSchema = z.object({
   how_bid_addresses: z.string(),
   whats_missing: z.string(),
   example_language: z.string().optional(),
+  gap_type: z.enum(["quick_fix", "structural_gap"]).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -145,6 +146,15 @@ export const AnswerScoreSchema = z.object({
 
 export type AnswerScore = z.infer<typeof AnswerScoreSchema>;
 
+// Quality dimension score (used in ApplicationScoringSchema)
+export const QualityDimensionSchema = z.object({
+  dimension: z.string(),
+  score: z.number().min(0).max(100).nullable(),
+  summary: z.string(),
+});
+
+export type QualityDimension = z.infer<typeof QualityDimensionSchema>;
+
 // Full application scoring (replaces ScoringSchema for form-based review)
 export const ApplicationScoringSchema = z.object({
   answer_scores: z.array(AnswerScoreSchema),
@@ -160,6 +170,7 @@ export const ApplicationScoringSchema = z.object({
   top_strengths: z.array(z.string()).min(1).max(5),
   top_improvements: z.array(z.string()).min(1).max(5),
   improvement_appendix: z.array(ImprovementAppendixItemSchema).optional(),
+  quality_dimensions: z.array(QualityDimensionSchema).optional(),
 });
 
 export type ApplicationScoring = z.infer<typeof ApplicationScoringSchema>;

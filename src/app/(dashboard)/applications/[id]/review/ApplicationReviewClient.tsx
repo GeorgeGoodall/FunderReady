@@ -73,6 +73,22 @@ interface CrossReference {
   gap_criteria?: GapCriterion[];
 }
 
+interface QualityDimension {
+  dimension: string;
+  score: number | null;
+  summary: string;
+}
+
+interface ImprovementAppendixItem {
+  criterion_id: string;
+  criterion: string;
+  what_funder_wants: string;
+  how_bid_addresses: string;
+  whats_missing: string;
+  example_language?: string;
+  gap_type?: "quick_fix" | "structural_gap";
+}
+
 interface ApplicationScoring {
   answer_scores: AnswerScore[];
   criteria_scores: CriterionScore[];
@@ -81,14 +97,8 @@ interface ApplicationScoring {
   submission_readiness: string;
   top_strengths: string[];
   top_improvements: string[];
-  improvement_appendix?: Array<{
-    criterion_id: string;
-    criterion: string;
-    what_funder_wants: string;
-    how_bid_addresses: string;
-    whats_missing: string;
-    example_language?: string;
-  }>;
+  improvement_appendix?: ImprovementAppendixItem[];
+  quality_dimensions?: QualityDimension[];
 }
 
 interface ReviewResults {
@@ -411,6 +421,11 @@ export function ApplicationReviewClient({
             </div>
 
             <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">{scoring.overall_descriptor}</p>
+
+            {/* Quality dimensions */}
+            {scoring.quality_dimensions && scoring.quality_dimensions.length > 0 && (
+              <QualityDimensionBars dimensions={scoring.quality_dimensions} />
+            )}
 
             {/* Strengths + improvements */}
             <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -902,6 +917,65 @@ function CrossReferenceFindingCard({ finding }: { finding: CrossReferenceFinding
 }
 
 // ---------------------------------------------------------------------------
+// Quality dimension bars
+// ---------------------------------------------------------------------------
+
+function QualityDimensionBars({ dimensions }: { dimensions: QualityDimension[] }) {
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
+  function barColour(score: number | null): string {
+    if (score === null) return "bg-zinc-200 dark:bg-zinc-700";
+    if (score > 70) return "bg-green-500 dark:bg-green-400";
+    if (score > 50) return "bg-amber-500 dark:bg-amber-400";
+    if (score > 25) return "bg-orange-500 dark:bg-orange-400";
+    return "bg-red-500 dark:bg-red-400";
+  }
+
+  function textColour(score: number | null): string {
+    if (score === null) return "text-zinc-400 dark:text-zinc-500";
+    if (score > 70) return "text-green-700 dark:text-green-400";
+    if (score > 50) return "text-amber-700 dark:text-amber-400";
+    if (score > 25) return "text-orange-700 dark:text-orange-400";
+    return "text-red-700 dark:text-red-400";
+  }
+
+  return (
+    <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+      <h3 className="mb-4 text-sm font-semibold">Quality Dimensions</h3>
+      <div className="space-y-3">
+        {dimensions.map((d, i) => (
+          <div key={d.dimension}>
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 text-left"
+              onClick={() => setExpandedIdx(expandedIdx === i ? null : i)}
+            >
+              <span className="w-36 shrink-0 text-xs text-zinc-600 dark:text-zinc-400">{d.dimension}</span>
+              <div className="flex-1">
+                <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800">
+                  {d.score !== null && (
+                    <div
+                      className={`h-2 rounded-full transition-all ${barColour(d.score)}`}
+                      style={{ width: `${d.score}%` }}
+                    />
+                  )}
+                </div>
+              </div>
+              <span className={`w-10 text-right text-xs font-medium ${textColour(d.score)}`}>
+                {d.score !== null ? d.score : "N/A"}
+              </span>
+            </button>
+            {expandedIdx === i && (
+              <p className="ml-39 mt-1 text-xs text-zinc-500 dark:text-zinc-400">{d.summary}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Improvement appendix (collapsible)
 // ---------------------------------------------------------------------------
 
@@ -918,7 +992,19 @@ function ImprovementAppendix({
       <div className="divide-y divide-zinc-100 border-t border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
         {items.map((item) => (
           <div key={item.criterion_id} className="px-5 py-4">
-            <h4 className="text-sm font-semibold">{item.criterion}</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-semibold">{item.criterion}</h4>
+              {item.gap_type === "quick_fix" && (
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  Quick fix
+                </span>
+              )}
+              {item.gap_type === "structural_gap" && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  Evidence gap
+                </span>
+              )}
+            </div>
             <div className="mt-2 space-y-1.5 text-xs text-zinc-600 dark:text-zinc-400">
               <p><span className="font-medium">What the funder wants:</span> {item.what_funder_wants}</p>
               <p><span className="font-medium">How you address it:</span> {item.how_bid_addresses}</p>
