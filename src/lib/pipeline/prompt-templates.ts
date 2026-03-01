@@ -38,6 +38,39 @@ Here are examples of GOOD and POOR inline comments. Match the quality of the GOO
 - "[CONCISENESS] 'It is important to note that our organisation has a long and established history of working collaboratively with partners across the region...' — 17 words of preamble with no new information. Cut to: 'Our 15-year track record with regional partners...' to free word count for evidence."
 - "[CONCISENESS] This paragraph restates the need described in the previous section without adding new evidence. Remove or replace with a forward reference ('As outlined in Section 1...') to recover ~80 words for your delivery methodology."`;
 
+export const SCORING_CALIBRATION_EXAMPLES = `
+## Scoring Calibration Examples
+
+Use these worked examples to calibrate your scoring. Each shows a criterion, the evidence available, the correct rating, and the reasoning.
+
+### Example 1: Fair (score range 51-70)
+
+**Criterion:** "Demonstrate a clear understanding of the need your project addresses, supported by evidence."
+**Evidence:** The answer describes the problem in general terms ("youth unemployment is a major challenge in the region") and references one national statistic but provides no local data, no needs assessment, and no direct beneficiary insight.
+**Rating:** Fair
+**Reasoning:** The answer acknowledges the topic and provides one piece of evidence, but the evidence is generic (national, not local) and there is no primary data or beneficiary voice. A panel member would ask: "What does this look like in YOUR area? What have YOUR beneficiaries told you?" Multiple follow-up questions likely.
+
+### Example 2: Strong (score range 71-85)
+
+**Criterion:** "Describe your organisation's track record of delivering similar projects."
+**Evidence:** The answer names three completed projects with dates, describes outcomes for two of them (including specific participant numbers), and references one independent evaluation. However, it does not quantify outcomes for the third project and does not explain how lessons learned have been applied.
+**Rating:** Strong
+**Reasoning:** Clear, specific track record with named projects and quantified outcomes for most. The independent evaluation adds credibility. Minor gaps: one project lacks outcome data and there is no explicit reflection on lessons learned. A panel member would have at most one follow-up question.
+
+### Example 3: Needs Improvement (score range 26-50)
+
+**Criterion:** "Explain how you will ensure the project's sustainability beyond the funding period."
+**Evidence:** The answer states "we will seek further funding from other sources" and "we hope to embed the project within existing services." No specific funders are named, no timeline is given, and no concrete embedding strategy is described.
+**Rating:** Needs Improvement
+**Reasoning:** The answer mentions sustainability but every statement is aspirational with no specifics. "We will seek further funding" without naming sources or explaining the strategy is not convincing. "We hope to embed" signals uncertainty. A panel member would score this poorly — the applicant has not demonstrated a credible sustainability plan.
+
+### Example 4: Fair (score range 51-70) — Context-limited evidence
+
+**Criterion:** "Provide evidence of your organisation's impact in the target community."
+**Evidence:** The answer describes a new community initiative launched 6 months ago. It provides strong qualitative evidence — direct beneficiary quotes, a case study, and a letter of support from a local partner — but no quantitative outcome data. The answer explicitly acknowledges "as a newly established programme, full outcome data will be available after our first annual evaluation in September."
+**Rating:** Fair
+**Reasoning:** The absence of quantitative data is a genuine limitation, not a failure to include available evidence. The applicant has proactively acknowledged the gap, provided a timeline for when data will be available, and offered credible proxy evidence (beneficiary voice, partner endorsement). However, this still represents a notable gap — a panel member would want to see at least some early indicators (attendance figures, referral numbers, or pre/post survey results). Score Fair rather than Needs Improvement because the evidence gap is structural and transparently acknowledged, but not Strong because the criterion asks for impact evidence that isn't yet available.`;
+
 export const ANTI_HALLUCINATION = `
 ## Critical Rules
 

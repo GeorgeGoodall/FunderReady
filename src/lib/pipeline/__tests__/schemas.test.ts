@@ -55,6 +55,103 @@ describe("CrossReferenceSchema", () => {
     expect(CrossReferenceSchema.parse(data)).toEqual(data);
   });
 
+  it("validates findings with confidence field", () => {
+    const data = {
+      findings: [
+        {
+          type: "contradiction" as const,
+          description: "Budget mismatch",
+          sections_involved: ["q1", "q3"],
+          severity: "high" as const,
+          confidence: "high" as const,
+        },
+      ],
+      overall_coherence: "adequate" as const,
+      summary: "Some issues found.",
+    };
+    const result = CrossReferenceSchema.parse(data);
+    expect(result.findings[0].confidence).toBe("high");
+  });
+
+  it("validates findings without confidence (backward compat)", () => {
+    const data = {
+      findings: [
+        {
+          type: "gap" as const,
+          description: "Missing coverage",
+          sections_involved: ["q2"],
+          severity: "medium" as const,
+        },
+      ],
+      overall_coherence: "adequate" as const,
+      summary: "Minor gaps.",
+    };
+    const result = CrossReferenceSchema.parse(data);
+    expect(result.findings[0].confidence).toBeUndefined();
+  });
+
+  it("validates all three confidence levels on findings", () => {
+    for (const level of ["high", "medium", "low"] as const) {
+      const data = {
+        findings: [
+          {
+            type: "gap" as const,
+            description: "Some gap",
+            sections_involved: ["q1"],
+            severity: "medium" as const,
+            confidence: level,
+          },
+        ],
+        overall_coherence: "adequate" as const,
+        summary: "Test.",
+      };
+      const result = CrossReferenceSchema.parse(data);
+      expect(result.findings[0].confidence).toBe(level);
+    }
+  });
+
+  it("validates finding with all optional fields including confidence", () => {
+    const data = {
+      findings: [
+        {
+          type: "inconsistency" as const,
+          description: "Naming shifts between answers",
+          sections_involved: ["q1", "q2"],
+          criteria_involved: ["c1"],
+          severity: "low" as const,
+          suggestion: "Standardise naming",
+          confidence: "medium" as const,
+        },
+      ],
+      overall_coherence: "strong" as const,
+      summary: "Minor naming issue.",
+    };
+    const result = CrossReferenceSchema.parse(data);
+    expect(result.findings[0]).toMatchObject({
+      confidence: "medium",
+      suggestion: "Standardise naming",
+      criteria_involved: ["c1"],
+    });
+  });
+
+  it("rejects invalid confidence value on findings", () => {
+    expect(() =>
+      CrossReferenceSchema.parse({
+        findings: [
+          {
+            type: "gap" as const,
+            description: "Missing coverage",
+            sections_involved: ["q2"],
+            severity: "medium" as const,
+            confidence: "very_high",
+          },
+        ],
+        overall_coherence: "adequate" as const,
+        summary: "Issues.",
+      })
+    ).toThrow();
+  });
+
   it("validates without gap_criteria (backward compatibility)", () => {
     const data = {
       findings: [],
@@ -172,6 +269,89 @@ describe("AnswerAnalysisSchema", () => {
         })
       ).toMatchObject({ answer_score: score });
     }
+  });
+
+  it("accepts confidence on criteria_relevance entries", () => {
+    const data = {
+      question_id: "q1",
+      inline_comments: [],
+      criteria_relevance: [
+        { criterion_id: "c1", relevance: "directly_addresses" as const, confidence: "high" as const },
+        { criterion_id: "c2", relevance: "partially_addresses" as const, confidence: "low" as const },
+      ],
+      strengths: ["Good"],
+      weaknesses: [],
+      answer_score: "Strong" as const,
+    };
+    const result = AnswerAnalysisSchema.parse(data);
+    expect(result.criteria_relevance[0].confidence).toBe("high");
+    expect(result.criteria_relevance[1].confidence).toBe("low");
+  });
+
+  it("accepts criteria_relevance without confidence (backward compat)", () => {
+    const data = {
+      question_id: "q1",
+      inline_comments: [],
+      criteria_relevance: [
+        { criterion_id: "c1", relevance: "directly_addresses" as const },
+      ],
+      strengths: ["Good"],
+      weaknesses: [],
+      answer_score: "Strong" as const,
+    };
+    const result = AnswerAnalysisSchema.parse(data);
+    expect(result.criteria_relevance[0].confidence).toBeUndefined();
+  });
+
+  it("accepts medium confidence on criteria_relevance", () => {
+    const data = {
+      question_id: "q1",
+      inline_comments: [],
+      criteria_relevance: [
+        { criterion_id: "c1", relevance: "partially_addresses" as const, confidence: "medium" as const },
+      ],
+      strengths: ["OK"],
+      weaknesses: [],
+      answer_score: "Fair" as const,
+    };
+    const result = AnswerAnalysisSchema.parse(data);
+    expect(result.criteria_relevance[0].confidence).toBe("medium");
+  });
+
+  it("accepts confidence with notes on criteria_relevance", () => {
+    const data = {
+      question_id: "q1",
+      inline_comments: [],
+      criteria_relevance: [
+        {
+          criterion_id: "c1",
+          relevance: "directly_addresses" as const,
+          notes: "Strong alignment with criterion",
+          confidence: "high" as const,
+        },
+      ],
+      strengths: ["Good"],
+      weaknesses: [],
+      answer_score: "Strong" as const,
+    };
+    const result = AnswerAnalysisSchema.parse(data);
+    expect(result.criteria_relevance[0].confidence).toBe("high");
+    expect(result.criteria_relevance[0].notes).toBe("Strong alignment with criterion");
+  });
+
+  it("rejects invalid confidence value on criteria_relevance", () => {
+    expect(() =>
+      AnswerAnalysisSchema.parse({
+        question_id: "q1",
+        inline_comments: [],
+        criteria_relevance: [
+          { criterion_id: "c1", relevance: "directly_addresses", confidence: "extreme" },
+        ],
+        strengths: [],
+        weaknesses: [],
+        answer_score: "Strong",
+      })
+    ).toThrow();
   });
 
   it("rejects invalid answer_score", () => {

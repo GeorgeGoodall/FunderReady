@@ -2,15 +2,25 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NonRetriableError } from "inngest";
 import { z } from "zod";
 
-const { mockCreate } = vi.hoisted(() => {
+const { mockCreate, MockAPIError } = vi.hoisted(() => {
   const mockCreate = vi.fn();
-  return { mockCreate };
+  // Minimal APIError class that matches the real SDK's shape
+  class MockAPIError extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+      super(message);
+      this.status = status;
+      this.name = "APIError";
+    }
+  }
+  return { mockCreate, MockAPIError };
 });
 
 vi.mock("@anthropic-ai/sdk", () => {
   return {
     default: class MockAnthropic {
       messages = { create: mockCreate };
+      static APIError = MockAPIError;
     },
   };
 });
@@ -288,6 +298,94 @@ describe("callClaude", () => {
     expect(onUsage.mock.calls[1][1]).toBe(true);
   });
 
+  it("passes temperature to API when specified", async () => {
+    mockCreate.mockResolvedValue({
+      content: [
+        { type: "tool_use", id: "t1", name: "structured_output", input: { name: "test", value: 1 } },
+      ],
+      usage: mockUsage,
+    });
+
+    await callClaude({
+      prompt: "test",
+      schema: TestSchema,
+      model: "claude-haiku-4-5-20251001",
+      maxTokens: 512,
+      temperature: 0,
+    });
+
+    const call = mockCreate.mock.calls[0][0];
+    expect(call.temperature).toBe(0);
+  });
+
+  it("passes non-zero temperature values", async () => {
+    mockCreate.mockResolvedValue({
+      content: [
+        { type: "tool_use", id: "t1", name: "structured_output", input: { name: "test", value: 1 } },
+      ],
+      usage: mockUsage,
+    });
+
+    await callClaude({
+      prompt: "test",
+      schema: TestSchema,
+      model: "claude-haiku-4-5-20251001",
+      maxTokens: 512,
+      temperature: 0.7,
+    });
+
+    const call = mockCreate.mock.calls[0][0];
+    expect(call.temperature).toBe(0.7);
+  });
+
+  it("passes temperature to validation retry call", async () => {
+    // First call returns invalid input
+    mockCreate.mockResolvedValueOnce({
+      content: [
+        { type: "tool_use", id: "t1", name: "structured_output", input: { name: "test" } },
+      ],
+      usage: mockUsage,
+    });
+    // Retry returns valid
+    mockCreate.mockResolvedValueOnce({
+      content: [
+        { type: "tool_use", id: "t2", name: "structured_output", input: { name: "test", value: 42 } },
+      ],
+      usage: mockUsage,
+    });
+
+    await callClaude({
+      prompt: "test",
+      schema: TestSchema,
+      model: "claude-haiku-4-5-20251001",
+      maxTokens: 512,
+      temperature: 0,
+    });
+
+    // Both the initial and retry calls should have temperature: 0
+    expect(mockCreate.mock.calls[0][0].temperature).toBe(0);
+    expect(mockCreate.mock.calls[1][0].temperature).toBe(0);
+  });
+
+  it("omits temperature from API call when not specified", async () => {
+    mockCreate.mockResolvedValue({
+      content: [
+        { type: "tool_use", id: "t1", name: "structured_output", input: { name: "test", value: 1 } },
+      ],
+      usage: mockUsage,
+    });
+
+    await callClaude({
+      prompt: "test",
+      schema: TestSchema,
+      model: "claude-haiku-4-5-20251001",
+      maxTokens: 512,
+    });
+
+    const call = mockCreate.mock.calls[0][0];
+    expect(call).not.toHaveProperty("temperature");
+  });
+
   it("does not break when onUsage is not provided", async () => {
     mockCreate.mockResolvedValue({
       content: [
@@ -304,6 +402,144 @@ describe("callClaude", () => {
     });
 
     expect(result).toEqual({ name: "test", value: 1 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Transient vs permanent error handling (isTransientError)
+// ---------------------------------------------------------------------------
+
+describe("callClaude — transient error handling", () => {
+  beforeEach(() => {
+    mockCreate.mockReset();
+  });
+
+  it("re-throws 429 rate limit errors (allows Inngest retry)", async () => {
+    mockCreate.mockRejectedValue(new MockAPIError(429, "Rate limited"));
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.toThrow("Rate limited");
+
+    // Should NOT wrap in NonRetriableError
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.not.toBeInstanceOf(NonRetriableError);
+  });
+
+  it("re-throws 529 overloaded errors (allows Inngest retry)", async () => {
+    mockCreate.mockRejectedValue(new MockAPIError(529, "Overloaded"));
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.toThrow("Overloaded");
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.not.toBeInstanceOf(NonRetriableError);
+  });
+
+  it("re-throws 500 server errors (allows Inngest retry)", async () => {
+    mockCreate.mockRejectedValue(new MockAPIError(500, "Internal server error"));
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.toThrow("Internal server error");
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.not.toBeInstanceOf(NonRetriableError);
+  });
+
+  it("re-throws network errors with ECONNRESET (allows Inngest retry)", async () => {
+    mockCreate.mockRejectedValue(new Error("socket hang up ECONNRESET"));
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.toThrow("ECONNRESET");
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.not.toBeInstanceOf(NonRetriableError);
+  });
+
+  it("re-throws network errors with ETIMEDOUT (allows Inngest retry)", async () => {
+    mockCreate.mockRejectedValue(new Error("connect ETIMEDOUT 1.2.3.4:443"));
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.toThrow("ETIMEDOUT");
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.not.toBeInstanceOf(NonRetriableError);
+  });
+
+  it("re-throws fetch failed errors (allows Inngest retry)", async () => {
+    mockCreate.mockRejectedValue(new Error("fetch failed"));
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.toThrow("fetch failed");
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.not.toBeInstanceOf(NonRetriableError);
+  });
+
+  it("wraps 400 bad request as NonRetriableError (permanent)", async () => {
+    mockCreate.mockRejectedValue(new MockAPIError(400, "Invalid request"));
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.toBeInstanceOf(NonRetriableError);
+  });
+
+  it("wraps 401 auth error as NonRetriableError (permanent)", async () => {
+    mockCreate.mockRejectedValue(new MockAPIError(401, "Invalid API key"));
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.toBeInstanceOf(NonRetriableError);
+  });
+
+  it("wraps 403 forbidden as NonRetriableError (permanent)", async () => {
+    mockCreate.mockRejectedValue(new MockAPIError(403, "Forbidden"));
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.toBeInstanceOf(NonRetriableError);
+  });
+
+  it("wraps unknown non-Error throws as NonRetriableError", async () => {
+    mockCreate.mockRejectedValue("string error");
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.toBeInstanceOf(NonRetriableError);
+  });
+
+  it("re-throws transient errors on validation retry path too", async () => {
+    // First call succeeds with invalid data
+    mockCreate.mockResolvedValueOnce({
+      content: [
+        { type: "tool_use", id: "t1", name: "structured_output", input: { name: "test" } }, // missing value
+      ],
+      usage: mockUsage,
+    });
+    // Retry call hits a transient error
+    mockCreate.mockRejectedValueOnce(new MockAPIError(429, "Rate limited on retry"));
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 })
+    ).rejects.toThrow("Rate limited on retry");
+
+    await expect(
+      callClaude({ prompt: "test", schema: TestSchema, model: "claude-haiku-4-5-20251001", maxTokens: 512 }).catch((e) => {
+        if (e instanceof NonRetriableError) throw new Error("Should not be NonRetriableError");
+        throw e;
+      })
+    ).rejects.toThrow();
   });
 });
 

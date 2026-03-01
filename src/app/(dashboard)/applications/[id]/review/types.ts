@@ -16,6 +16,7 @@ export interface AnswerAnalysis {
     criterion_id: string;
     relevance: string;
     notes?: string;
+    confidence?: string;
   }>;
   strengths: string[];
   weaknesses: string[];
@@ -50,6 +51,7 @@ export interface CrossReferenceFinding {
   criteria_involved?: string[];
   severity: string;
   suggestion?: string;
+  confidence?: string;
 }
 
 export interface GapCriterion {

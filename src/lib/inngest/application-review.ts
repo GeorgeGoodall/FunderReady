@@ -326,6 +326,7 @@ export const applicationReviewRequested = inngest.createFunction(
             schema: LenientAnswerAnalysisSchema,
             model: MODEL,
             maxTokens: 8192,
+            temperature: 0,
             onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
               stepUsage.push({
                 applicationReviewId: reviewId,
@@ -400,7 +401,7 @@ export const applicationReviewRequested = inngest.createFunction(
 
     const crossRefResult = await step.run("cross-reference", async () => {
       const stepUsage: LogAiUsageParams[] = [];
-      const prompt = buildApplicationCrossReferencePrompt(
+      const { systemPrompt, userPrompt } = buildApplicationCrossReferencePrompt(
         answerAnalyses,
         questions.map((q) => ({ id: q.id, question: q.question })),
         criteria,
@@ -408,10 +409,12 @@ export const applicationReviewRequested = inngest.createFunction(
       );
 
       const result = await callClaude({
-        prompt,
+        prompt: userPrompt,
+        systemPrompt,
         schema: CrossReferenceSchema,
         model: MODEL,
         maxTokens: 16384,
+        temperature: 0,
         onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
           stepUsage.push({
             applicationReviewId: reviewId,
@@ -468,7 +471,7 @@ export const applicationReviewRequested = inngest.createFunction(
 
     const scoringResult = await step.run("scoring", async () => {
       const stepUsage: LogAiUsageParams[] = [];
-      const prompt = buildApplicationScoringPrompt(
+      const { systemPrompt: scoringSystemPrompt, userPrompt: scoringUserPrompt } = buildApplicationScoringPrompt(
         answerAnalyses,
         crossReferenceWithGaps,
         questions.map((q) => ({ id: q.id, question: q.question })),
@@ -478,10 +481,12 @@ export const applicationReviewRequested = inngest.createFunction(
       );
 
       const result = await callClaude({
-        prompt,
+        prompt: scoringUserPrompt,
+        systemPrompt: scoringSystemPrompt,
         schema: ApplicationScoringSchema,
         model: MODEL,
         maxTokens: 16384,
+        temperature: 0,
         onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
           stepUsage.push({
             applicationReviewId: reviewId,

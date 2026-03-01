@@ -126,6 +126,8 @@ interface CallClaudeOptions<T> {
   allowPartial?: boolean;
   /** Called after each Claude API call with token usage data */
   onUsage?: (usage: ClaudeUsageData, isRetry: boolean) => void;
+  /** Sampling temperature (0 = deterministic). Omitted from API call when undefined. */
+  temperature?: number;
 }
 
 const TOOL_NAME = "structured_output";
@@ -168,7 +170,7 @@ function isTransientError(error: unknown): boolean {
 export async function callClaude<T>(options: CallClaudeOptions<T> & { allowPartial: true }): Promise<T | null>;
 export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T>;
 export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | null> {
-  const { prompt, systemPrompt, schema, model, maxTokens, allowPartial, onUsage } = options;
+  const { prompt, systemPrompt, schema, model, maxTokens, allowPartial, onUsage, temperature } = options;
 
   const client = getClient();
   const tool = buildTool(schema);
@@ -192,6 +194,7 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
     message = await client.messages.create({
       model,
       max_tokens: maxTokens,
+      ...(temperature !== undefined && { temperature }),
       system: systemPrompt || undefined,
       messages: [{ role: "user", content: prompt }],
       tools: [tool],
@@ -236,6 +239,7 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
       retryMessage = await client.messages.create({
         model,
         max_tokens: maxTokens,
+        ...(temperature !== undefined && { temperature }),
         system: systemPrompt || undefined,
         messages: [
           { role: "user", content: prompt },

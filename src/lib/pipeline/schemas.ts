@@ -47,6 +47,7 @@ export const CrossReferenceFindingSchema = z.object({
   criteria_involved: z.array(z.string()).optional(),
   severity: z.enum(["high", "medium", "low"]),
   suggestion: z.string().optional(),
+  confidence: z.enum(["high", "medium", "low"]).optional(),
 });
 
 export const GapCriterionSchema = z.object({
@@ -120,6 +121,7 @@ export const AnswerAnalysisSchema = z.object({
       criterion_id: z.string(),
       relevance: z.enum(["directly_addresses", "partially_addresses", "not_relevant"]),
       notes: z.string().optional(),
+      confidence: z.enum(["high", "medium", "low"]).optional(),
     })
   ),
   strengths: z.array(z.string()),
