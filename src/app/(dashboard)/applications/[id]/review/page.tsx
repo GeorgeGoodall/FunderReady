@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ApplicationReviewClient } from "./ApplicationReviewClient";
+import type { TabId } from "./types";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +10,10 @@ export default async function ApplicationReviewPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ reviewNumber?: string }>;
+  searchParams: Promise<{ reviewNumber?: string; tab?: string }>;
 }) {
   const { id } = await params;
-  const { reviewNumber: reviewNumberParam } = await searchParams;
+  const { reviewNumber: reviewNumberParam, tab: tabParam } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -94,6 +95,9 @@ export default async function ApplicationReviewPage({
     }
   }
 
+  const validTabs: TabId[] = ["summary", "answers", "cross-ref"];
+  const defaultTab: TabId = validTabs.includes(tabParam as TabId) ? (tabParam as TabId) : "summary";
+
   return (
     <ApplicationReviewClient
       application={application}
@@ -115,6 +119,7 @@ export default async function ApplicationReviewPage({
         created_at: review.created_at,
       } : null}
       isHistorical={isHistorical}
+      defaultTab={defaultTab}
     />
   );
 }
