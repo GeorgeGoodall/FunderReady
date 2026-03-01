@@ -530,11 +530,12 @@ export function ApplicationReviewClient({
           <div id="section-answers">
             <h3 className="mb-4 text-lg font-semibold">Answer Feedback</h3>
             <div className="space-y-4">
-              {questions.map((q) => {
+              {questions.map((q, qIndex) => {
                 const isQDisabled = disabledQuestionIds.has(q.id);
                 const feedback = answer_feedback?.[q.id];
                 const answer = answers.find((a) => a.question_id === q.id);
                 const isOutdated = outdatedMap[q.id] ?? false;
+                const questionNumber = qIndex + 1;
 
                 if (isQDisabled) {
                   return (
@@ -552,6 +553,7 @@ export function ApplicationReviewClient({
                 return (
                   <div key={q.id} id={`answer-${q.id}`}>
                     <AnswerFeedbackCard
+                      questionNumber={questionNumber}
                       question={q}
                       answer={answer?.last_reviewed_text ?? answer?.answer_text ?? ""}
                       feedback={feedback}
@@ -660,11 +662,13 @@ function Header({
 // ---------------------------------------------------------------------------
 
 function AnswerFeedbackCard({
+  questionNumber,
   question,
   answer,
   feedback,
   isOutdated,
 }: {
+  questionNumber: number;
   question: { id: string; question: string; guidance?: string };
   answer: string;
   feedback: AnswerAnalysis;
@@ -680,16 +684,20 @@ function AnswerFeedbackCard({
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center justify-between px-5 py-3 text-left"
       >
-        <div className="flex items-center gap-3">
-          <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${SCORE_COLOURS[feedback.answer_score] ?? ""}`}>
-            {feedback.answer_score}
-          </span>
-          <span className="text-sm font-medium">{question.question}</span>
-          {isOutdated && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-              Changed since review
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${SCORE_COLOURS[feedback.answer_score] ?? ""}`}>
+              {feedback.answer_score}
             </span>
-          )}
+            {isOutdated && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                Changed since review
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <span className="text-zinc-400 dark:text-zinc-500">{questionNumber}.</span> {question.question}
+          </p>
         </div>
         <svg
           className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${expanded ? "rotate-180" : ""}`}
