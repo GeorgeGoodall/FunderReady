@@ -50,6 +50,12 @@ export default async function ApplicationPage({
     .eq("id", application.questions_set_id)
     .single();
 
+  const { data: criteriaSet } = await supabase
+    .from("criteria_sets")
+    .select("id, criteria_json")
+    .eq("id", application.criteria_set_id)
+    .single();
+
   // Fetch all approved questions sets for this fund (for swap UI)
   const serviceClient = createServiceClient();
   const { data: availableSetsRaw } = await serviceClient
@@ -73,6 +79,7 @@ export default async function ApplicationPage({
       fund={fund}
       questionsSet={questionsSet}
       availableQuestionsSets={availableQuestionsSets}
+      criteriaSet={criteriaSet}
     />
   );
 }

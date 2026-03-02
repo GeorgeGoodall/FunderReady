@@ -4,6 +4,9 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormField } from "@/components/FormField";
+import { ImportResultModal } from "@/components/ImportResultModal";
+import { generateMarkdown, getExportFilename, type ExportCriterion } from "@/lib/markdown-export";
+import { parseMarkdown, validateImportMetadata, MAX_IMPORT_FILE_SIZE, type ParseResult } from "@/lib/markdown-import";
 import type { Json } from "@/types/database";
 
 interface Question {
@@ -59,12 +62,18 @@ interface QuestionsSetData {
   approved: boolean | null;
 }
 
+interface CriteriaSetData {
+  id: string;
+  criteria_json: Json;
+}
+
 interface ApplicationFormClientProps {
   application: ApplicationData;
   answers: AnswerData[];
   fund: FundData | null;
   questionsSet: QuestionsSetData | null;
   availableQuestionsSets?: AvailableQuestionsSet[];
+  criteriaSet?: CriteriaSetData | null;
 }
 
 export function ApplicationFormClient({
@@ -73,6 +82,7 @@ export function ApplicationFormClient({
   fund,
   questionsSet,
   availableQuestionsSets = [],
+  criteriaSet,
 }: ApplicationFormClientProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -324,6 +334,85 @@ export function ApplicationFormClient({
     } finally {
       setDeleting(false);
     }
+  };
+
+  // Markdown export/import
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importResult, setImportResult] = useState<ParseResult | null>(null);
+
+  const handleExport = () => {
+    if (!fund) return;
+
+    const criteria: ExportCriterion[] = Array.isArray(criteriaSet?.criteria_json)
+      ? (criteriaSet.criteria_json as unknown as ExportCriterion[])
+      : [];
+
+    const md = generateMarkdown({
+      application: { id: application.id, title: application.title },
+      fund: { id: fund.id, name: fund.name, organisation: fund.organisation },
+      criteria,
+      questions,
+      answerMap,
+      optionsMap,
+      disabledMap,
+      questionsSetId: application.questions_set_id,
+    });
+
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = getExportFilename(fund.name, application.title, application.id);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_IMPORT_FILE_SIZE) {
+      setError("File is too large. Maximum size is 2 MB.");
+      e.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const content = reader.result as string;
+      const parsed = parseMarkdown(content, questions);
+      const validated = validateImportMetadata(parsed, application.id, application.questions_set_id);
+      setImportResult(validated);
+    };
+    reader.readAsText(file);
+
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
+  };
+
+  const applyImport = (result: ParseResult) => {
+    const newAnswerMap = { ...answerMap };
+    const newOptionsMap = { ...optionsMap };
+    const newDisabledMap = { ...disabledMap };
+
+    for (const a of result.answers) {
+      newAnswerMap[a.question_id] = a.answer_text;
+      if (a.selected_options) {
+        newOptionsMap[a.question_id] = a.selected_options;
+      }
+      newDisabledMap[a.question_id] = a.is_disabled;
+    }
+
+    setAnswerMap(newAnswerMap);
+    setOptionsMap(newOptionsMap);
+    setDisabledMap(newDisabledMap);
+    dirtyRef.current = true;
+    setImportResult(null);
+
+    // Trigger save
+    setTimeout(() => saveAnswers(), 0);
   };
 
   const isReviewing = application.status === "submitted_for_review" || application.status === "reviewing";
@@ -593,6 +682,31 @@ export function ApplicationFormClient({
             Update Questions
           </Link>
         )}
+        {(isDraft || isReviewed) && fund && (
+          <>
+            <button
+              type="button"
+              onClick={handleExport}
+              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Export Markdown
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Import Markdown
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".md,text/markdown"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+          </>
+        )}
         {application.review_count > 1 && (
           <Link
             href={`/applications/${application.id}/history`}
@@ -658,6 +772,15 @@ export function ApplicationFormClient({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Import result modal */}
+      {importResult && (
+        <ImportResultModal
+          result={importResult}
+          onConfirm={() => applyImport(importResult)}
+          onCancel={() => setImportResult(null)}
+        />
       )}
 
       {/* Swap questions set confirmation modal */}
