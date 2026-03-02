@@ -5,6 +5,20 @@ import type { AnswerAnalysis } from "../types";
 import { SCORE_COLOURS } from "../constants";
 import { CopyButton } from "@/components/CopyButton";
 import { HighlightedText } from "./HighlightedText";
+import { FeedbackButton } from "./FeedbackButton";
+
+interface AnswerFeedbackCardProps {
+  questionNumber: number;
+  question: { id: string; question: string; guidance?: string };
+  answer: string;
+  feedback: AnswerAnalysis;
+  isOutdated: boolean;
+  defaultExpanded?: boolean;
+  reviewId?: string;
+  applicationId?: string;
+  feedbackMap?: Record<string, "up" | "down">;
+  onFeedbackChange?: (itemPath: string, sentiment: "up" | "down" | null) => void;
+}
 
 export function AnswerFeedbackCard({
   questionNumber,
@@ -13,14 +27,11 @@ export function AnswerFeedbackCard({
   feedback,
   isOutdated,
   defaultExpanded = false,
-}: {
-  questionNumber: number;
-  question: { id: string; question: string; guidance?: string };
-  answer: string;
-  feedback: AnswerAnalysis;
-  isOutdated: boolean;
-  defaultExpanded?: boolean;
-}) {
+  reviewId,
+  applicationId,
+  feedbackMap,
+  onFeedbackChange,
+}: AnswerFeedbackCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   return (
@@ -62,7 +73,15 @@ export function AnswerFeedbackCard({
               <span className="text-xs font-medium text-zinc-500">Your answer:</span>
               {answer.trim() && <CopyButton text={answer} />}
             </div>
-            <HighlightedText text={answer} comments={feedback.inline_comments} />
+            <HighlightedText
+              text={answer}
+              comments={feedback.inline_comments}
+              questionId={question.id}
+              reviewId={reviewId}
+              applicationId={applicationId}
+              feedbackMap={feedbackMap}
+              onFeedbackChange={onFeedbackChange}
+            />
           </div>
 
           {/* Strengths */}
@@ -71,8 +90,19 @@ export function AnswerFeedbackCard({
               <h4 className="text-xs font-semibold text-green-700 dark:text-green-400">Strengths</h4>
               <ul className="mt-1 space-y-1">
                 {feedback.strengths.map((s, i) => (
-                  <li key={i} className="flex gap-2 text-xs text-zinc-700 dark:text-zinc-300">
-                    <span className="text-green-500">+</span>{s}
+                  <li key={i} className="flex items-start gap-2 text-xs text-zinc-700 dark:text-zinc-300">
+                    <span className="text-green-500">+</span>
+                    <span className="flex-1">{s}</span>
+                    {reviewId && applicationId && (
+                      <FeedbackButton
+                        reviewId={reviewId}
+                        applicationId={applicationId}
+                        itemPath={`answer_feedback/${question.id}/strengths/${i}`}
+                        itemType="strength"
+                        currentSentiment={feedbackMap?.[`answer_feedback/${question.id}/strengths/${i}`] ?? null}
+                        onSentimentChange={onFeedbackChange}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -85,8 +115,19 @@ export function AnswerFeedbackCard({
               <h4 className="text-xs font-semibold text-red-700 dark:text-red-400">Weaknesses</h4>
               <ul className="mt-1 space-y-1">
                 {feedback.weaknesses.map((s, i) => (
-                  <li key={i} className="flex gap-2 text-xs text-zinc-700 dark:text-zinc-300">
-                    <span className="text-red-500">-</span>{s}
+                  <li key={i} className="flex items-start gap-2 text-xs text-zinc-700 dark:text-zinc-300">
+                    <span className="text-red-500">-</span>
+                    <span className="flex-1">{s}</span>
+                    {reviewId && applicationId && (
+                      <FeedbackButton
+                        reviewId={reviewId}
+                        applicationId={applicationId}
+                        itemPath={`answer_feedback/${question.id}/weaknesses/${i}`}
+                        itemType="weakness"
+                        currentSentiment={feedbackMap?.[`answer_feedback/${question.id}/weaknesses/${i}`] ?? null}
+                        onSentimentChange={onFeedbackChange}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>

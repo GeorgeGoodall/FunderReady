@@ -6,6 +6,8 @@ import {
   buildApplicationScoringPrompt,
   formatAnswerAnalysesSummary,
   formatAnswerAnalysesForScoring,
+  formatPreviousAnswerContext,
+  formatPreviousOverallContext,
   type AnswerContext,
 } from "../application-prompts";
 import type { AnswerAnalysis } from "../schemas";
@@ -693,13 +695,14 @@ describe("buildApplicationCrossReferencePrompt — content details", () => {
     expect(userPrompt).toContain('q2: "Describe your approach"');
   });
 
-  it("user prompt includes answer analyses summaries with inline comments", () => {
+  it("user prompt includes answer analyses summaries without inline comments", () => {
     const { userPrompt } = buildApplicationCrossReferencePrompt(
       sampleAnalyses, sampleQuestions, sampleCriteria
     );
-    // Cross-ref should use formatAnswerAnalysesSummary which includes issues
-    expect(userPrompt).toContain("Issues flagged:");
-    expect(userPrompt).toContain("[EVIDENCE]");
+    // Cross-ref now uses formatAnswerAnalysesForScoring which strips inline_comments
+    expect(userPrompt).not.toContain("Issues flagged:");
+    expect(userPrompt).toContain("Score: Fair");
+    expect(userPrompt).toContain("Strengths:");
   });
 
   it("includes disabled questions section when provided", () => {
@@ -931,32 +934,295 @@ describe("SCORING_CALIBRATION_EXAMPLES constant", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildAnswerAnalysisSystemPrompt", () => {
-  it("returns a CacheBlock array with one element", () => {
+  it("returns two CacheBlock elements (static + fund-specific)", () => {
     const blocks = buildAnswerAnalysisSystemPrompt([{ id: "c1", criterion: "Need" }]);
-    expect(blocks).toHaveLength(1);
+    expect(blocks).toHaveLength(2);
     expect(blocks[0].type).toBe("text");
     expect(blocks[0].cache_control).toEqual({ type: "ephemeral" });
+    expect(blocks[1].type).toBe("text");
+    expect(blocks[1].cache_control).toEqual({ type: "ephemeral" });
   });
 
-  it("includes SYSTEM_PERSONA, SCORING_RUBRIC, and criteria text", () => {
+  it("static block includes SYSTEM_PERSONA, SCORING_RUBRIC but not criteria", () => {
     const blocks = buildAnswerAnalysisSystemPrompt([
       { id: "c1", criterion: "Clear need" },
       { id: "c2", criterion: "Sound approach" },
     ]);
     expect(blocks[0].text).toContain("experienced grant reviewer");
     expect(blocks[0].text).toContain("Scoring Rubric");
-    expect(blocks[0].text).toContain("Clear need");
-    expect(blocks[0].text).toContain("Sound approach");
+    expect(blocks[0].text).not.toContain("Clear need");
   });
 
-  it("includes comment examples and categories", () => {
+  it("fund-specific block contains criteria text", () => {
+    const blocks = buildAnswerAnalysisSystemPrompt([
+      { id: "c1", criterion: "Clear need" },
+      { id: "c2", criterion: "Sound approach" },
+    ]);
+    expect(blocks[1].text).toContain("Clear need");
+    expect(blocks[1].text).toContain("Sound approach");
+  });
+
+  it("includes comment examples and categories in static block", () => {
     const blocks = buildAnswerAnalysisSystemPrompt([{ id: "c1", criterion: "Need" }]);
     expect(blocks[0].text).toContain("Comment Examples");
     expect(blocks[0].text).toContain("Comment Categories");
   });
 
-  it("includes anti-hallucination rules", () => {
+  it("includes anti-hallucination rules in static block", () => {
     const blocks = buildAnswerAnalysisSystemPrompt([{ id: "c1", criterion: "Need" }]);
     expect(blocks[0].text).toContain("Critical Rules");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Feedback Evolution: formatPreviousAnswerContext
+// ---------------------------------------------------------------------------
+
+describe("formatPreviousAnswerContext", () => {
+  const previousResults = {
+    answer_feedback: {
+      q1: {
+        answer_score: "Fair",
+        weaknesses: ["No quantitative data", "Vague partner references"],
+      },
+      q2: {
+        answer_score: "Strong",
+        weaknesses: [],
+      },
+    },
+    scoring: {
+      overall_score: 62,
+      submission_readiness: "Needs revisions",
+      top_improvements: ["Add evidence", "Strengthen partnerships section"],
+    },
+  };
+
+  it("returns context with score and weaknesses when data exists", () => {
+    const result = formatPreviousAnswerContext("q1", previousResults, false, 2);
+    expect(result).not.toBeNull();
+    expect(result).toContain('"Fair"');
+    expect(result).toContain("No quantitative data");
+    expect(result).toContain("Vague partner references");
+  });
+
+  it("returns null when no data for question", () => {
+    const result = formatPreviousAnswerContext("q99", previousResults, false, 2);
+    expect(result).toBeNull();
+  });
+
+  it('includes "modified since" when answer changed', () => {
+    const result = formatPreviousAnswerContext("q1", previousResults, true, 2);
+    expect(result).toContain("modified since");
+    expect(result).not.toContain("not changed since");
+  });
+
+  it('includes "not changed since" when answer unchanged', () => {
+    const result = formatPreviousAnswerContext("q1", previousResults, false, 2);
+    expect(result).toContain("not changed since");
+    expect(result).not.toContain("modified since");
+  });
+
+  it("includes review number", () => {
+    const result = formatPreviousAnswerContext("q1", previousResults, false, 3);
+    expect(result).toContain("review #3");
+  });
+
+  it("omits weaknesses section when no weaknesses", () => {
+    const result = formatPreviousAnswerContext("q2", previousResults, false, 2);
+    expect(result).not.toBeNull();
+    expect(result).toContain('"Strong"');
+    expect(result).not.toContain("Previous weaknesses flagged:");
+  });
+
+  it("includes instructions about acknowledging improvements", () => {
+    const result = formatPreviousAnswerContext("q1", previousResults, true, 2);
+    expect(result).toContain("Acknowledge improvements");
+    expect(result).toContain("still outstanding");
+  });
+
+  it("handles undefined weaknesses (key missing entirely)", () => {
+    const results = {
+      answer_feedback: {
+        q10: { answer_score: "Good" },
+      },
+    };
+    const result = formatPreviousAnswerContext("q10", results, false, 2);
+    expect(result).not.toBeNull();
+    expect(result).toContain('"Good"');
+    expect(result).not.toContain("Previous weaknesses flagged:");
+  });
+
+  it("returns null when answer_feedback is not an object", () => {
+    expect(formatPreviousAnswerContext("q1", { answer_feedback: "bad" }, false, 2)).toBeNull();
+    expect(formatPreviousAnswerContext("q1", { answer_feedback: null }, false, 2)).toBeNull();
+  });
+
+  it("returns null when question entry is not an object", () => {
+    const results = { answer_feedback: { q1: "not-an-object" } };
+    expect(formatPreviousAnswerContext("q1", results, false, 2)).toBeNull();
+  });
+
+  it("defaults answer_score to Unknown when missing", () => {
+    const results = { answer_feedback: { q1: { weaknesses: ["issue"] } } };
+    const result = formatPreviousAnswerContext("q1", results, false, 2);
+    expect(result).toContain('"Unknown"');
+  });
+
+  it("filters out non-string weaknesses", () => {
+    const results = {
+      answer_feedback: { q1: { answer_score: "Fair", weaknesses: ["valid", 123, null, "also valid"] } },
+    };
+    const result = formatPreviousAnswerContext("q1", results, false, 2);
+    expect(result).toContain("valid");
+    expect(result).toContain("also valid");
+    expect(result).not.toContain("123");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Feedback Evolution: formatPreviousOverallContext
+// ---------------------------------------------------------------------------
+
+describe("formatPreviousOverallContext", () => {
+  const previousResults = {
+    answer_feedback: {},
+    scoring: {
+      overall_score: 62,
+      submission_readiness: "Needs revisions",
+      top_improvements: ["Add evidence", "Strengthen partnerships section"],
+    },
+  };
+
+  it("returns overall score and top improvements", () => {
+    const result = formatPreviousOverallContext(previousResults, 2);
+    expect(result).not.toBeNull();
+    expect(result).toContain("62/100");
+    expect(result).toContain("Needs revisions");
+    expect(result).toContain("Add evidence");
+    expect(result).toContain("Strengthen partnerships section");
+  });
+
+  it("returns null when no previous results (no scoring)", () => {
+    const result = formatPreviousOverallContext({}, 2);
+    expect(result).toBeNull();
+  });
+
+  it("includes review number", () => {
+    const result = formatPreviousOverallContext(previousResults, 3);
+    expect(result).toContain("review #3");
+  });
+
+  it("includes trajectory instruction", () => {
+    const result = formatPreviousOverallContext(previousResults, 2);
+    expect(result).toContain("score trajectory context");
+  });
+
+  it("handles overall_score of 0 (falsy but valid)", () => {
+    const results = { scoring: { overall_score: 0, submission_readiness: "Not ready" } };
+    const result = formatPreviousOverallContext(results, 2);
+    expect(result).not.toBeNull();
+    expect(result).toContain("0/100");
+    expect(result).toContain("Not ready");
+  });
+
+  it("handles missing top_improvements", () => {
+    const results = { scoring: { overall_score: 50 } };
+    const result = formatPreviousOverallContext(results, 2);
+    expect(result).not.toBeNull();
+    expect(result).toContain("50/100");
+    expect(result).not.toContain("Previous top improvements recommended:");
+  });
+
+  it("returns null when scoring is not an object", () => {
+    expect(formatPreviousOverallContext({ scoring: "bad" }, 2)).toBeNull();
+    expect(formatPreviousOverallContext({ scoring: null }, 2)).toBeNull();
+  });
+
+  it("defaults overall_score to N/A when not a number", () => {
+    const results = { scoring: { overall_score: "high", submission_readiness: "Good" } };
+    const result = formatPreviousOverallContext(results, 2);
+    expect(result).toContain("N/A/100");
+  });
+
+  it("defaults submission_readiness to Unknown when not a string", () => {
+    const results = { scoring: { overall_score: 70 } };
+    const result = formatPreviousOverallContext(results, 2);
+    expect(result).toContain('"Unknown"');
+  });
+
+  it("filters out non-string top_improvements", () => {
+    const results = {
+      scoring: { overall_score: 50, top_improvements: ["valid", 123, null, "also valid"] },
+    };
+    const result = formatPreviousOverallContext(results, 2);
+    expect(result).toContain("valid");
+    expect(result).toContain("also valid");
+    expect(result).not.toContain("123");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Feedback Evolution: buildAnswerAnalysisPrompt with previous context
+// ---------------------------------------------------------------------------
+
+describe("buildAnswerAnalysisPrompt — previous context", () => {
+  it("includes previous context section when provided", () => {
+    const prevContext = "## Previous Review Context\n\nThis is review #2.";
+    const prompt = buildAnswerAnalysisPrompt(makeAnswer(), prevContext);
+    expect(prompt).toContain("## Previous Review Context");
+    expect(prompt).toContain("This is review #2.");
+  });
+
+  it("wraps previous context in <prior_review_output> tags", () => {
+    const prevContext = "## Previous Review Context\n\nThis is review #2.";
+    const prompt = buildAnswerAnalysisPrompt(makeAnswer(), prevContext);
+    expect(prompt).toContain("<prior_review_output>");
+    expect(prompt).toContain("</prior_review_output>");
+    expect(prompt).toContain("content within <prior_review_output> tags");
+  });
+
+  it("omits previous context section when not provided", () => {
+    const prompt = buildAnswerAnalysisPrompt(makeAnswer());
+    expect(prompt).not.toContain("Previous Review Context");
+    expect(prompt).not.toContain("<prior_review_output>");
+  });
+
+  it("omits previous context section when null", () => {
+    const prompt = buildAnswerAnalysisPrompt(makeAnswer(), null);
+    expect(prompt).not.toContain("Previous Review Context");
+    expect(prompt).not.toContain("<prior_review_output>");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Feedback Evolution: buildApplicationScoringPrompt with previous context
+// ---------------------------------------------------------------------------
+
+describe("buildApplicationScoringPrompt — previous context", () => {
+  const crossRef = { findings: [], overall_coherence: "strong", summary: "Good" };
+
+  it("includes previous context section when provided", () => {
+    const prevContext = "## Previous Review Context\n\nThe previous review scored 62/100.";
+    const { userPrompt } = buildApplicationScoringPrompt(
+      sampleAnalyses, crossRef, sampleQuestions, sampleCriteria,
+      undefined, [], prevContext
+    );
+    expect(userPrompt).toContain("## Previous Review Context");
+    expect(userPrompt).toContain("previous review scored 62/100");
+  });
+
+  it("omits previous context section when not provided", () => {
+    const { userPrompt } = buildApplicationScoringPrompt(
+      sampleAnalyses, crossRef, sampleQuestions, sampleCriteria
+    );
+    expect(userPrompt).not.toContain("Previous Review Context");
+  });
+
+  it("omits previous context section when null", () => {
+    const { userPrompt } = buildApplicationScoringPrompt(
+      sampleAnalyses, crossRef, sampleQuestions, sampleCriteria,
+      undefined, [], null
+    );
+    expect(userPrompt).not.toContain("Previous Review Context");
   });
 });

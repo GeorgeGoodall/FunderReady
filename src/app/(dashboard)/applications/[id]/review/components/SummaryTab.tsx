@@ -7,6 +7,7 @@ import { SCORE_COLOURS, SCORE_ORDER, READINESS_COLOURS } from "../constants";
 import { InlineRefs } from "./InlineRefs";
 import { QualityDimensionBars } from "./QualityDimensionBars";
 import { ImprovementDetail } from "./ImprovementDetail";
+import { FeedbackButton } from "./FeedbackButton";
 
 export function SummaryTab({
   applicationId,
@@ -15,6 +16,9 @@ export function SummaryTab({
   gap_count,
   questionMap,
   criteriaMap,
+  reviewId,
+  feedbackMap,
+  onFeedbackChange,
 }: {
   applicationId: string;
   scoring: ApplicationScoring;
@@ -22,6 +26,9 @@ export function SummaryTab({
   gap_count: ReviewResults["gap_count"];
   questionMap: Map<string, string>;
   criteriaMap: Map<string, string>;
+  reviewId?: string;
+  feedbackMap?: Record<string, "up" | "down">;
+  onFeedbackChange?: (itemPath: string, sentiment: "up" | "down" | null) => void;
 }) {
   const hasGaps = (gap_count ?? 0) > 0 && projected_score !== undefined;
 
@@ -102,6 +109,10 @@ export function SummaryTab({
         appendixMap={appendixMap}
         questionMap={questionMap}
         criteriaMap={criteriaMap}
+        reviewId={reviewId}
+        applicationId={applicationId}
+        feedbackMap={feedbackMap}
+        onFeedbackChange={onFeedbackChange}
       />
 
     </div>
@@ -117,11 +128,19 @@ function CriteriaScoresSection({
   appendixMap,
   questionMap,
   criteriaMap,
+  reviewId,
+  applicationId,
+  feedbackMap,
+  onFeedbackChange,
 }: {
   criteriaScores: ApplicationScoring["criteria_scores"];
   appendixMap: Map<string, ImprovementAppendixItem>;
   questionMap: Map<string, string>;
   criteriaMap: Map<string, string>;
+  reviewId?: string;
+  applicationId?: string;
+  feedbackMap?: Record<string, "up" | "down">;
+  onFeedbackChange?: (itemPath: string, sentiment: "up" | "down" | null) => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(false); // false = worst first
@@ -183,6 +202,19 @@ function CriteriaScoresSection({
                   )}
                 </div>
               </div>
+
+              {reviewId && applicationId && (
+                <div className="px-5 pb-2">
+                  <FeedbackButton
+                    reviewId={reviewId}
+                    applicationId={applicationId}
+                    itemPath={`criteria_scores/${cs.criterion_id}`}
+                    itemType="criteria_score"
+                    currentSentiment={feedbackMap?.[`criteria_scores/${cs.criterion_id}`] ?? null}
+                    onSentimentChange={onFeedbackChange}
+                  />
+                </div>
+              )}
 
               {isExpanded && appendixItem && (
                 <div className="border-t border-zinc-100 bg-zinc-50/50 px-5 py-4 dark:border-zinc-800 dark:bg-zinc-800/30">

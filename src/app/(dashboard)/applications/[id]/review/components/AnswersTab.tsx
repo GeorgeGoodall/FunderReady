@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import type { AnswerAnalysis } from "../types";
+import { GOOD_SCORES } from "../constants";
 import { AnswerFeedbackCard } from "./AnswerFeedbackCard";
-
-const GOOD_SCORES = new Set(["Excellent", "Strong"]);
 
 export function AnswersTab({
   questions,
@@ -12,12 +11,20 @@ export function AnswersTab({
   answerFeedback,
   outdatedMap,
   disabledQuestionIds,
+  reviewId,
+  applicationId,
+  feedbackMap,
+  onFeedbackChange,
 }: {
   questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number }>;
   answers: Array<{ question_id: string; answer_text: string; last_reviewed_text: string | null; is_disabled?: boolean | null }>;
   answerFeedback: Record<string, AnswerAnalysis>;
   outdatedMap: Record<string, boolean>;
   disabledQuestionIds: Set<string>;
+  reviewId?: string;
+  applicationId?: string;
+  feedbackMap?: Record<string, "up" | "down">;
+  onFeedbackChange?: (itemPath: string, sentiment: "up" | "down" | null) => void;
 }) {
   const [filter, setFilter] = useState<"all" | "needs-attention">("needs-attention");
 
@@ -100,6 +107,10 @@ export function AnswersTab({
             answer={answer?.last_reviewed_text ?? answer?.answer_text ?? ""}
             feedback={feedback}
             isOutdated={isOutdated}
+            reviewId={reviewId}
+            applicationId={applicationId}
+            feedbackMap={feedbackMap}
+            onFeedbackChange={onFeedbackChange}
           />
         );
       })}

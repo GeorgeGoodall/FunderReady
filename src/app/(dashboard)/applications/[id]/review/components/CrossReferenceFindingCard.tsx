@@ -4,15 +4,26 @@ import type { CrossReferenceFinding } from "../types";
 import { SEVERITY_COLOURS } from "../constants";
 import { ReferenceTag } from "./ReferenceTag";
 import { InlineRefs } from "./InlineRefs";
+import { FeedbackButton } from "./FeedbackButton";
 
 export function CrossReferenceFindingCard({
   finding,
+  findingIndex,
   questionMap,
   criteriaMap,
+  reviewId,
+  applicationId,
+  feedbackMap,
+  onFeedbackChange,
 }: {
   finding: CrossReferenceFinding;
+  findingIndex: number;
   questionMap: Map<string, string>;
   criteriaMap: Map<string, string>;
+  reviewId?: string;
+  applicationId?: string;
+  feedbackMap?: Record<string, "up" | "down">;
+  onFeedbackChange?: (itemPath: string, sentiment: "up" | "down" | null) => void;
 }) {
   return (
     <div className={`rounded-lg border p-4 ${SEVERITY_COLOURS[finding.severity] ?? SEVERITY_COLOURS.low}`}>
@@ -45,6 +56,18 @@ export function CrossReferenceFindingCard({
           <ReferenceTag key={cId} id={cId} type="criteria" fullText={criteriaMap.get(cId)} variant="chip" />
         ))}
       </div>
+      {reviewId && applicationId && (
+        <div className="mt-2">
+          <FeedbackButton
+            reviewId={reviewId}
+            applicationId={applicationId}
+            itemPath={`cross_reference/findings/${findingIndex}`}
+            itemType="cross_reference_finding"
+            currentSentiment={feedbackMap?.[`cross_reference/findings/${findingIndex}`] ?? null}
+            onSentimentChange={onFeedbackChange}
+          />
+        </div>
+      )}
     </div>
   );
 }

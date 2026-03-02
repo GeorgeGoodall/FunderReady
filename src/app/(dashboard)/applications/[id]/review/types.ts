@@ -2,99 +2,21 @@
 // Shared types for the review page
 // ---------------------------------------------------------------------------
 
-export interface AnswerInlineComment {
-  target_text: string;
-  category: string;
-  issue: string;
-  suggestion: string;
-}
+// Re-export Zod-inferred types from the pipeline schemas (single source of truth)
+export type {
+  AnswerInlineComment,
+  AnswerAnalysis,
+  CriterionScore,
+  AnswerScore,
+  CrossReferenceFinding,
+  GapCriterion,
+  CrossReference,
+  QualityDimension,
+  ImprovementAppendixItem,
+  ApplicationScoring,
+} from "@/lib/pipeline/schemas";
 
-export interface AnswerAnalysis {
-  question_id: string;
-  inline_comments: AnswerInlineComment[];
-  criteria_relevance: Array<{
-    criterion_id: string;
-    relevance: string;
-    notes?: string;
-    confidence?: string;
-  }>;
-  strengths: string[];
-  weaknesses: string[];
-  answer_score: string;
-  word_count_assessment?: {
-    actual: number;
-    limit?: number;
-    status: string;
-  };
-}
-
-export interface CriterionScore {
-  criterion_id: string;
-  criterion: string;
-  score: string;
-  bid_evidence: string[];
-  gaps: string[];
-  summary: string;
-}
-
-export interface AnswerScore {
-  question_id: string;
-  question_text: string;
-  score: string;
-  summary: string;
-}
-
-export interface CrossReferenceFinding {
-  type: string;
-  description: string;
-  sections_involved: string[];
-  criteria_involved?: string[];
-  severity: string;
-  suggestion?: string;
-  confidence?: string;
-}
-
-export interface GapCriterion {
-  criterion_id: string;
-  criterion: string;
-  related_disabled_question_ids: string[];
-  related_disabled_question_texts: string[];
-}
-
-export interface CrossReference {
-  findings: CrossReferenceFinding[];
-  overall_coherence: string;
-  summary: string;
-  gap_criteria?: GapCriterion[];
-}
-
-export interface QualityDimension {
-  dimension: string;
-  score: number | null;
-  summary: string;
-}
-
-export interface ImprovementAppendixItem {
-  criterion_id: string;
-  criterion: string;
-  what_funder_wants: string;
-  how_bid_addresses: string;
-  whats_missing: string;
-  example_language?: string;
-  gap_type?: "quick_fix" | "structural_gap";
-}
-
-export interface ApplicationScoring {
-  answer_scores: AnswerScore[];
-  criteria_scores: CriterionScore[];
-  overall_score: number;
-  overall_descriptor: string;
-  submission_readiness: string;
-  top_strengths: string[];
-  top_improvements: string[];
-  improvement_appendix?: ImprovementAppendixItem[];
-  quality_dimensions?: QualityDimension[];
-}
+import type { ApplicationScoring, CrossReference, AnswerAnalysis } from "@/lib/pipeline/schemas";
 
 export interface ReviewResults {
   answer_feedback: Record<string, AnswerAnalysis>;
@@ -129,6 +51,33 @@ export interface ApplicationReviewClientProps {
   } | null;
   isHistorical?: boolean;
   defaultTab?: TabId;
+  initialFeedback?: Record<string, "up" | "down">;
 }
 
 export type TabId = "summary" | "answers" | "cross-ref";
+
+// ---------------------------------------------------------------------------
+// Runtime type guards for Supabase JSON boundaries
+// ---------------------------------------------------------------------------
+
+/** Safely extract a number from an unknown record, returning a fallback on failure. */
+export function safeNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" ? value : fallback;
+}
+
+/**
+ * Validate that an unknown value has the required shape to be treated as ReviewResults.
+ * Returns the typed value or null if the shape is invalid.
+ */
+export function parseReviewResults(raw: Record<string, unknown> | null): ReviewResults | null {
+  if (!raw) return null;
+  const scoring = raw.scoring;
+  if (!scoring || typeof scoring !== "object") return null;
+  // Validate minimum required scoring fields
+  const s = scoring as Record<string, unknown>;
+  if (typeof s.overall_score !== "number" || !Array.isArray(s.criteria_scores)) return null;
+  // Validate answer_feedback and cross_reference exist as objects
+  if (!raw.answer_feedback || typeof raw.answer_feedback !== "object") return null;
+  if (!raw.cross_reference || typeof raw.cross_reference !== "object") return null;
+  return raw as unknown as ReviewResults;
+}

@@ -24,6 +24,8 @@ import {
   buildAnswerAnalysisPrompt,
   buildApplicationCrossReferencePrompt,
   buildApplicationScoringPrompt,
+  formatPreviousAnswerContext,
+  formatPreviousOverallContext,
   type AnswerContext,
 } from "@/lib/pipeline/application-prompts";
 import type { Criterion } from "@/lib/pipeline/prompt-templates";
@@ -42,7 +44,7 @@ const MODEL = "claude-sonnet-4-6";
 
 function sanitizeAnalysis(raw: unknown): unknown {
   if (!raw || typeof raw !== "object") return raw;
-  const obj = raw as Record<string, unknown>;
+  const obj = { ...(raw as Record<string, unknown>) };
   for (const key of ["inline_comments", "criteria_relevance", "strengths", "weaknesses"]) {
     if (obj[key] !== undefined && !Array.isArray(obj[key])) {
       obj[key] = [];
@@ -155,6 +157,86 @@ export function computeProjectedScore(
 }
 
 // ---------------------------------------------------------------------------
+// Pure helpers for previous review context (extracted for testability)
+// ---------------------------------------------------------------------------
+
+export interface TrimmedAnswerFeedback {
+  answer_score?: string;
+  weaknesses?: string[];
+}
+
+export interface TrimmedScoringContext {
+  overall_score?: number;
+  submission_readiness?: string;
+  top_improvements?: string[];
+}
+
+export interface TrimmedReviewResults {
+  answer_feedback?: Record<string, TrimmedAnswerFeedback>;
+  scoring?: TrimmedScoringContext;
+}
+
+/**
+ * Extract and trim previous review results to only the fields needed
+ * for feedback evolution prompts. Keeps Inngest step state small.
+ */
+export function trimPreviousReviewResults(
+  fullResults: Record<string, unknown>
+): TrimmedReviewResults {
+  const trimmed: TrimmedReviewResults = {};
+
+  // Extract per-answer scores and weaknesses
+  const af = fullResults.answer_feedback;
+  if (af && typeof af === "object") {
+    const trimmedFeedback: Record<string, TrimmedAnswerFeedback> = {};
+    for (const [qId, raw] of Object.entries(af as Record<string, unknown>)) {
+      if (raw && typeof raw === "object") {
+        const entry = raw as Record<string, unknown>;
+        trimmedFeedback[qId] = {
+          answer_score: typeof entry.answer_score === "string" ? entry.answer_score : undefined,
+          weaknesses: Array.isArray(entry.weaknesses)
+            ? entry.weaknesses.filter((w): w is string => typeof w === "string")
+            : undefined,
+        };
+      }
+    }
+    trimmed.answer_feedback = trimmedFeedback;
+  }
+
+  // Extract overall scoring summary
+  const sc = fullResults.scoring;
+  if (sc && typeof sc === "object") {
+    const scoring = sc as Record<string, unknown>;
+    trimmed.scoring = {
+      overall_score: typeof scoring.overall_score === "number" ? scoring.overall_score : undefined,
+      submission_readiness: typeof scoring.submission_readiness === "string" ? scoring.submission_readiness : undefined,
+      top_improvements: Array.isArray(scoring.top_improvements)
+        ? scoring.top_improvements.filter((v): v is string => typeof v === "string")
+        : undefined,
+    };
+  }
+
+  return trimmed;
+}
+
+/**
+ * Compute which answers have changed since the last review.
+ * Returns a map of question_id → boolean (true if answer text differs from last reviewed).
+ */
+export function computeAnswerChanges(
+  answers: Array<{ question_id: string; answer_text: string; last_reviewed_text?: string | null }>,
+): Record<string, boolean> {
+  const changes: Record<string, boolean> = {};
+  for (const a of answers) {
+    changes[a.question_id] =
+      a.last_reviewed_text !== null &&
+      a.last_reviewed_text !== undefined &&
+      a.answer_text !== a.last_reviewed_text;
+  }
+  return changes;
+}
+
+// ---------------------------------------------------------------------------
 // Pipeline function
 // ---------------------------------------------------------------------------
 
@@ -195,10 +277,10 @@ export const applicationReviewRequested = inngest.createFunction(
         throw new NonRetriableError(`Application not found: ${applicationId}`);
       }
 
-      // Load answers (including is_disabled)
+      // Load answers (including is_disabled and last_reviewed_text for change detection)
       const { data: answers, error: answersError } = await supabase
         .from("application_answers")
-        .select("question_id, answer_text, field_type, selected_options, is_disabled")
+        .select("question_id, answer_text, field_type, selected_options, is_disabled, last_reviewed_text")
         .eq("application_id", applicationId);
 
       if (answersError) {
@@ -226,6 +308,17 @@ export const applicationReviewRequested = inngest.createFunction(
       if (!questionsSet?.questions_json) {
         throw new NonRetriableError("Questions set not found or empty");
       }
+
+      // Load previous completed review (for feedback evolution)
+      const { data: prevReview } = await supabase
+        .from("application_reviews")
+        .select("review_number, results")
+        .eq("application_id", applicationId)
+        .eq("status", "completed")
+        .neq("id", reviewId)
+        .order("review_number", { ascending: false })
+        .limit(1)
+        .single();
 
       // Mark application as actively reviewing
       await supabase
@@ -262,6 +355,27 @@ export const applicationReviewRequested = inngest.createFunction(
         .filter((q) => disabledAnswerIds.has(q.id))
         .map((q) => ({ question_id: q.id, question_text: q.question }));
 
+      // Compute answer changes: which answers were modified since last review
+      const answerChanges = prevReview
+        ? computeAnswerChanges(allAnswers)
+        : {} as Record<string, boolean>;
+
+      // Extract only the fields needed for feedback evolution (keeps Inngest step state small)
+      let previousReviewContext: {
+        review_number: number;
+        results: Record<string, unknown>;
+      } | null = null;
+
+      if (prevReview?.results && typeof prevReview.results === "object") {
+        const trimmedResults = trimPreviousReviewResults(
+          prevReview.results as Record<string, unknown>
+        );
+        previousReviewContext = {
+          review_number: prevReview.review_number,
+          results: trimmedResults as unknown as Record<string, unknown>,
+        };
+      }
+
       return {
         title: app.title,
         criteria: criteriaSet.criteria_json as unknown as Criterion[],
@@ -269,10 +383,12 @@ export const applicationReviewRequested = inngest.createFunction(
         overallWordLimit: questionsSet.overall_word_limit ?? undefined,
         enabledAnswers,
         disabledQuestions,
+        previousReview: previousReviewContext,
+        answerChanges,
       };
     });
 
-    const { criteria, questions, enabledAnswers, disabledQuestions, overallWordLimit } = appData;
+    const { criteria, questions, enabledAnswers, disabledQuestions, overallWordLimit, previousReview, answerChanges } = appData;
 
     // Build answer contexts from enabled answers only
     const answerContexts: AnswerContext[] = [];
@@ -319,13 +435,22 @@ export const applicationReviewRequested = inngest.createFunction(
         const systemPrompt = buildAnswerAnalysisSystemPrompt(criteria);
 
         const analyseAnswer = (ctx: AnswerContext) => {
-          const prompt = buildAnswerAnalysisPrompt(ctx);
+          // Build previous context for feedback evolution (re-reviews)
+          const prevContext = previousReview
+            ? formatPreviousAnswerContext(
+                ctx.question_id,
+                previousReview.results,
+                answerChanges[ctx.question_id] ?? false,
+                previousReview.review_number + 1
+              )
+            : null;
+          const prompt = buildAnswerAnalysisPrompt(ctx, prevContext);
           return callClaude({
             prompt,
             systemPrompt,
             schema: LenientAnswerAnalysisSchema,
             model: MODEL,
-            maxTokens: 8192,
+            maxTokens: 12288,
             temperature: 0,
             onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
               stepUsage.push({
@@ -365,8 +490,8 @@ export const applicationReviewRequested = inngest.createFunction(
             .filter((i) => i !== -1);
           if (failedIndices.length === 0) break;
 
-          // Backoff before retrying (1s, then 2s)
-          await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 1000));
+          // Exponential backoff before retrying (2s, then 8s)
+          await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt + 1) * 1000));
 
           const retryContexts = failedIndices.map((i) => answerContexts[i]);
           const retryResults = await runBatched(retryContexts);
@@ -453,8 +578,8 @@ export const applicationReviewRequested = inngest.createFunction(
       .map((c) => ({
         criterion_id: c.id,
         criterion: c.criterion,
-        related_disabled_question_ids: disabledQuestions.map((q) => q.question_id),
-        related_disabled_question_texts: disabledQuestions.map((q) => q.question_text),
+        related_disabled_question_ids: [] as string[],
+        related_disabled_question_texts: [] as string[],
       }));
 
     const crossReferenceWithGaps = { ...crossReference, gap_criteria: gapCriteria };
@@ -471,13 +596,18 @@ export const applicationReviewRequested = inngest.createFunction(
 
     const scoringResult = await step.run("scoring", async () => {
       const stepUsage: LogAiUsageParams[] = [];
+      // Build previous overall context for feedback evolution
+      const prevOverallContext = previousReview
+        ? formatPreviousOverallContext(previousReview.results, previousReview.review_number + 1)
+        : null;
       const { systemPrompt: scoringSystemPrompt, userPrompt: scoringUserPrompt } = buildApplicationScoringPrompt(
         answerAnalyses,
         crossReferenceWithGaps,
         questions.map((q) => ({ id: q.id, question: q.question })),
         criteria,
         overallWordLimit,
-        disabledQuestions
+        disabledQuestions,
+        prevOverallContext
       );
 
       const result = await callClaude({
@@ -596,13 +726,15 @@ export const applicationReviewRequested = inngest.createFunction(
       }
 
       // Stamp last_reviewed_text on enabled answers only (skip disabled)
-      for (const answer of enabledAnswers) {
-        await supabase
-          .from("application_answers")
-          .update({ last_reviewed_text: answer.answer_text })
-          .eq("application_id", applicationId)
-          .eq("question_id", answer.question_id);
-      }
+      await Promise.all(
+        enabledAnswers.map((answer) =>
+          supabase
+            .from("application_answers")
+            .update({ last_reviewed_text: answer.answer_text })
+            .eq("application_id", applicationId)
+            .eq("question_id", answer.question_id)
+        )
+      );
 
       // Update application status to reviewed
       const { error: statusError } = await supabase

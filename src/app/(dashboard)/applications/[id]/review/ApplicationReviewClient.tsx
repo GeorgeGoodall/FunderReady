@@ -3,14 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { ApplicationReviewClientProps, ReviewResults, TabId } from "./types";
-import { PIPELINE_STEPS } from "./constants";
+import type { ApplicationReviewClientProps, TabId } from "./types";
+import { safeNumber, parseReviewResults } from "./types";
+import { PIPELINE_STEPS, GOOD_SCORES } from "./constants";
 import { Header } from "./components/Header";
 import { TabBar } from "./components/TabBar";
 import { SummaryTab } from "./components/SummaryTab";
 import { AnswersTab } from "./components/AnswersTab";
 import { CrossReferenceTab } from "./components/CrossReferenceTab";
-const GOOD_SCORES = new Set(["Excellent", "Strong"]);
 
 export function ApplicationReviewClient({
   application,
@@ -21,12 +21,26 @@ export function ApplicationReviewClient({
   review,
   isHistorical = false,
   defaultTab = "summary",
+  initialFeedback = {},
 }: ApplicationReviewClientProps) {
   const router = useRouter();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, "up" | "down">>(initialFeedback);
 
-  const isInProgress = !isHistorical && review && !["completed", "failed"].includes(review.status);
+  const handleFeedbackChange = (itemPath: string, sentiment: "up" | "down" | null) => {
+    setFeedbackMap((prev) => {
+      const next = { ...prev };
+      if (sentiment === null) {
+        delete next[itemPath];
+      } else {
+        next[itemPath] = sentiment;
+      }
+      return next;
+    });
+  };
+
+  const isInProgress = !isHistorical && review && review.status !== "completed" && review.status !== "failed";
 
   // Poll for updates while in progress
   useEffect(() => {
@@ -95,8 +109,8 @@ export function ApplicationReviewClient({
   // In progress
   if (isInProgress) {
     const currentIndex = PIPELINE_STEPS.findIndex((s) => s.key === review.status);
-    const answersCompleted = (review.progress?.answers_completed as number) ?? 0;
-    const answersTotal = (review.progress?.answers_total as number) ?? 0;
+    const answersCompleted = safeNumber(review.progress?.answers_completed);
+    const answersTotal = safeNumber(review.progress?.answers_total);
 
     return (
       <div className="space-y-6">
@@ -144,7 +158,7 @@ export function ApplicationReviewClient({
   }
 
   // Completed — show results
-  const results = review.results as unknown as ReviewResults | null;
+  const results = parseReviewResults(review.results);
   if (!results?.scoring) {
     return (
       <div className="space-y-4">
@@ -226,6 +240,9 @@ export function ApplicationReviewClient({
             gap_count={gap_count}
             questionMap={questionMap}
             criteriaMap={criteriaMap}
+            reviewId={review.id}
+            feedbackMap={feedbackMap}
+            onFeedbackChange={handleFeedbackChange}
           />
         )}
 
@@ -236,6 +253,10 @@ export function ApplicationReviewClient({
             answerFeedback={answer_feedback}
             outdatedMap={outdatedMap}
             disabledQuestionIds={disabledQuestionIds}
+            reviewId={review.id}
+            applicationId={application.id}
+            feedbackMap={feedbackMap}
+            onFeedbackChange={handleFeedbackChange}
           />
         )}
 
@@ -244,6 +265,10 @@ export function ApplicationReviewClient({
             crossReference={cross_reference}
             questionMap={questionMap}
             criteriaMap={criteriaMap}
+            reviewId={review.id}
+            applicationId={application.id}
+            feedbackMap={feedbackMap}
+            onFeedbackChange={handleFeedbackChange}
           />
         )}
       </div>

@@ -39,3 +39,5 @@ export const SCORE_ORDER: Record<string, number> = {
   Strong: 4,
   Excellent: 5,
 };
+
+export const GOOD_SCORES = new Set(["Excellent", "Strong"]);

@@ -7,9 +7,19 @@ import { CommentHighlight } from "./CommentHighlight";
 export function HighlightedText({
   text,
   comments,
+  questionId,
+  reviewId,
+  applicationId,
+  feedbackMap,
+  onFeedbackChange,
 }: {
   text: string;
   comments: AnswerInlineComment[];
+  questionId?: string;
+  reviewId?: string;
+  applicationId?: string;
+  feedbackMap?: Record<string, "up" | "down">;
+  onFeedbackChange?: (itemPath: string, sentiment: "up" | "down" | null) => void;
 }) {
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const containerRef = useRef<HTMLParagraphElement>(null);
@@ -33,11 +43,12 @@ export function HighlightedText({
   }
 
   // Find non-overlapping matches sorted by position
-  const matches: Array<{ start: number; end: number; comment: AnswerInlineComment }> = [];
-  for (const comment of comments) {
+  const matches: Array<{ start: number; end: number; comment: AnswerInlineComment; commentIndex: number }> = [];
+  for (let ci = 0; ci < comments.length; ci++) {
+    const comment = comments[ci];
     const idx = text.indexOf(comment.target_text);
     if (idx !== -1) {
-      matches.push({ start: idx, end: idx + comment.target_text.length, comment });
+      matches.push({ start: idx, end: idx + comment.target_text.length, comment, commentIndex: ci });
     }
   }
   matches.sort((a, b) => a.start - b.start);
@@ -66,6 +77,7 @@ export function HighlightedText({
         <span key={`t-${i}`}>{text.slice(pos, m.start)}</span>
       );
     }
+    const itemPath = questionId ? `answer_feedback/${questionId}/inline_comments/${m.commentIndex}` : undefined;
     segments.push(
       <CommentHighlight
         key={`h-${i}`}
@@ -73,6 +85,11 @@ export function HighlightedText({
         comment={m.comment}
         isOpen={openIdx === i}
         onToggle={() => setOpenIdx(openIdx === i ? null : i)}
+        reviewId={reviewId}
+        applicationId={applicationId}
+        itemPath={itemPath}
+        feedbackSentiment={itemPath && feedbackMap ? (feedbackMap[itemPath] ?? null) : null}
+        onFeedbackChange={onFeedbackChange}
       />
     );
     pos = m.end;

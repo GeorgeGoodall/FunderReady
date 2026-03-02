@@ -1,6 +1,7 @@
 "use client";
 
 import type { AnswerInlineComment } from "../types";
+import { FeedbackButton } from "./FeedbackButton";
 
 const CATEGORY_COLOURS: Record<string, string> = {
   ALIGNMENT: "bg-blue-100 dark:bg-blue-900/30",
@@ -20,11 +21,21 @@ export function CommentHighlight({
   comment,
   isOpen,
   onToggle,
+  reviewId,
+  applicationId,
+  itemPath,
+  feedbackSentiment,
+  onFeedbackChange,
 }: {
   text: string;
   comment: AnswerInlineComment;
   isOpen: boolean;
   onToggle: () => void;
+  reviewId?: string;
+  applicationId?: string;
+  itemPath?: string;
+  feedbackSentiment?: "up" | "down" | null;
+  onFeedbackChange?: (itemPath: string, sentiment: "up" | "down" | null) => void;
 }) {
   return (
     <span className="relative inline">
@@ -55,6 +66,18 @@ export function CommentHighlight({
           <span className="mt-1 block text-xs text-zinc-600 dark:text-zinc-400">
             <span className="font-medium">Suggestion:</span> {comment.suggestion}
           </span>
+          {reviewId && applicationId && itemPath && (
+            <span className="mt-2 flex items-center border-t border-zinc-100 pt-2 dark:border-zinc-700">
+              <FeedbackButton
+                reviewId={reviewId}
+                applicationId={applicationId}
+                itemPath={itemPath}
+                itemType="inline_comment"
+                currentSentiment={feedbackSentiment ?? null}
+                onSentimentChange={onFeedbackChange}
+              />
+            </span>
+          )}
         </span>
       )}
     </span>

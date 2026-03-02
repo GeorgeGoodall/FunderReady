@@ -21,10 +21,10 @@ export default async function ApplicationReviewPage({
 
   if (!user) redirect("/login");
 
-  // Fetch application
+  // Fetch application (single query for all needed columns)
   const { data: application } = await supabase
     .from("applications")
-    .select("id, title, status, review_count, fund_id")
+    .select("id, title, status, review_count, fund_id, questions_set_id, criteria_set_id")
     .eq("id", id)
     .single();
 
@@ -40,13 +40,6 @@ export default async function ApplicationReviewPage({
   const fund = rawFund
     ? { ...rawFund, organisation: (rawFund.organisations as unknown as { id: string; name: string } | null) ?? null }
     : null;
-
-  // Fetch application's questions_set_id and criteria_set_id (fallback for old reviews)
-  const { data: app_full } = await supabase
-    .from("applications")
-    .select("questions_set_id, criteria_set_id")
-    .eq("id", id)
-    .single();
 
   // Fetch answers for outdated detection
   const { data: answers } = await supabase
@@ -68,7 +61,7 @@ export default async function ApplicationReviewPage({
     : await reviewQuery.order("review_number", { ascending: false }).limit(1).single();
 
   // Use review's questions_set_id if available, otherwise fall back to application's
-  const questionsSetId = review?.questions_set_id ?? app_full?.questions_set_id;
+  const questionsSetId = review?.questions_set_id ?? application.questions_set_id;
   let questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number }> = [];
   if (questionsSetId) {
     const { data: qs } = await supabase
@@ -82,7 +75,7 @@ export default async function ApplicationReviewPage({
   }
 
   // Fetch criteria for reference tags in cross-reference findings
-  const criteriaSetId = app_full?.criteria_set_id;
+  const criteriaSetId = application.criteria_set_id;
   let criteria: Array<{ id: string; criterion: string }> = [];
   if (criteriaSetId) {
     const { data: cs } = await supabase
@@ -92,6 +85,24 @@ export default async function ApplicationReviewPage({
       .single();
     if (cs?.criteria_json && Array.isArray(cs.criteria_json)) {
       criteria = cs.criteria_json as unknown as typeof criteria;
+    }
+  }
+
+  // Load user feedback for this review
+  let initialFeedback: Record<string, "up" | "down"> = {};
+  if (review) {
+    const { data: feedbackRows } = await supabase
+      .from("review_feedback")
+      .select("item_path, sentiment")
+      .eq("review_id", review.id)
+      .eq("user_id", user.id);
+
+    if (feedbackRows) {
+      for (const row of feedbackRows) {
+        if (row.sentiment === "up" || row.sentiment === "down") {
+          initialFeedback[row.item_path] = row.sentiment;
+        }
+      }
     }
   }
 
@@ -120,6 +131,7 @@ export default async function ApplicationReviewPage({
       } : null}
       isHistorical={isHistorical}
       defaultTab={defaultTab}
+      initialFeedback={initialFeedback}
     />
   );
 }

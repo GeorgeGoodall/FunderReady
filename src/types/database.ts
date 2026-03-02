@@ -494,6 +494,47 @@ export type Database = {
           },
         ]
       }
+      review_feedback: {
+        Row: {
+          id: string
+          review_id: string
+          user_id: string
+          item_path: string
+          item_type: string
+          sentiment: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          review_id: string
+          user_id: string
+          item_path: string
+          item_type: string
+          sentiment: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          review_id?: string
+          user_id?: string
+          item_path?: string
+          item_type?: string
+          sentiment?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_feedback_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "application_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       review_purchases: {
         Row: {
           amount_pence: number

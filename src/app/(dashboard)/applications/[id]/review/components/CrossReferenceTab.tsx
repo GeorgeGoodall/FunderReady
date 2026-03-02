@@ -2,15 +2,24 @@
 
 import type { CrossReference } from "../types";
 import { CrossReferenceFindingCard } from "./CrossReferenceFindingCard";
+import { FeedbackButton } from "./FeedbackButton";
 
 export function CrossReferenceTab({
   crossReference,
   questionMap,
   criteriaMap,
+  reviewId,
+  applicationId,
+  feedbackMap,
+  onFeedbackChange,
 }: {
   crossReference: CrossReference;
   questionMap: Map<string, string>;
   criteriaMap: Map<string, string>;
+  reviewId?: string;
+  applicationId?: string;
+  feedbackMap?: Record<string, "up" | "down">;
+  onFeedbackChange?: (itemPath: string, sentiment: "up" | "down" | null) => void;
 }) {
   const findings = crossReference.findings ?? [];
   const gapCriteria = crossReference.gap_criteria ?? [];
@@ -44,6 +53,18 @@ export function CrossReferenceTab({
           </span>
         </div>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{crossReference.summary}</p>
+        {reviewId && applicationId && (
+          <div className="mt-2">
+            <FeedbackButton
+              reviewId={reviewId}
+              applicationId={applicationId}
+              itemPath="cross_reference/summary"
+              itemType="cross_reference_summary"
+              currentSentiment={feedbackMap?.["cross_reference/summary"] ?? null}
+              onSentimentChange={onFeedbackChange}
+            />
+          </div>
+        )}
       </div>
 
       {/* Findings */}
@@ -57,7 +78,17 @@ export function CrossReferenceTab({
           </h3>
           <div className="space-y-3">
             {findings.map((finding, i) => (
-              <CrossReferenceFindingCard key={i} finding={finding} questionMap={questionMap} criteriaMap={criteriaMap} />
+              <CrossReferenceFindingCard
+                key={i}
+                finding={finding}
+                findingIndex={i}
+                questionMap={questionMap}
+                criteriaMap={criteriaMap}
+                reviewId={reviewId}
+                applicationId={applicationId}
+                feedbackMap={feedbackMap}
+                onFeedbackChange={onFeedbackChange}
+              />
             ))}
           </div>
         </div>
