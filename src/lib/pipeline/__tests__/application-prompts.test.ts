@@ -6,12 +6,13 @@ import {
   buildApplicationScoringPrompt,
   formatAnswerAnalysesSummary,
   formatAnswerAnalysesForScoring,
+  formatAnswerAnalysesForCrossReference,
   formatPreviousAnswerContext,
   formatPreviousOverallContext,
   type AnswerContext,
 } from "../application-prompts";
 import type { AnswerAnalysis } from "../schemas";
-import { SYSTEM_PERSONA, SCORING_RUBRIC, QUALITY_DIMENSIONS, SCORING_CALIBRATION_EXAMPLES } from "../prompt-templates";
+import { SCORING_CALIBRATION_EXAMPLES } from "../prompt-templates";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -72,7 +73,16 @@ describe("buildAnswerAnalysisPrompt — text_short field type", () => {
     expect(prompt).not.toContain("utilised");
   });
 
-  it("does NOT include factual field notice (text_short may still expect narrative)", () => {
+  it("includes short text field classification guidance", () => {
+    const prompt = buildAnswerAnalysisPrompt(
+      makeAnswer({ field_type: "text_short", answer_text: "Transform Training" })
+    );
+    expect(prompt).toContain("## Field Type: text_short");
+    expect(prompt).toContain("administrative/contact field");
+    expect(prompt).toContain("short narrative field");
+  });
+
+  it("does NOT include factual field notice", () => {
     const prompt = buildAnswerAnalysisPrompt(
       makeAnswer({ field_type: "text_short", answer_text: "Transform Training" })
     );
@@ -675,6 +685,125 @@ describe("formatAnswerAnalysesForScoring — edge cases", () => {
 });
 
 // ---------------------------------------------------------------------------
+// formatAnswerAnalysesForCrossReference — edge cases
+// ---------------------------------------------------------------------------
+
+describe("formatAnswerAnalysesForCrossReference — edge cases", () => {
+  it("returns empty string for empty analyses array", () => {
+    const text = formatAnswerAnalysesForCrossReference([], []);
+    expect(text).toBe("");
+  });
+
+  it("falls back to 'Unknown question' when question_id not found", () => {
+    const analyses: AnswerAnalysis[] = [
+      {
+        question_id: "q99",
+        inline_comments: [],
+        criteria_relevance: [],
+        strengths: [],
+        weaknesses: [],
+        answer_score: "Fair",
+      },
+    ];
+    const text = formatAnswerAnalysesForCrossReference(analyses, sampleQuestions);
+    expect(text).toContain("Unknown question");
+  });
+
+  it("includes scores, criteria, strengths, weaknesses", () => {
+    const text = formatAnswerAnalysesForCrossReference(sampleAnalyses, sampleQuestions);
+    expect(text).toContain("Score: Fair");
+    expect(text).toContain("Score: Strong");
+    expect(text).toContain("Criteria: c1 (directly_addresses");
+    expect(text).toContain("Strengths: Clear articulation");
+    expect(text).toContain("Weaknesses: Lacks data");
+  });
+
+  it("includes Key excerpts with target_text and category for answers with inline_comments", () => {
+    const text = formatAnswerAnalysesForCrossReference(sampleAnalyses, sampleQuestions);
+    expect(text).toContain("Key excerpts:");
+    expect(text).toContain('[EVIDENCE] "significant impact"');
+    expect(text).toContain("No figures to support this claim about impact.");
+  });
+
+  it("omits suggestion text from excerpts", () => {
+    const analyses: AnswerAnalysis[] = [
+      {
+        question_id: "q1",
+        inline_comments: [
+          { target_text: "vague claim", category: "SPECIFICITY", issue: "Vague claim needs detail.", suggestion: "Add specific numbers." },
+        ],
+        criteria_relevance: [],
+        strengths: [],
+        weaknesses: [],
+        answer_score: "Fair",
+      },
+    ];
+    const text = formatAnswerAnalysesForCrossReference(analyses, sampleQuestions);
+    expect(text).toContain("Key excerpts:");
+    expect(text).toContain('[SPECIFICITY] "vague claim"');
+    expect(text).toContain("Vague claim needs detail.");
+    expect(text).not.toContain("Add specific numbers.");
+  });
+
+  it("omits Key excerpts section for answers with no inline_comments", () => {
+    const analyses: AnswerAnalysis[] = [
+      {
+        question_id: "q2",
+        inline_comments: [],
+        criteria_relevance: [],
+        strengths: ["Good structure"],
+        weaknesses: [],
+        answer_score: "Strong",
+      },
+    ];
+    const text = formatAnswerAnalysesForCrossReference(analyses, sampleQuestions);
+    expect(text).not.toContain("Key excerpts:");
+    expect(text).toContain("Score: Strong");
+    expect(text).toContain("Strengths: Good structure");
+  });
+
+  it("filters out not_relevant criteria from output", () => {
+    const analyses: AnswerAnalysis[] = [
+      {
+        question_id: "q1",
+        inline_comments: [],
+        criteria_relevance: [
+          { criterion_id: "c1", relevance: "not_relevant" },
+          { criterion_id: "c2", relevance: "directly_addresses" },
+        ],
+        strengths: [],
+        weaknesses: [],
+        answer_score: "Fair",
+      },
+    ];
+    const text = formatAnswerAnalysesForCrossReference(analyses, sampleQuestions);
+    expect(text).toContain("c2 (directly_addresses");
+    expect(text).not.toContain("c1");
+  });
+
+  it("includes multiple excerpts for multiple inline_comments", () => {
+    const analyses: AnswerAnalysis[] = [
+      {
+        question_id: "q1",
+        inline_comments: [
+          { target_text: "first quote", category: "EVIDENCE", issue: "Issue one.", suggestion: "Suggestion one." },
+          { target_text: "second quote", category: "ALIGNMENT", issue: "Issue two.", suggestion: "Suggestion two." },
+        ],
+        criteria_relevance: [],
+        strengths: [],
+        weaknesses: [],
+        answer_score: "Fair",
+      },
+    ];
+    const text = formatAnswerAnalysesForCrossReference(analyses, sampleQuestions);
+    expect(text).toContain('[EVIDENCE] "first quote" — Issue one.');
+    expect(text).toContain('[ALIGNMENT] "second quote" — Issue two.');
+    expect(text).not.toContain("Suggestion one.");
+    expect(text).not.toContain("Suggestion two.");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // buildApplicationCrossReferencePrompt — additional coverage
 // ---------------------------------------------------------------------------
 
@@ -695,12 +824,17 @@ describe("buildApplicationCrossReferencePrompt — content details", () => {
     expect(userPrompt).toContain('q2: "Describe your approach"');
   });
 
-  it("user prompt includes answer analyses summaries without inline comments", () => {
+  it("user prompt includes answer analyses with key excerpts from inline comments", () => {
     const { userPrompt } = buildApplicationCrossReferencePrompt(
       sampleAnalyses, sampleQuestions, sampleCriteria
     );
-    // Cross-ref now uses formatAnswerAnalysesForScoring which strips inline_comments
-    expect(userPrompt).not.toContain("Issues flagged:");
+    // Cross-ref uses formatAnswerAnalysesForCrossReference which includes target_text excerpts
+    expect(userPrompt).toContain("Key excerpts:");
+    expect(userPrompt).toContain('"significant impact"');
+    expect(userPrompt).toContain("[EVIDENCE]");
+    expect(userPrompt).toContain("No figures to support this claim about impact.");
+    // Suggestions are stripped — only target_text, category, and issue are included
+    expect(userPrompt).not.toContain("Add specific metrics.");
     expect(userPrompt).toContain("Score: Fair");
     expect(userPrompt).toContain("Strengths:");
   });
@@ -731,6 +865,49 @@ describe("buildApplicationCrossReferencePrompt — content details", () => {
     expect(systemPrompt[0].type).toBe("text");
     expect(systemPrompt[0].cache_control).toEqual({ type: "ephemeral" });
   });
+
+  it("includes full answer texts section when answerTexts is provided", () => {
+    const answerTexts = [
+      { question_id: "q1", answer_text: "We deliver training to 50 young people." },
+      { question_id: "q2", answer_text: "Our approach uses evidence-based methods." },
+    ];
+    const { userPrompt } = buildApplicationCrossReferencePrompt(
+      sampleAnalyses, sampleQuestions, sampleCriteria, [], answerTexts
+    );
+    expect(userPrompt).toContain("Full Answer Texts");
+    expect(userPrompt).toContain("We deliver training to 50 young people.");
+    expect(userPrompt).toContain("Our approach uses evidence-based methods.");
+    expect(userPrompt).toContain("<user_supplied_content>");
+    expect(userPrompt).toContain("q1: Describe your project need");
+    expect(userPrompt).toContain("q2: Describe your approach");
+  });
+
+  it("omits full answer texts section when answerTexts is empty", () => {
+    const { userPrompt } = buildApplicationCrossReferencePrompt(
+      sampleAnalyses, sampleQuestions, sampleCriteria, [], []
+    );
+    expect(userPrompt).not.toContain("Full Answer Texts");
+    expect(userPrompt).not.toContain("<user_supplied_content>");
+  });
+
+  it("omits full answer texts section when answerTexts is not provided", () => {
+    const { userPrompt } = buildApplicationCrossReferencePrompt(
+      sampleAnalyses, sampleQuestions, sampleCriteria
+    );
+    expect(userPrompt).not.toContain("Full Answer Texts");
+    expect(userPrompt).not.toContain("<user_supplied_content>");
+  });
+
+  it("critical rule instructs checking all answer texts before flagging missing content", () => {
+    const answerTexts = [
+      { question_id: "q1", answer_text: "Some answer text." },
+    ];
+    const { userPrompt } = buildApplicationCrossReferencePrompt(
+      sampleAnalyses, sampleQuestions, sampleCriteria, [], answerTexts
+    );
+    expect(userPrompt).toContain("Base findings on the full answer texts AND the answer analyses");
+    expect(userPrompt).toContain("check ALL answer texts");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -750,7 +927,7 @@ describe("buildApplicationScoringPrompt — content details", () => {
 
   it("user prompt includes cross-reference JSON", () => {
     const crossRefWithFindings = {
-      findings: [{ type: "gap", description: "Missing budget", sections_involved: ["q1"], severity: "medium" }],
+      findings: [{ type: "gap", description: "Missing budget", sections_involved: ["q1"], severity: "medium", confidence: "medium" }],
       overall_coherence: "adequate",
       summary: "Some gaps",
     };
@@ -844,10 +1021,11 @@ describe("buildApplicationScoringPrompt — content details", () => {
 
   it("trims cross-ref findings to 20 when more than 20 provided", () => {
     const manyFindings = Array.from({ length: 25 }, (_, i) => ({
-      type: "gap",
+      type: "gap" as const,
       description: `Finding ${i + 1}`,
       sections_involved: ["q1"],
-      severity: "low",
+      severity: "low" as const,
+      confidence: "low" as const,
     }));
     const bigCrossRef = { findings: manyFindings, overall_coherence: "weak", summary: "Many issues" };
     const { userPrompt } = buildApplicationScoringPrompt(
@@ -860,10 +1038,11 @@ describe("buildApplicationScoringPrompt — content details", () => {
 
   it("does not trim cross-ref findings when 20 or fewer", () => {
     const fewFindings = Array.from({ length: 3 }, (_, i) => ({
-      type: "gap",
+      type: "gap" as const,
       description: `Issue ${i + 1}`,
       sections_involved: ["q1"],
-      severity: "medium",
+      severity: "medium" as const,
+      confidence: "medium" as const,
     }));
     const smallCrossRef = { findings: fewFindings, overall_coherence: "adequate", summary: "Some" };
     const { userPrompt } = buildApplicationScoringPrompt(
@@ -889,6 +1068,50 @@ describe("buildApplicationScoringPrompt — content details", () => {
     expect(systemPrompt[0].type).toBe("text");
     expect(systemPrompt[0].cache_control).toEqual({ type: "ephemeral" });
   });
+
+  it("user prompt contains overall score calibration guidance", () => {
+    const { userPrompt } = buildApplicationScoringPrompt(
+      sampleAnalyses, crossRef, sampleQuestions, sampleCriteria
+    );
+    expect(userPrompt).toContain("Overall score calibration");
+  });
+
+  it("user prompt contains submission_readiness calibration", () => {
+    const { userPrompt } = buildApplicationScoringPrompt(
+      sampleAnalyses, crossRef, sampleQuestions, sampleCriteria
+    );
+    expect(userPrompt).toContain("submission_readiness calibration");
+  });
+
+  it("user prompt contains cross-reference Excellent-blocking rule", () => {
+    const { userPrompt } = buildApplicationScoringPrompt(
+      sampleAnalyses, crossRef, sampleQuestions, sampleCriteria
+    );
+    expect(userPrompt).toContain("HIGH severity AND HIGH confidence");
+  });
+
+  it("user prompt contains CAN still score guidance", () => {
+    const { userPrompt } = buildApplicationScoringPrompt(
+      sampleAnalyses, crossRef, sampleQuestions, sampleCriteria
+    );
+    expect(userPrompt).toContain("CAN still score");
+  });
+
+  it("user prompt contains majority-Strong-no-Excellent calibration rule", () => {
+    const { userPrompt } = buildApplicationScoringPrompt(
+      sampleAnalyses, crossRef, sampleQuestions, sampleCriteria
+    );
+    expect(userPrompt).toContain("no Excellent and at most one Fair");
+    expect(userPrompt).toContain("73-77");
+  });
+
+  it("system prompt contains quality dimensions calibration guidance", () => {
+    const { systemPrompt } = buildApplicationScoringPrompt(
+      sampleAnalyses, crossRef, sampleQuestions, sampleCriteria
+    );
+    expect(systemPrompt[0].text).toContain("Calibration guidance");
+    expect(systemPrompt[0].text).toContain("professional grant writer");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -909,11 +1132,11 @@ describe("SCORING_CALIBRATION_EXAMPLES constant", () => {
   });
 
   it("each example has Criterion, Evidence, Rating, and Reasoning fields", () => {
-    // All four examples should have these structural markers
+    // All five examples should have these structural markers
     const markers = ["**Criterion:**", "**Evidence:**", "**Rating:**", "**Reasoning:**"];
     for (const marker of markers) {
       const occurrences = SCORING_CALIBRATION_EXAMPLES.split(marker).length - 1;
-      expect(occurrences).toBe(4);
+      expect(occurrences).toBe(5);
     }
   });
 
@@ -921,6 +1144,7 @@ describe("SCORING_CALIBRATION_EXAMPLES constant", () => {
     expect(SCORING_CALIBRATION_EXAMPLES).toContain("score range 51-70");
     expect(SCORING_CALIBRATION_EXAMPLES).toContain("score range 71-85");
     expect(SCORING_CALIBRATION_EXAMPLES).toContain("score range 26-50");
+    expect(SCORING_CALIBRATION_EXAMPLES).toContain("score range 86-100");
   });
 
   it("includes a context-limited evidence example", () => {
@@ -1037,7 +1261,13 @@ describe("formatPreviousAnswerContext", () => {
   it("includes instructions about acknowledging improvements", () => {
     const result = formatPreviousAnswerContext("q1", previousResults, true, 2);
     expect(result).toContain("Acknowledge improvements");
-    expect(result).toContain("still outstanding");
+    expect(result).toContain("may be addressed in another answer");
+  });
+
+  it("instructs that persistence across reviews is not a scoring factor", () => {
+    const result = formatPreviousAnswerContext("q1", previousResults, false, 2);
+    expect(result).toContain("number of review cycles");
+    expect(result).toContain("NOT a scoring factor");
   });
 
   it("handles undefined weaknesses (key missing entirely)", () => {
@@ -1093,10 +1323,10 @@ describe("formatPreviousOverallContext", () => {
     },
   };
 
-  it("returns overall score and top improvements", () => {
+  it("returns readiness and top improvements but NOT the numeric score", () => {
     const result = formatPreviousOverallContext(previousResults, 2);
     expect(result).not.toBeNull();
-    expect(result).toContain("62/100");
+    expect(result).not.toContain("62");
     expect(result).toContain("Needs revisions");
     expect(result).toContain("Add evidence");
     expect(result).toContain("Strengthen partnerships section");
@@ -1112,24 +1342,31 @@ describe("formatPreviousOverallContext", () => {
     expect(result).toContain("review #3");
   });
 
-  it("includes trajectory instruction", () => {
+  it("includes instruction to score purely on current content", () => {
     const result = formatPreviousOverallContext(previousResults, 2);
-    expect(result).toContain("score trajectory context");
+    expect(result).toContain("Score the application purely on its current content");
+    expect(result).toContain("do NOT attempt to infer or match any previous score");
   });
 
-  it("handles overall_score of 0 (falsy but valid)", () => {
+  it("instructs that persistence across reviews is not a scoring factor", () => {
+    const result = formatPreviousOverallContext(previousResults, 2);
+    expect(result).toContain("flagged across multiple reviews");
+    expect(result).toContain("score on substance, not persistence");
+  });
+
+  it("handles submission_readiness of 'Not ready'", () => {
     const results = { scoring: { overall_score: 0, submission_readiness: "Not ready" } };
     const result = formatPreviousOverallContext(results, 2);
     expect(result).not.toBeNull();
-    expect(result).toContain("0/100");
     expect(result).toContain("Not ready");
+    // Score should NOT be leaked
+    expect(result).not.toContain("0/100");
   });
 
   it("handles missing top_improvements", () => {
     const results = { scoring: { overall_score: 50 } };
     const result = formatPreviousOverallContext(results, 2);
     expect(result).not.toBeNull();
-    expect(result).toContain("50/100");
     expect(result).not.toContain("Previous top improvements recommended:");
   });
 
@@ -1138,10 +1375,11 @@ describe("formatPreviousOverallContext", () => {
     expect(formatPreviousOverallContext({ scoring: null }, 2)).toBeNull();
   });
 
-  it("defaults overall_score to N/A when not a number", () => {
-    const results = { scoring: { overall_score: "high", submission_readiness: "Good" } };
+  it("does not include numeric score even when overall_score is present", () => {
+    const results = { scoring: { overall_score: 85, submission_readiness: "Good" } };
     const result = formatPreviousOverallContext(results, 2);
-    expect(result).toContain("N/A/100");
+    expect(result).not.toContain("85");
+    expect(result).toContain("Good");
   });
 
   it("defaults submission_readiness to Unknown when not a string", () => {
@@ -1157,7 +1395,8 @@ describe("formatPreviousOverallContext", () => {
     const result = formatPreviousOverallContext(results, 2);
     expect(result).toContain("valid");
     expect(result).toContain("also valid");
-    expect(result).not.toContain("123");
+    // 123 is not a string, should be filtered out
+    expect(result).not.toContain("- 123");
   });
 });
 
@@ -1224,5 +1463,103 @@ describe("buildApplicationScoringPrompt — previous context", () => {
       undefined, [], null
     );
     expect(userPrompt).not.toContain("Previous Review Context");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Scoring prompt: no independent gap generation
+// ---------------------------------------------------------------------------
+
+describe("buildApplicationScoringPrompt — no independent gaps guideline", () => {
+  const crossRef = { findings: [], overall_coherence: "strong", summary: "Good" };
+
+  it("instructs scoring step not to independently generate gaps", () => {
+    const { userPrompt } = buildApplicationScoringPrompt(
+      sampleAnalyses, crossRef, sampleQuestions, sampleCriteria
+    );
+    expect(userPrompt).toContain("Do NOT independently assess whether content is missing");
+    expect(userPrompt).toContain("gap detection was completed in prior pipeline steps");
+  });
+
+  it("instructs scoring step to exclude resolved_weakness gaps", () => {
+    const { userPrompt } = buildApplicationScoringPrompt(
+      sampleAnalyses, crossRef, sampleQuestions, sampleCriteria
+    );
+    expect(userPrompt).toContain("resolved_weakness");
+    expect(userPrompt).toContain("exclude it from the gaps list");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-reference prompt: resolved_weakness instructions
+// ---------------------------------------------------------------------------
+
+describe("buildApplicationCrossReferencePrompt — resolved_weakness", () => {
+  it("includes resolved_weakness in the type enum", () => {
+    const { userPrompt } = buildApplicationCrossReferencePrompt(
+      sampleAnalyses, sampleQuestions, sampleCriteria
+    );
+    expect(userPrompt).toContain("resolved_weakness");
+  });
+
+  it("includes resolved_weakness instructions in What to Look For", () => {
+    const { userPrompt } = buildApplicationCrossReferencePrompt(
+      sampleAnalyses, sampleQuestions, sampleCriteria
+    );
+    expect(userPrompt).toContain("Resolved weaknesses");
+    expect(userPrompt).toContain("source_question");
+    expect(userPrompt).toContain("original_weakness");
+    expect(userPrompt).toContain("resolved_by");
+  });
+
+  it("includes repetition guidance about grant writing practice", () => {
+    const { userPrompt } = buildApplicationCrossReferencePrompt(
+      sampleAnalyses, sampleQuestions, sampleCriteria
+    );
+    expect(userPrompt).toContain("standard grant writing practice");
+    expect(userPrompt).toContain("different panel assessors");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Answer analysis prompt: target_text and cross-answer weakness instructions
+// ---------------------------------------------------------------------------
+
+describe("buildAnswerAnalysisPrompt — target_text and cross-answer guidance", () => {
+  it("instructs target_text must come from Answer Text only", () => {
+    const prompt = buildAnswerAnalysisPrompt(makeAnswer());
+    expect(prompt).toContain("Answer Text section ONLY");
+    expect(prompt).toContain("NEVER use text from the question, guidance, criteria");
+  });
+
+  it("includes cross-answer weakness softening guidance", () => {
+    const prompt = buildAnswerAnalysisPrompt(makeAnswer());
+    expect(prompt).toContain("may be covered in another answer");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatPreviousAnswerContext: cross-answer weakness softening
+// ---------------------------------------------------------------------------
+
+describe("formatPreviousAnswerContext — cross-answer softening", () => {
+  const previousResults = {
+    answer_feedback: {
+      q1: {
+        answer_score: "Fair",
+        weaknesses: ["No budget detail"],
+      },
+    },
+  };
+
+  it("suggests content may be in another answer rather than treating as definitive gap", () => {
+    const result = formatPreviousAnswerContext("q1", previousResults, false, 2);
+    expect(result).toContain("may be addressed in another answer");
+    expect(result).toContain("verify in cross-reference step");
+  });
+
+  it("does not use 'still outstanding' language", () => {
+    const result = formatPreviousAnswerContext("q1", previousResults, false, 2);
+    expect(result).not.toContain("still outstanding");
   });
 });

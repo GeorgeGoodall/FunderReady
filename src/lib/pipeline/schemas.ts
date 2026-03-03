@@ -41,13 +41,18 @@ export const CrossReferenceFindingSchema = z.object({
     "unresolved_reference",
     "inconsistency",
     "repetition",
+    "resolved_weakness",
   ]),
   description: z.string(),
   sections_involved: z.array(z.string()),
   criteria_involved: z.array(z.string()).optional(),
   severity: z.enum(["high", "medium", "low"]),
   suggestion: z.string().optional(),
-  confidence: z.enum(["high", "medium", "low"]).optional(),
+  confidence: z.enum(["high", "medium", "low"]),
+  // resolved_weakness fields: which answer had the weakness and which answer resolves it
+  source_question: z.string().optional(),
+  original_weakness: z.string().optional(),
+  resolved_by: z.string().optional(),
 });
 
 export const GapCriterionSchema = z.object({

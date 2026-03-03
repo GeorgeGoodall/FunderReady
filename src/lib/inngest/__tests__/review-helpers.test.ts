@@ -2,7 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   trimPreviousReviewResults,
   computeAnswerChanges,
+  annotateResolvedWeaknesses,
 } from "../application-review";
+import type { AnswerAnalysis } from "@/lib/pipeline/schemas";
+import type { CrossReference } from "@/lib/pipeline/schemas";
 
 // ---------------------------------------------------------------------------
 // trimPreviousReviewResults
@@ -178,5 +181,333 @@ describe("computeAnswerChanges", () => {
     ];
     const changes = computeAnswerChanges(answers);
     expect(changes).toEqual({ q1: false, q2: true, q3: false });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// annotateResolvedWeaknesses
+// ---------------------------------------------------------------------------
+
+function makeAnalysis(overrides: Partial<AnswerAnalysis> = {}): AnswerAnalysis {
+  return {
+    question_id: "q1",
+    inline_comments: [],
+    criteria_relevance: [],
+    strengths: [],
+    weaknesses: [],
+    answer_score: "Fair",
+    ...overrides,
+  };
+}
+
+function makeCrossRef(findings: CrossReference["findings"] = []): CrossReference {
+  return {
+    findings,
+    overall_coherence: "adequate",
+    summary: "Test",
+  };
+}
+
+describe("annotateResolvedWeaknesses", () => {
+  it("annotates a weakness with exact match", () => {
+    const analyses = [
+      makeAnalysis({
+        question_id: "q1",
+        weaknesses: ["No budget detail", "Vague partner references"],
+      }),
+    ];
+    const crossRef = makeCrossRef([
+      {
+        type: "resolved_weakness",
+        description: "Budget detail is in q17",
+        sections_involved: ["q1", "q17"],
+        severity: "low",
+        confidence: "high",
+        source_question: "q1",
+        original_weakness: "No budget detail",
+        resolved_by: "q17",
+      },
+    ]);
+
+    const count = annotateResolvedWeaknesses(analyses, crossRef);
+
+    expect(count).toBe(1);
+    expect(analyses[0].weaknesses[0]).toBe(
+      "No budget detail (void — addressed in q17)"
+    );
+    // Second weakness should be untouched
+    expect(analyses[0].weaknesses[1]).toBe("Vague partner references");
+  });
+
+  it("annotates via substring match when original_weakness is contained in weakness", () => {
+    const analyses = [
+      makeAnalysis({
+        question_id: "q1",
+        weaknesses: ["No budget detail provided in this answer"],
+      }),
+    ];
+    const crossRef = makeCrossRef([
+      {
+        type: "resolved_weakness",
+        description: "Budget detail is in q17",
+        sections_involved: ["q1", "q17"],
+        severity: "low",
+        confidence: "high",
+        source_question: "q1",
+        original_weakness: "no budget detail",
+        resolved_by: "q17",
+      },
+    ]);
+
+    const count = annotateResolvedWeaknesses(analyses, crossRef);
+
+    expect(count).toBe(1);
+    expect(analyses[0].weaknesses[0]).toContain("(void — addressed in q17)");
+  });
+
+  it("annotates via substring match when weakness is contained in original_weakness", () => {
+    const analyses = [
+      makeAnalysis({
+        question_id: "q1",
+        weaknesses: ["No budget detail"],
+      }),
+    ];
+    const crossRef = makeCrossRef([
+      {
+        type: "resolved_weakness",
+        description: "Budget detail is in q17",
+        sections_involved: ["q1", "q17"],
+        severity: "low",
+        confidence: "high",
+        source_question: "q1",
+        original_weakness: "No budget detail provided in this answer, but it is covered in q17",
+        resolved_by: "q17",
+      },
+    ]);
+
+    const count = annotateResolvedWeaknesses(analyses, crossRef);
+
+    expect(count).toBe(1);
+    expect(analyses[0].weaknesses[0]).toContain("(void — addressed in q17)");
+  });
+
+  it("returns 0 when no resolved_weakness findings", () => {
+    const analyses = [
+      makeAnalysis({
+        question_id: "q1",
+        weaknesses: ["Some weakness"],
+      }),
+    ];
+    const crossRef = makeCrossRef([
+      {
+        type: "gap",
+        description: "Something missing",
+        sections_involved: ["q1"],
+        severity: "medium",
+        confidence: "medium",
+      },
+    ]);
+
+    const count = annotateResolvedWeaknesses(analyses, crossRef);
+
+    expect(count).toBe(0);
+    expect(analyses[0].weaknesses[0]).toBe("Some weakness");
+  });
+
+  it("returns 0 when findings array is empty", () => {
+    const analyses = [
+      makeAnalysis({ question_id: "q1", weaknesses: ["A weakness"] }),
+    ];
+    const count = annotateResolvedWeaknesses(analyses, makeCrossRef([]));
+    expect(count).toBe(0);
+  });
+
+  it("skips findings with missing source_question", () => {
+    const analyses = [
+      makeAnalysis({ question_id: "q1", weaknesses: ["A weakness"] }),
+    ];
+    const crossRef = makeCrossRef([
+      {
+        type: "resolved_weakness",
+        description: "Something",
+        sections_involved: ["q1"],
+        severity: "low",
+        confidence: "high",
+        original_weakness: "A weakness",
+        resolved_by: "q2",
+        // source_question is missing
+      },
+    ]);
+
+    const count = annotateResolvedWeaknesses(analyses, crossRef);
+    expect(count).toBe(0);
+  });
+
+  it("skips findings with missing original_weakness", () => {
+    const analyses = [
+      makeAnalysis({ question_id: "q1", weaknesses: ["A weakness"] }),
+    ];
+    const crossRef = makeCrossRef([
+      {
+        type: "resolved_weakness",
+        description: "Something",
+        sections_involved: ["q1"],
+        severity: "low",
+        confidence: "high",
+        source_question: "q1",
+        resolved_by: "q2",
+        // original_weakness is missing
+      },
+    ]);
+
+    const count = annotateResolvedWeaknesses(analyses, crossRef);
+    expect(count).toBe(0);
+  });
+
+  it("skips findings with missing resolved_by", () => {
+    const analyses = [
+      makeAnalysis({ question_id: "q1", weaknesses: ["A weakness"] }),
+    ];
+    const crossRef = makeCrossRef([
+      {
+        type: "resolved_weakness",
+        description: "Something",
+        sections_involved: ["q1"],
+        severity: "low",
+        confidence: "high",
+        source_question: "q1",
+        original_weakness: "A weakness",
+        // resolved_by is missing
+      },
+    ]);
+
+    const count = annotateResolvedWeaknesses(analyses, crossRef);
+    expect(count).toBe(0);
+  });
+
+  it("skips when source_question does not match any analysis", () => {
+    const analyses = [
+      makeAnalysis({ question_id: "q1", weaknesses: ["A weakness"] }),
+    ];
+    const crossRef = makeCrossRef([
+      {
+        type: "resolved_weakness",
+        description: "Something",
+        sections_involved: ["q99"],
+        severity: "low",
+        confidence: "high",
+        source_question: "q99",
+        original_weakness: "A weakness",
+        resolved_by: "q2",
+      },
+    ]);
+
+    const count = annotateResolvedWeaknesses(analyses, crossRef);
+    expect(count).toBe(0);
+  });
+
+  it("does not double-annotate an already-annotated weakness", () => {
+    const analyses = [
+      makeAnalysis({
+        question_id: "q1",
+        weaknesses: ["No budget detail (void — addressed in q17)"],
+      }),
+    ];
+    const crossRef = makeCrossRef([
+      {
+        type: "resolved_weakness",
+        description: "Budget detail is in q17",
+        sections_involved: ["q1", "q17"],
+        severity: "low",
+        confidence: "high",
+        source_question: "q1",
+        original_weakness: "No budget detail",
+        resolved_by: "q17",
+      },
+    ]);
+
+    const count = annotateResolvedWeaknesses(analyses, crossRef);
+
+    expect(count).toBe(0);
+    expect(analyses[0].weaknesses[0]).toBe(
+      "No budget detail (void — addressed in q17)"
+    );
+  });
+
+  it("handles multiple resolved weaknesses across different answers", () => {
+    const analyses = [
+      makeAnalysis({
+        question_id: "q1",
+        weaknesses: ["No budget detail", "Missing evaluation plan"],
+      }),
+      makeAnalysis({
+        question_id: "q2",
+        weaknesses: ["No staff ratios"],
+      }),
+    ];
+    const crossRef = makeCrossRef([
+      {
+        type: "resolved_weakness",
+        description: "Budget in q17",
+        sections_involved: ["q1", "q17"],
+        severity: "low",
+        confidence: "high",
+        source_question: "q1",
+        original_weakness: "No budget detail",
+        resolved_by: "q17",
+      },
+      {
+        type: "resolved_weakness",
+        description: "Eval plan in q21",
+        sections_involved: ["q1", "q21"],
+        severity: "low",
+        confidence: "high",
+        source_question: "q1",
+        original_weakness: "Missing evaluation plan",
+        resolved_by: "q21",
+      },
+      {
+        type: "resolved_weakness",
+        description: "Staff ratios in q19",
+        sections_involved: ["q2", "q19"],
+        severity: "low",
+        confidence: "high",
+        source_question: "q2",
+        original_weakness: "No staff ratios",
+        resolved_by: "q19",
+      },
+    ]);
+
+    const count = annotateResolvedWeaknesses(analyses, crossRef);
+
+    expect(count).toBe(3);
+    expect(analyses[0].weaknesses[0]).toContain("(void — addressed in q17)");
+    expect(analyses[0].weaknesses[1]).toContain("(void — addressed in q21)");
+    expect(analyses[1].weaknesses[0]).toContain("(void — addressed in q19)");
+  });
+
+  it("skips non-matching weakness text", () => {
+    const analyses = [
+      makeAnalysis({
+        question_id: "q1",
+        weaknesses: ["Completely different weakness text"],
+      }),
+    ];
+    const crossRef = makeCrossRef([
+      {
+        type: "resolved_weakness",
+        description: "Something",
+        sections_involved: ["q1", "q2"],
+        severity: "low",
+        confidence: "high",
+        source_question: "q1",
+        original_weakness: "No budget detail",
+        resolved_by: "q2",
+      },
+    ]);
+
+    const count = annotateResolvedWeaknesses(analyses, crossRef);
+    expect(count).toBe(0);
+    expect(analyses[0].weaknesses[0]).toBe("Completely different weakness text");
   });
 });

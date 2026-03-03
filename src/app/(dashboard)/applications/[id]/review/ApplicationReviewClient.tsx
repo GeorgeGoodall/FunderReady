@@ -11,6 +11,7 @@ import { TabBar } from "./components/TabBar";
 import { SummaryTab } from "./components/SummaryTab";
 import { AnswersTab } from "./components/AnswersTab";
 import { CrossReferenceTab } from "./components/CrossReferenceTab";
+import { CreateDraftButton } from "@/components/CreateDraftButton";
 
 export function ApplicationReviewClient({
   application,
@@ -216,14 +217,22 @@ export function ApplicationReviewClient({
 
       {/* Historical review banner */}
       {isHistorical && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-300">
-          You are viewing Review #{review.review_number} (historical).{" "}
-          <Link
-            href={`/applications/${application.id}/review`}
-            className="font-medium underline underline-offset-2"
-          >
-            View latest review
-          </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-300">
+          <span>
+            You are viewing Review #{review.review_number} (historical).{" "}
+            <Link
+              href={`/applications/${application.id}/review`}
+              className="font-medium underline underline-offset-2"
+            >
+              View latest review
+            </Link>
+          </span>
+          <CreateDraftButton
+            applicationId={application.id}
+            reviewId={review.id}
+            reviewNumber={review.review_number}
+            className="rounded-lg border border-amber-400 bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-200 disabled:opacity-60 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40"
+          />
         </div>
       )}
 
@@ -274,13 +283,21 @@ export function ApplicationReviewClient({
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+      <div className="flex flex-wrap items-center gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
         <Link
           href={`/applications/${application.id}`}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
         >
           Edit Current Draft
         </Link>
+        {isHistorical && (
+          <CreateDraftButton
+            applicationId={application.id}
+            reviewId={review.id}
+            reviewNumber={review.review_number}
+            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          />
+        )}
         {application.review_count > 1 && (
           <Link
             href={`/applications/${application.id}/history`}

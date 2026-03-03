@@ -237,6 +237,70 @@ export function computeAnswerChanges(
 }
 
 // ---------------------------------------------------------------------------
+// Post-processing: annotate weaknesses resolved by other answers
+// ---------------------------------------------------------------------------
+
+/**
+ * After the cross-reference step, match `resolved_weakness` findings back to
+ * the per-answer weaknesses and annotate them with "(void — addressed in qY)".
+ *
+ * This runs BEFORE the scoring step so that:
+ * 1. The scoring step sees annotated weaknesses and knows to exclude them
+ * 2. The saved answer_feedback shows the annotations to the user
+ *
+ * Mutates `answerAnalyses[].weaknesses` in-place. Returns the count of
+ * annotations applied (useful for logging/testing).
+ */
+export function annotateResolvedWeaknesses(
+  answerAnalyses: AnswerAnalysis[],
+  crossReference: CrossReference
+): number {
+  const resolved = crossReference.findings.filter(
+    (f) =>
+      f.type === "resolved_weakness" &&
+      f.source_question &&
+      f.original_weakness &&
+      f.resolved_by
+  );
+
+  if (resolved.length === 0) return 0;
+
+  // Build lookup: question_id → analysis
+  const byQuestion = new Map<string, AnswerAnalysis>();
+  for (const a of answerAnalyses) {
+    byQuestion.set(a.question_id, a);
+  }
+
+  let count = 0;
+
+  for (const finding of resolved) {
+    const analysis = byQuestion.get(finding.source_question!);
+    if (!analysis) continue;
+
+    const needle = finding.original_weakness!.toLowerCase().trim();
+
+    // Match: exact, then substring in either direction
+    let idx = analysis.weaknesses.findIndex(
+      (w) => w.toLowerCase().trim() === needle
+    );
+    if (idx === -1) {
+      idx = analysis.weaknesses.findIndex(
+        (w) =>
+          w.toLowerCase().includes(needle) ||
+          needle.includes(w.toLowerCase().trim())
+      );
+    }
+
+    if (idx !== -1 && !analysis.weaknesses[idx].includes("(void —")) {
+      analysis.weaknesses[idx] += ` (void — addressed in ${finding.resolved_by})`;
+      count++;
+    }
+  }
+
+  return count;
+}
+
+// ---------------------------------------------------------------------------
 // Pipeline function
 // ---------------------------------------------------------------------------
 
@@ -530,7 +594,8 @@ export const applicationReviewRequested = inngest.createFunction(
         answerAnalyses,
         questions.map((q) => ({ id: q.id, question: q.question })),
         criteria,
-        disabledQuestions
+        disabledQuestions,
+        enabledAnswers.map((a) => ({ question_id: a.question_id, answer_text: a.answer_text }))
       );
 
       const result = await callClaude({
@@ -583,6 +648,11 @@ export const applicationReviewRequested = inngest.createFunction(
       }));
 
     const crossReferenceWithGaps = { ...crossReference, gap_criteria: gapCriteria };
+
+    // -----------------------------------------------------------------------
+    // Post-processing: annotate per-answer weaknesses resolved by other answers
+    // -----------------------------------------------------------------------
+    annotateResolvedWeaknesses(answerAnalyses, crossReference);
 
     // -----------------------------------------------------------------------
     // Step 4: Scoring
@@ -717,6 +787,12 @@ export const applicationReviewRequested = inngest.createFunction(
             gap_count: gapCount,
             total_criteria_count: totalCriteriaCount,
             disabled_questions: disabledQuestions,
+            answer_snapshot: enabledAnswers.map((a) => ({
+              question_id: a.question_id,
+              answer_text: a.answer_text,
+              selected_options: a.selected_options ?? null,
+            })),
+            disabled_answer_ids: disabledQuestions.map((q) => q.question_id),
           },
         })
         .eq("id", reviewId);

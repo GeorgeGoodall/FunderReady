@@ -21,6 +21,7 @@ describe("CrossReferenceSchema", () => {
           criteria_involved: ["c4"],
           severity: "high" as const,
           suggestion: "Align budget figures across all sections",
+          confidence: "high" as const,
         },
       ],
       overall_coherence: "adequate" as const,
@@ -73,7 +74,7 @@ describe("CrossReferenceSchema", () => {
     expect(result.findings[0].confidence).toBe("high");
   });
 
-  it("validates findings without confidence (backward compat)", () => {
+  it("rejects findings without confidence (confidence is required)", () => {
     const data = {
       findings: [
         {
@@ -86,8 +87,7 @@ describe("CrossReferenceSchema", () => {
       overall_coherence: "adequate" as const,
       summary: "Minor gaps.",
     };
-    const result = CrossReferenceSchema.parse(data);
-    expect(result.findings[0].confidence).toBeUndefined();
+    expect(() => CrossReferenceSchema.parse(data)).toThrow();
   });
 
   it("validates all three confidence levels on findings", () => {

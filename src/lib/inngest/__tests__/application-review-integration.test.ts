@@ -490,3 +490,66 @@ describe("Gap criteria computation", () => {
     expect(gapCriteria[0].related_disabled_question_texts).toEqual(["Budget breakdown"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Answer snapshot shape
+// ---------------------------------------------------------------------------
+
+describe("Answer snapshot shape", () => {
+  it("snapshot includes question_id, answer_text, and selected_options", () => {
+    const enabledAnswers = [
+      { question_id: "q1", answer_text: "Our answer", selected_options: ["option_a"], is_disabled: false },
+      { question_id: "q2", answer_text: "Second answer", selected_options: null, is_disabled: false },
+    ];
+
+    const snapshot = enabledAnswers.map((a) => ({
+      question_id: a.question_id,
+      answer_text: a.answer_text,
+      selected_options: a.selected_options ?? null,
+    }));
+
+    expect(snapshot).toHaveLength(2);
+    expect(snapshot[0]).toEqual({
+      question_id: "q1",
+      answer_text: "Our answer",
+      selected_options: ["option_a"],
+    });
+    expect(snapshot[1]).toEqual({
+      question_id: "q2",
+      answer_text: "Second answer",
+      selected_options: null,
+    });
+  });
+
+  it("snapshot only includes enabled answers", () => {
+    const allAnswers = [
+      { question_id: "q1", answer_text: "Enabled answer", selected_options: null, is_disabled: false },
+      { question_id: "q2", answer_text: "Disabled answer", selected_options: null, is_disabled: true },
+      { question_id: "q3", answer_text: "Another enabled", selected_options: ["opt"], is_disabled: false },
+    ];
+
+    const enabledAnswers = allAnswers.filter((a) => !a.is_disabled && a.answer_text.trim().length > 0);
+    const snapshot = enabledAnswers.map((a) => ({
+      question_id: a.question_id,
+      answer_text: a.answer_text,
+      selected_options: a.selected_options ?? null,
+    }));
+
+    expect(snapshot).toHaveLength(2);
+    expect(snapshot.map((s) => s.question_id)).toEqual(["q1", "q3"]);
+  });
+
+  it("disabled_answer_ids captures disabled question IDs", () => {
+    const allAnswers = [
+      { question_id: "q1", answer_text: "Enabled", is_disabled: false },
+      { question_id: "q2", answer_text: "Disabled", is_disabled: true },
+      { question_id: "q3", answer_text: "Also disabled", is_disabled: true },
+    ];
+
+    const disabledAnswerIds = allAnswers
+      .filter((a) => a.is_disabled)
+      .map((a) => a.question_id);
+
+    expect(disabledAnswerIds).toEqual(["q2", "q3"]);
+  });
+});

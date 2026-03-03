@@ -69,7 +69,14 @@ Use these worked examples to calibrate your scoring. Each shows a criterion, the
 **Criterion:** "Provide evidence of your organisation's impact in the target community."
 **Evidence:** The answer describes a new community initiative launched 6 months ago. It provides strong qualitative evidence — direct beneficiary quotes, a case study, and a letter of support from a local partner — but no quantitative outcome data. The answer explicitly acknowledges "as a newly established programme, full outcome data will be available after our first annual evaluation in September."
 **Rating:** Fair
-**Reasoning:** The absence of quantitative data is a genuine limitation, not a failure to include available evidence. The applicant has proactively acknowledged the gap, provided a timeline for when data will be available, and offered credible proxy evidence (beneficiary voice, partner endorsement). However, this still represents a notable gap — a panel member would want to see at least some early indicators (attendance figures, referral numbers, or pre/post survey results). Score Fair rather than Needs Improvement because the evidence gap is structural and transparently acknowledged, but not Strong because the criterion asks for impact evidence that isn't yet available.`;
+**Reasoning:** The absence of quantitative data is a genuine limitation, not a failure to include available evidence. The applicant has proactively acknowledged the gap, provided a timeline for when data will be available, and offered credible proxy evidence (beneficiary voice, partner endorsement). However, this still represents a notable gap — a panel member would want to see at least some early indicators (attendance figures, referral numbers, or pre/post survey results). Score Fair rather than Needs Improvement because the evidence gap is structural and transparently acknowledged, but not Strong because the criterion asks for impact evidence that isn't yet available.
+
+### Example 5: Excellent (score range 86-100)
+
+**Criterion:** "Demonstrate a clear understanding of the need your project addresses, supported by evidence."
+**Evidence:** The answer cites three local data sources (council deprivation index, GP referral data, organisation's own waiting list), includes a direct beneficiary quote from a needs assessment, references a specific gap in existing local provision with named services that do not cover the target group, and explains why the problem is worsening with a clear causal chain supported by trend data over three years.
+**Rating:** Excellent
+**Reasoning:** The answer provides multi-layered evidence: official data, primary research, and service-level intelligence. It demonstrates deep local knowledge rather than generic claims. The causal analysis shows understanding beyond surface-level statistics. A panel member would have no follow-up questions about need — the case is comprehensively made. Minor cross-reference findings (e.g., the same data being cited in another answer) do not diminish the strength of this criterion's final score.`;
 
 export const ANTI_HALLUCINATION = `
 ## Critical Rules
@@ -90,7 +97,9 @@ Score 7 quality dimensions across the ENTIRE application (all answers combined),
 - **Persuasiveness**: How well does the writing persuade and convince? Does it build a compelling case, or just state facts? Consider narrative strength and argument quality.
 - **Relevance**: How relevant are the answers to the specific questions asked and the funder's criteria? Does the content address what was asked, or drift off-topic?
 - **Financial Accuracy**: Accuracy of budget figures, missing financial values, incorrect sums, reconciliation between financial answers. Score only across answers containing financial content. If no financial content exists, score null.
-- **Conciseness**: How concise are the answers? Is there bloat, filler, needless repetition, or content that wastes word count without adding value?`;
+- **Conciseness**: How concise are the answers? Is there bloat, filler, needless repetition, or content that wastes word count without adding value?
+
+Calibration guidance: A score of 85+ means a professional grant writer would approve with no changes needed in this dimension. 70-84 means solid with minor issues that do not undermine the application. 55-69 means notable weaknesses that a panel would likely question. Below 55 means significant problems that would materially harm the application's chances. For Language & Grammar specifically, minor issues in an otherwise professional submission should still score 80+.`;
 
 export const COMMENT_CATEGORIES_DESC = `
 ## Comment Categories
