@@ -580,3 +580,137 @@ describe("POST /api/detect-fund", () => {
     expect(data.matchedFund).toBeNull();
   });
 });
+
+// =====================================================================
+// GET /api/admin/metrics
+// =====================================================================
+
+describe("GET /api/admin/metrics", () => {
+  async function importRoute() {
+    const mod = await import("../../api/admin/metrics/route");
+    return mod.GET;
+  }
+
+  // Extended chainMock that supports .gte() for date filtering
+  function metricsChainMock(resolvedValue: unknown) {
+    const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+    chain.select = vi.fn(() => chain);
+    chain.insert = vi.fn(() => chain);
+    chain.update = vi.fn(() => chain);
+    chain.upsert = vi.fn(() => chain);
+    chain.eq = vi.fn(() => chain);
+    chain.gte = vi.fn(() => chain);
+    chain.order = vi.fn(() => chain);
+    chain.limit = vi.fn(() => Promise.resolve(resolvedValue));
+    chain.single = vi.fn(() => Promise.resolve(resolvedValue));
+    chain.maybeSingle = vi.fn(() => Promise.resolve(resolvedValue));
+    chain.textSearch = vi.fn(() => chain);
+    chain.then = vi.fn((resolve: (v: unknown) => unknown) => Promise.resolve(resolvedValue).then(resolve));
+    return chain;
+  }
+
+  it("returns 401 when not authenticated", async () => {
+    unauthenticatedUser();
+    const GET = await importRoute();
+    const res = await GET();
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 403 for non-admin users", async () => {
+    authenticatedUser();
+    mockServiceFrom.mockReturnValue(
+      metricsChainMock({ data: { is_admin: false }, error: null })
+    );
+    const GET = await importRoute();
+    const res = await GET();
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "Forbidden" });
+  });
+
+  it("returns 200 with aggregated metrics", async () => {
+    authenticatedUser();
+
+    const sampleLogs = [
+      { pipeline_step: "answer_analysis", model: "claude-sonnet", input_tokens: 1000, output_tokens: 200, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cost_usd: "0.005", cost_gbp: "0.004" },
+      { pipeline_step: "scoring", model: "claude-sonnet", input_tokens: 500, output_tokens: 100, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cost_usd: "0.003", cost_gbp: "0.002" },
+    ];
+
+    let serviceCallCount = 0;
+    mockServiceFrom.mockImplementation(() => {
+      serviceCallCount++;
+      if (serviceCallCount === 1) {
+        // Profile check
+        return metricsChainMock({ data: { is_admin: true }, error: null });
+      }
+      // All subsequent calls return appropriate data
+      // The route runs 9 queries in Promise.all
+      // We'll return sample data for all of them
+      return metricsChainMock({ data: sampleLogs, error: null, count: 5 });
+    });
+
+    const GET = await importRoute();
+    const res = await GET();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty("all_time");
+    expect(body).toHaveProperty("last_30_days");
+    expect(body).toHaveProperty("recent_logs");
+    expect(body).toHaveProperty("recent_reviews");
+    expect(body).toHaveProperty("platform");
+    expect(body.all_time.total_calls).toBeGreaterThanOrEqual(0);
+  });
+
+  it("returns 200 with empty data (all zeros)", async () => {
+    authenticatedUser();
+
+    let serviceCallCount = 0;
+    mockServiceFrom.mockImplementation(() => {
+      serviceCallCount++;
+      if (serviceCallCount === 1) {
+        return metricsChainMock({ data: { is_admin: true }, error: null });
+      }
+      return metricsChainMock({ data: null, error: null, count: 0 });
+    });
+
+    const GET = await importRoute();
+    const res = await GET();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.all_time).toMatchObject({
+      total_calls: 0,
+      total_input_tokens: 0,
+      total_output_tokens: 0,
+      total_cost_usd: 0,
+      total_cost_gbp: 0,
+    });
+    expect(body.platform).toMatchObject({
+      users: 0,
+      applications: 0,
+      completed_reviews: 0,
+      funds: 0,
+      organisations: 0,
+    });
+  });
+
+  it("handles null data gracefully", async () => {
+    authenticatedUser();
+
+    let serviceCallCount = 0;
+    mockServiceFrom.mockImplementation(() => {
+      serviceCallCount++;
+      if (serviceCallCount === 1) {
+        return metricsChainMock({ data: { is_admin: true }, error: null });
+      }
+      return metricsChainMock({ data: null, error: null, count: null });
+    });
+
+    const GET = await importRoute();
+    const res = await GET();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.recent_logs).toEqual([]);
+    expect(body.recent_reviews).toEqual([]);
+    expect(body.all_time.total_calls).toBe(0);
+  });
+});

@@ -831,3 +831,360 @@ describe("GET /api/funds/my", () => {
     expect(await res.json()).toEqual({ funds: [] });
   });
 });
+
+// =========================================================================
+// POST /api/funds/[id]/criteria-sets
+// =========================================================================
+
+describe("POST /api/funds/[id]/criteria-sets", () => {
+  async function importRoute() {
+    const mod = await import("../../api/funds/[id]/criteria-sets/route");
+    return mod.POST;
+  }
+
+  const validBody = {
+    name: "Criteria v1",
+    description: "Main criteria",
+    criteria: [{ id: "c1", criterion: "Quality", weight: "30%", sub_questions: [] }],
+  };
+
+  it("returns 401 when not authenticated", async () => {
+    unauthenticatedUser();
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        body: JSON.stringify(validBody),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 400 for invalid JSON body", async () => {
+    authenticatedUser();
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", { method: "POST", body: "not json" }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid JSON" });
+  });
+
+  it("returns 400 when schema validation fails (empty criteria array)", async () => {
+    authenticatedUser();
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Test", criteria: [] }),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 when fund not found", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(
+      tableDispatch({ funds: { data: null, error: null } })
+    );
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Fund not found" });
+  });
+
+  it("returns 201 auto-approved when first set (count=0)", async () => {
+    authenticatedUser();
+    const createdSet = {
+      id: CRITERIA_SET_ID,
+      name: "Criteria v1",
+      description: "Main criteria",
+      criteria_json: validBody.criteria,
+      approved: true,
+      created_at: "2026-02-01",
+    };
+    const callIndex = { funds: 0, criteria_sets: 0 };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "funds") {
+        return chainMock({ data: { id: FUND_ID }, error: null });
+      }
+      if (table === "criteria_sets") {
+        callIndex.criteria_sets++;
+        if (callIndex.criteria_sets === 1) {
+          // Count query
+          return chainMock({ count: 0, data: null, error: null });
+        }
+        // Insert query
+        return chainMock({ data: createdSet, error: null });
+      }
+      return chainMock({ data: null, error: null });
+    });
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.criteriaSet).toMatchObject({ id: CRITERIA_SET_ID, approved: true });
+  });
+
+  it("returns 201 not auto-approved when subsequent set (count>0)", async () => {
+    authenticatedUser();
+    const createdSet = {
+      id: "new-cs-id",
+      name: "Criteria v2",
+      description: null,
+      criteria_json: validBody.criteria,
+      approved: false,
+      created_at: "2026-02-15",
+    };
+    const callIndex = { criteria_sets: 0 };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "funds") {
+        return chainMock({ data: { id: FUND_ID }, error: null });
+      }
+      if (table === "criteria_sets") {
+        callIndex.criteria_sets++;
+        if (callIndex.criteria_sets === 1) {
+          return chainMock({ count: 2, data: null, error: null });
+        }
+        return chainMock({ data: createdSet, error: null });
+      }
+      return chainMock({ data: null, error: null });
+    });
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.criteriaSet).toMatchObject({ approved: false });
+  });
+
+  it("returns 500 when insert fails", async () => {
+    authenticatedUser();
+    const callIndex = { criteria_sets: 0 };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "funds") {
+        return chainMock({ data: { id: FUND_ID }, error: null });
+      }
+      if (table === "criteria_sets") {
+        callIndex.criteria_sets++;
+        if (callIndex.criteria_sets === 1) {
+          return chainMock({ count: 0, data: null, error: null });
+        }
+        return chainMock({ data: null, error: { message: "insert failed" } });
+      }
+      return chainMock({ data: null, error: null });
+    });
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Failed to create criteria set" });
+  });
+});
+
+// =========================================================================
+// POST /api/funds/[id]/questions-sets
+// =========================================================================
+
+describe("POST /api/funds/[id]/questions-sets", () => {
+  async function importRoute() {
+    const mod = await import("../../api/funds/[id]/questions-sets/route");
+    return mod.POST;
+  }
+
+  const validBody = {
+    questions: [{ id: "q1", question: "Describe your project", word_count_max: 500 }],
+    overall_word_limit: 5000,
+  };
+
+  it("returns 401 when not authenticated", async () => {
+    unauthenticatedUser();
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        body: JSON.stringify(validBody),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 400 for invalid JSON body", async () => {
+    authenticatedUser();
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", { method: "POST", body: "not json" }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid JSON" });
+  });
+
+  it("returns 400 when schema validation fails (empty questions array)", async () => {
+    authenticatedUser();
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questions: [] }),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 when fund not found", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(
+      tableDispatch({ funds: { data: null, error: null } })
+    );
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Fund not found" });
+  });
+
+  it("returns 201 auto-approved when first set (count=0)", async () => {
+    authenticatedUser();
+    const createdSet = {
+      id: QUESTIONS_SET_ID,
+      questions_json: validBody.questions,
+      overall_word_limit: 5000,
+      approved: true,
+      created_at: "2026-02-01",
+    };
+    const callIndex = { questions_sets: 0 };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "funds") {
+        return chainMock({ data: { id: FUND_ID }, error: null });
+      }
+      if (table === "questions_sets") {
+        callIndex.questions_sets++;
+        if (callIndex.questions_sets === 1) {
+          return chainMock({ count: 0, data: null, error: null });
+        }
+        return chainMock({ data: createdSet, error: null });
+      }
+      return chainMock({ data: null, error: null });
+    });
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.questionsSet).toMatchObject({ id: QUESTIONS_SET_ID, approved: true });
+  });
+
+  it("returns 201 not auto-approved when subsequent set (count>0)", async () => {
+    authenticatedUser();
+    const createdSet = {
+      id: "new-qs-id",
+      questions_json: validBody.questions,
+      overall_word_limit: 5000,
+      approved: false,
+      created_at: "2026-02-15",
+    };
+    const callIndex = { questions_sets: 0 };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "funds") {
+        return chainMock({ data: { id: FUND_ID }, error: null });
+      }
+      if (table === "questions_sets") {
+        callIndex.questions_sets++;
+        if (callIndex.questions_sets === 1) {
+          return chainMock({ count: 3, data: null, error: null });
+        }
+        return chainMock({ data: createdSet, error: null });
+      }
+      return chainMock({ data: null, error: null });
+    });
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.questionsSet).toMatchObject({ approved: false });
+  });
+
+  it("returns 500 when insert fails", async () => {
+    authenticatedUser();
+    const callIndex = { questions_sets: 0 };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "funds") {
+        return chainMock({ data: { id: FUND_ID }, error: null });
+      }
+      if (table === "questions_sets") {
+        callIndex.questions_sets++;
+        if (callIndex.questions_sets === 1) {
+          return chainMock({ count: 0, data: null, error: null });
+        }
+        return chainMock({ data: null, error: { message: "insert failed" } });
+      }
+      return chainMock({ data: null, error: null });
+    });
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Failed to create questions set" });
+  });
+});

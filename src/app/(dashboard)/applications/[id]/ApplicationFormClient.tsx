@@ -1,14 +1,19 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormField } from "@/components/FormField";
 import { ApplicationStatusBadge } from "@/components/ApplicationStatusBadge";
 import { ImportResultModal } from "@/components/ImportResultModal";
-import { generateMarkdown, getExportFilename, type ExportCriterion } from "@/lib/markdown-export";
-import { parseMarkdown, validateImportMetadata, MAX_IMPORT_FILE_SIZE, type ParseResult } from "@/lib/markdown-import";
 import type { Json } from "@/types/database";
+import {
+  useDeleteApplication,
+  useTitleEditing,
+  useFormAutoSave,
+  useQuestionsSetSwap,
+  useMarkdownImportExport,
+} from "./hooks";
 
 interface Question {
   id: string;
@@ -86,213 +91,57 @@ export function ApplicationFormClient({
   criteriaSet,
 }: ApplicationFormClientProps) {
   const router = useRouter();
-  const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState("");
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-
-  // Questions set swap
-  const [showSwapConfirm, setShowSwapConfirm] = useState(false);
-  const [selectedSwapSetId, setSelectedSwapSetId] = useState("");
-  const [swapping, setSwapping] = useState(false);
-  const [swapResult, setSwapResult] = useState<{ added: number; removed: number; kept: number } | null>(null);
-
-  const otherSets = availableQuestionsSets.filter((s) => s.id !== application.questions_set_id);
-  // Show banner when the newest approved set is newer than the user's current set
-  // (handles both approved and unapproved current sets)
-  const newestApprovedSet = otherSets[0] ?? null;
-  const hasNewerApprovedSet =
-    newestApprovedSet !== null &&
-    (newestApprovedSet.created_at ?? "") > (questionsSet?.created_at ?? "");
-
-  const handleSwapQuestionsSet = async () => {
-    if (!selectedSwapSetId) return;
-    setSwapping(true);
-    setError("");
-    try {
-      // Save any pending answers first
-      await saveAnswers();
-
-      const res = await fetch(`/api/applications/${application.id}/questions-set`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionsSetId: selectedSwapSetId }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to swap questions set");
-        return;
-      }
-
-      setSwapResult(data);
-      setShowSwapConfirm(false);
-      setSelectedSwapSetId("");
-      // Reload to get new questions + answers
-      router.refresh();
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setSwapping(false);
-    }
-  };
-
-  // Title editing
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleValue, setTitleValue] = useState(application.title ?? "");
-  const [savingTitle, setSavingTitle] = useState(false);
-  const titleInputRef = useRef<HTMLInputElement>(null);
-
-  const handleTitleEdit = () => {
-    setEditingTitle(true);
-    setTimeout(() => titleInputRef.current?.select(), 0);
-  };
-
-  const handleTitleSave = async () => {
-    setEditingTitle(false);
-    const trimmed = titleValue.trim();
-    // No change
-    if (trimmed === (application.title ?? "")) return;
-    setSavingTitle(true);
-    try {
-      await fetch(`/api/applications/${application.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: trimmed }),
-      });
-    } finally {
-      setSavingTitle(false);
-    }
-  };
-
-  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") handleTitleSave();
-    if (e.key === "Escape") {
-      setTitleValue(application.title ?? "");
-      setEditingTitle(false);
-    }
-  };
 
   // Parse questions from the questions set
   const questions: Question[] = Array.isArray(questionsSet?.questions_json)
     ? (questionsSet.questions_json as unknown as Question[])
     : [];
 
-  // Build answer state keyed by question_id
-  const [answerMap, setAnswerMap] = useState<Record<string, string>>(() => {
-    const map: Record<string, string> = {};
-    for (const a of initialAnswers) {
-      map[a.question_id] = a.answer_text;
-    }
-    return map;
-  });
+  // Hooks
+  const { showDeleteConfirm, setShowDeleteConfirm, deleting, handleDelete } =
+    useDeleteApplication(application.id, setError);
 
-  const [optionsMap, setOptionsMap] = useState<Record<string, string[]>>(() => {
-    const map: Record<string, string[]> = {};
-    for (const a of initialAnswers) {
-      if (a.selected_options && Array.isArray(a.selected_options)) {
-        map[a.question_id] = a.selected_options as string[];
-      }
-    }
-    return map;
-  });
+  const {
+    editingTitle, titleValue, setTitleValue, savingTitle,
+    titleInputRef, handleTitleEdit, handleTitleSave, handleTitleKeyDown,
+  } = useTitleEditing(application.id, application.title ?? "");
 
-  const [disabledMap, setDisabledMap] = useState<Record<string, boolean>>(() => {
-    const map: Record<string, boolean> = {};
-    for (const a of initialAnswers) {
-      if (a.is_disabled) {
-        map[a.question_id] = true;
-      }
-    }
-    return map;
-  });
+  const {
+    answerMap, setAnswerMap, optionsMap, setOptionsMap,
+    disabledMap, setDisabledMap, reviewedTextMap,
+    saving, lastSaved, dirtyRef, saveAnswers,
+    handleChange, handleOptionsChange, handleDisabledChange, handleBlur,
+  } = useFormAutoSave(application.id, initialAnswers, questions, setError);
 
-  // Track last_reviewed_text per question
-  const reviewedTextMap: Record<string, string | null> = {};
-  for (const a of initialAnswers) {
-    reviewedTextMap[a.question_id] = a.last_reviewed_text;
-  }
+  const {
+    showSwapConfirm, setShowSwapConfirm,
+    selectedSwapSetId, setSelectedSwapSetId,
+    swapping, swapResult, setSwapResult,
+    otherSets, newestApprovedSet, hasNewerApprovedSet,
+    handleSwapQuestionsSet,
+  } = useQuestionsSetSwap(
+    application.id,
+    application.questions_set_id,
+    availableQuestionsSets,
+    questionsSet?.created_at ?? null,
+    saveAnswers,
+    setError
+  );
 
-  // Dirty tracking for auto-save
-  const dirtyRef = useRef(false);
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const saveAnswers = useCallback(async () => {
-    if (!dirtyRef.current) return;
-
-    const answersToSave = questions
-      .filter((q) => answerMap[q.id] !== undefined || disabledMap[q.id] !== undefined)
-      .map((q) => ({
-        question_id: q.id,
-        answer_text: answerMap[q.id] ?? "",
-        is_disabled: disabledMap[q.id] ?? false,
-        ...(optionsMap[q.id] && { selected_options: optionsMap[q.id] }),
-      }));
-
-    if (answersToSave.length === 0) return;
-
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/applications/${application.id}/answers`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: answersToSave }),
-      });
-
-      if (res.ok) {
-        dirtyRef.current = false;
-        setLastSaved(new Date());
-        setError("");
-      } else {
-        const data = await res.json();
-        setError(data.error ?? "Failed to save");
-      }
-    } catch {
-      setError("Network error saving answers");
-    } finally {
-      setSaving(false);
-    }
-  }, [answerMap, optionsMap, disabledMap, application.id, questions]);
-
-  // Auto-save every 30s if dirty
-  useEffect(() => {
-    autoSaveTimerRef.current = setInterval(() => {
-      if (dirtyRef.current) {
-        saveAnswers();
-      }
-    }, 30000);
-    return () => {
-      if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current);
-    };
-  }, [saveAnswers]);
-
-  const handleChange = (questionId: string, value: string) => {
-    setAnswerMap((prev) => ({ ...prev, [questionId]: value }));
-    dirtyRef.current = true;
-  };
-
-  const handleOptionsChange = (questionId: string, options: string[]) => {
-    setOptionsMap((prev) => ({ ...prev, [questionId]: options }));
-    dirtyRef.current = true;
-  };
-
-  const handleDisabledChange = (questionId: string, disabled: boolean) => {
-    setDisabledMap((prev) => ({ ...prev, [questionId]: disabled }));
-    dirtyRef.current = true;
-  };
-
-  const handleBlur = () => {
-    if (dirtyRef.current) {
-      saveAnswers();
-    }
-  };
+  const {
+    fileInputRef, importResult, setImportResult,
+    handleExport, handleFileSelect, applyImport,
+  } = useMarkdownImportExport(
+    application, fund, criteriaSet, questions,
+    answerMap, optionsMap, disabledMap,
+    setAnswerMap, setOptionsMap, setDisabledMap,
+    dirtyRef, saveAnswers, setError
+  );
 
   const handleSubmitForReview = async () => {
-    // Force save first
     await saveAnswers();
-
     setSubmitting(true);
     setError("");
 
@@ -313,107 +162,6 @@ export function ApplicationFormClient({
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleDelete = async () => {
-    setDeleting(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/applications/${application.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error ?? "Failed to delete application");
-        setShowDeleteConfirm(false);
-        return;
-      }
-      router.push("/dashboard");
-    } catch {
-      setError("Network error. Please try again.");
-      setShowDeleteConfirm(false);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  // Markdown export/import
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importResult, setImportResult] = useState<ParseResult | null>(null);
-
-  const handleExport = () => {
-    if (!fund) return;
-
-    const criteria: ExportCriterion[] = Array.isArray(criteriaSet?.criteria_json)
-      ? (criteriaSet.criteria_json as unknown as ExportCriterion[])
-      : [];
-
-    const md = generateMarkdown({
-      application: { id: application.id, title: application.title },
-      fund: { id: fund.id, name: fund.name, organisation: fund.organisation },
-      criteria,
-      questions,
-      answerMap,
-      optionsMap,
-      disabledMap,
-      questionsSetId: application.questions_set_id,
-    });
-
-    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = getExportFilename(fund.name, application.title, application.id);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 100);
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > MAX_IMPORT_FILE_SIZE) {
-      setError("File is too large. Maximum size is 2 MB.");
-      e.target.value = "";
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const content = reader.result as string;
-      const parsed = parseMarkdown(content, questions);
-      const validated = validateImportMetadata(parsed, application.id, application.questions_set_id);
-      setImportResult(validated);
-    };
-    reader.readAsText(file);
-
-    // Reset input so the same file can be re-selected
-    e.target.value = "";
-  };
-
-  const applyImport = (result: ParseResult) => {
-    const newAnswerMap = { ...answerMap };
-    const newOptionsMap = { ...optionsMap };
-    const newDisabledMap = { ...disabledMap };
-
-    for (const a of result.answers) {
-      newAnswerMap[a.question_id] = a.answer_text;
-      if (a.selected_options) {
-        newOptionsMap[a.question_id] = a.selected_options;
-      }
-      newDisabledMap[a.question_id] = a.is_disabled;
-    }
-
-    setAnswerMap(newAnswerMap);
-    setOptionsMap(newOptionsMap);
-    setDisabledMap(newDisabledMap);
-    dirtyRef.current = true;
-    setImportResult(null);
-
-    // Trigger save
-    setTimeout(() => saveAnswers(), 0);
   };
 
   const isReviewing = application.status === "submitted_for_review" || application.status === "reviewing";

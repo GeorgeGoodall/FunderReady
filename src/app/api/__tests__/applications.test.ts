@@ -1068,3 +1068,514 @@ describe("GET /api/applications/[id]/reviews/latest", () => {
     expect(body.applicationStatus).toBe("reviewed");
   });
 });
+
+// =========================================================================
+// POST /api/applications/[id]/reviews/[reviewId]/create-draft
+// =========================================================================
+
+describe("POST /api/applications/[id]/reviews/[reviewId]/create-draft", () => {
+  async function importRoute() {
+    const mod = await import(
+      "../../api/applications/[id]/reviews/[reviewId]/create-draft/route"
+    );
+    return mod.POST;
+  }
+
+  // Two-level route params helper (Next.js 16 async params)
+  function routeParamsTwoLevel(id: string, reviewId: string) {
+    return { params: Promise.resolve({ id, reviewId }) };
+  }
+
+  // Extended chainMock with .like()
+  function draftChainMock(resolvedValue: unknown) {
+    const resolved = Promise.resolve(resolvedValue);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chain: Record<string, any> = {};
+    const returnChain = vi.fn(() => chain);
+    chain.select = returnChain;
+    chain.insert = returnChain;
+    chain.update = returnChain;
+    chain.delete = returnChain;
+    chain.upsert = returnChain;
+    chain.eq = returnChain;
+    chain.like = returnChain;
+    chain.in = returnChain;
+    chain.order = returnChain;
+    chain.limit = returnChain;
+    chain.single = vi.fn(() => resolved);
+    chain.maybeSingle = vi.fn(() => resolved);
+    chain.then = (
+      onfulfilled: Parameters<Promise<unknown>["then"]>[0],
+      onrejected: Parameters<Promise<unknown>["then"]>[1]
+    ) => resolved.then(onfulfilled, onrejected);
+    return chain;
+  }
+
+  const REVIEW_ID = "rev-00000000-0000-0000-0000-000000000001";
+
+  const sourceApp = {
+    id: APP_ID,
+    fund_id: FUND_ID,
+    criteria_set_id: CRITERIA_SET_ID,
+    questions_set_id: QUESTIONS_SET_ID,
+    title: "My Application",
+  };
+
+  const completedReview = {
+    id: REVIEW_ID,
+    review_number: 1,
+    status: "completed",
+    results: {
+      answer_snapshot: [
+        { question_id: "q1", answer_text: "Our answer" },
+      ],
+      disabled_answer_ids: [],
+    },
+    questions_set_id: QUESTIONS_SET_ID,
+    criteria_set_id: CRITERIA_SET_ID,
+  };
+
+  it("returns 401 when not authenticated", async () => {
+    unauthenticatedUser();
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", { method: "POST" }),
+      routeParamsTwoLevel(APP_ID, REVIEW_ID)
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when application not found", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(() =>
+      draftChainMock({ data: null, error: null })
+    );
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", { method: "POST" }),
+      routeParamsTwoLevel(APP_ID, REVIEW_ID)
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Application not found" });
+  });
+
+  it("returns 404 when review not found", async () => {
+    authenticatedUser();
+    const callIndex = { applications: 0, application_reviews: 0 };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "applications") {
+        return draftChainMock({ data: sourceApp, error: null });
+      }
+      if (table === "application_reviews") {
+        return draftChainMock({ data: null, error: null });
+      }
+      return draftChainMock({ data: null, error: null });
+    });
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", { method: "POST" }),
+      routeParamsTwoLevel(APP_ID, REVIEW_ID)
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Review not found" });
+  });
+
+  it("returns 429 when rate limit reached (5+ drafts)", async () => {
+    authenticatedUser();
+    const callIndex = { applications: 0 };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "applications") {
+        callIndex.applications++;
+        if (callIndex.applications === 1) {
+          return draftChainMock({ data: sourceApp, error: null });
+        }
+        // Rate limit count query
+        return draftChainMock({ count: 5, data: null, error: null });
+      }
+      if (table === "application_reviews") {
+        return draftChainMock({ data: completedReview, error: null });
+      }
+      return draftChainMock({ data: null, error: null });
+    });
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", { method: "POST" }),
+      routeParamsTwoLevel(APP_ID, REVIEW_ID)
+    );
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toContain("Maximum drafts");
+  });
+
+  it("returns 201 with answer snapshot on success", async () => {
+    authenticatedUser();
+    const callIndex = { applications: 0 };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "applications") {
+        callIndex.applications++;
+        if (callIndex.applications === 1) {
+          return draftChainMock({ data: sourceApp, error: null });
+        }
+        if (callIndex.applications === 2) {
+          // Rate limit count
+          return draftChainMock({ count: 0, data: null, error: null });
+        }
+        // Insert new application
+        return draftChainMock({ data: { id: "new-app-id" }, error: null });
+      }
+      if (table === "application_reviews") {
+        return draftChainMock({ data: completedReview, error: null });
+      }
+      return draftChainMock({ data: null, error: null });
+    });
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === "questions_sets") {
+        return draftChainMock({
+          data: { questions_json: [{ id: "q1", field_type: "text_long" }] },
+          error: null,
+        });
+      }
+      if (table === "application_answers") {
+        return draftChainMock({ data: null, error: null });
+      }
+      return draftChainMock({ data: null, error: null });
+    });
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", { method: "POST" }),
+      routeParamsTwoLevel(APP_ID, REVIEW_ID)
+    );
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ applicationId: "new-app-id" });
+  });
+
+  it("returns 201 with fallback to current answers (no snapshot)", async () => {
+    authenticatedUser();
+    const reviewNoSnapshot = {
+      ...completedReview,
+      results: { disabled_answer_ids: [] },
+    };
+    const callIndex = { applications: 0, application_answers: 0 };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "applications") {
+        callIndex.applications++;
+        if (callIndex.applications === 1) {
+          return draftChainMock({ data: sourceApp, error: null });
+        }
+        if (callIndex.applications === 2) {
+          return draftChainMock({ count: 0, data: null, error: null });
+        }
+        return draftChainMock({ data: { id: "new-app-id" }, error: null });
+      }
+      if (table === "application_reviews") {
+        return draftChainMock({ data: reviewNoSnapshot, error: null });
+      }
+      if (table === "application_answers") {
+        // Fallback current answers query
+        return draftChainMock({
+          data: [{ question_id: "q1", answer_text: "Current answer", selected_options: null, is_disabled: false }],
+          error: null,
+        });
+      }
+      return draftChainMock({ data: null, error: null });
+    });
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === "questions_sets") {
+        return draftChainMock({
+          data: { questions_json: [{ id: "q1", field_type: "text_long" }] },
+          error: null,
+        });
+      }
+      if (table === "application_answers") {
+        return draftChainMock({ data: null, error: null });
+      }
+      return draftChainMock({ data: null, error: null });
+    });
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", { method: "POST" }),
+      routeParamsTwoLevel(APP_ID, REVIEW_ID)
+    );
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ applicationId: "new-app-id" });
+  });
+
+  it("returns 500 when application insert fails", async () => {
+    authenticatedUser();
+    const callIndex = { applications: 0 };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "applications") {
+        callIndex.applications++;
+        if (callIndex.applications === 1) {
+          return draftChainMock({ data: sourceApp, error: null });
+        }
+        if (callIndex.applications === 2) {
+          return draftChainMock({ count: 0, data: null, error: null });
+        }
+        return draftChainMock({ data: null, error: { message: "insert failed" } });
+      }
+      if (table === "application_reviews") {
+        return draftChainMock({ data: completedReview, error: null });
+      }
+      return draftChainMock({ data: null, error: null });
+    });
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === "questions_sets") {
+        return draftChainMock({
+          data: { questions_json: [{ id: "q1" }] },
+          error: null,
+        });
+      }
+      return draftChainMock({ data: null, error: null });
+    });
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost", { method: "POST" }),
+      routeParamsTwoLevel(APP_ID, REVIEW_ID)
+    );
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Failed to create draft" });
+  });
+});
+
+// =========================================================================
+// PATCH /api/applications/[id]/questions-set (swap)
+// =========================================================================
+
+describe("PATCH /api/applications/[id]/questions-set", () => {
+  async function importRoute() {
+    const mod = await import("../../api/applications/[id]/questions-set/route");
+    return mod.PATCH;
+  }
+
+  // Extended chainMock with .in() and .delete()
+  function swapChainMock(resolvedValue: unknown) {
+    const resolved = Promise.resolve(resolvedValue);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chain: Record<string, any> = {};
+    const returnChain = vi.fn(() => chain);
+    chain.select = returnChain;
+    chain.insert = returnChain;
+    chain.update = returnChain;
+    chain.delete = returnChain;
+    chain.upsert = returnChain;
+    chain.eq = returnChain;
+    chain.in = returnChain;
+    chain.order = returnChain;
+    chain.limit = returnChain;
+    chain.single = vi.fn(() => resolved);
+    chain.maybeSingle = vi.fn(() => resolved);
+    chain.then = (
+      onfulfilled: Parameters<Promise<unknown>["then"]>[0],
+      onrejected: Parameters<Promise<unknown>["then"]>[1]
+    ) => resolved.then(onfulfilled, onrejected);
+    return chain;
+  }
+
+  const NEW_QS_ID = "00000000-0000-0000-0000-000000000099";
+
+  const draftApp = {
+    id: APP_ID,
+    status: "draft",
+    fund_id: FUND_ID,
+    questions_set_id: QUESTIONS_SET_ID,
+  };
+
+  it("returns 401 when not authenticated", async () => {
+    unauthenticatedUser();
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        body: JSON.stringify({ questionsSetId: NEW_QS_ID }),
+      }),
+      routeParams(APP_ID)
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when application not found", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(() =>
+      swapChainMock({ data: null, error: null })
+    );
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionsSetId: NEW_QS_ID }),
+      }),
+      routeParams(APP_ID)
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Application not found" });
+  });
+
+  it("returns 409 when review is in progress", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(() =>
+      swapChainMock({ data: { ...draftApp, status: "submitted_for_review" }, error: null })
+    );
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionsSetId: NEW_QS_ID }),
+      }),
+      routeParams(APP_ID)
+    );
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain("review is in progress");
+  });
+
+  it("returns 400 for invalid JSON body", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(() =>
+      swapChainMock({ data: draftApp, error: null })
+    );
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", { method: "PATCH", body: "not json" }),
+      routeParams(APP_ID)
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid JSON" });
+  });
+
+  it("returns 400 for invalid body (not a UUID)", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(() =>
+      swapChainMock({ data: draftApp, error: null })
+    );
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionsSetId: "not-a-uuid" }),
+      }),
+      routeParams(APP_ID)
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when same questions set (no-op)", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(() =>
+      swapChainMock({ data: draftApp, error: null })
+    );
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionsSetId: QUESTIONS_SET_ID }),
+      }),
+      routeParams(APP_ID)
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Already using this questions set" });
+  });
+
+  it("returns 404 when new set not found", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(() =>
+      swapChainMock({ data: draftApp, error: null })
+    );
+    mockServiceFrom.mockImplementation(() =>
+      swapChainMock({ data: null, error: null })
+    );
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionsSetId: NEW_QS_ID }),
+      }),
+      routeParams(APP_ID)
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Questions set not found" });
+  });
+
+  it("returns 400 when new set belongs to different fund", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(() =>
+      swapChainMock({ data: draftApp, error: null })
+    );
+    let serviceCallCount = 0;
+    mockServiceFrom.mockImplementation(() => {
+      serviceCallCount++;
+      if (serviceCallCount === 1) {
+        return swapChainMock({
+          data: { id: NEW_QS_ID, fund_id: "other-fund-id", approved: true, created_by: "other-user", questions_json: [] },
+          error: null,
+        });
+      }
+      return swapChainMock({ data: null, error: null });
+    });
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionsSetId: NEW_QS_ID }),
+      }),
+      routeParams(APP_ID)
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Questions set belongs to a different fund" });
+  });
+
+  it("returns 200 with added/removed/kept counts on success", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(() =>
+      swapChainMock({ data: draftApp, error: null })
+    );
+    let serviceCallCount = 0;
+    mockServiceFrom.mockImplementation(() => {
+      serviceCallCount++;
+      if (serviceCallCount === 1) {
+        // New set lookup
+        return swapChainMock({
+          data: {
+            id: NEW_QS_ID,
+            fund_id: FUND_ID,
+            approved: true,
+            created_by: "other-user",
+            questions_json: [
+              { id: "q1", field_type: "text_long" },
+              { id: "q3", field_type: "text_short" },
+            ],
+          },
+          error: null,
+        });
+      }
+      if (serviceCallCount === 2) {
+        // Current answers
+        return swapChainMock({
+          data: [
+            { id: "ans-1", question_id: "q1" },
+            { id: "ans-2", question_id: "q2" },
+          ],
+          error: null,
+        });
+      }
+      // All subsequent: delete, insert, update
+      return swapChainMock({ data: null, error: null });
+    });
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionsSetId: NEW_QS_ID }),
+      }),
+      routeParams(APP_ID)
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ added: 1, removed: 1, kept: 1 });
+  });
+});
