@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CreateDraftButton } from "@/components/CreateDraftButton";
+import { NewReviewButton } from "@/components/CreateDraftButton";
 import {
   LineChart,
   Line,
@@ -200,10 +200,8 @@ function ReviewRow({ review, applicationId }: { review: ReviewSummary; applicati
       {/* Actions */}
       {review.status === "completed" && (
         <div className="flex shrink-0 items-center gap-3">
-          <CreateDraftButton
+          <NewReviewButton
             applicationId={applicationId}
-            reviewId={review.id}
-            reviewNumber={review.review_number}
             className="text-sm text-zinc-500 hover:text-zinc-700 disabled:opacity-60 dark:text-zinc-400 dark:hover:text-zinc-300"
           />
           <Link

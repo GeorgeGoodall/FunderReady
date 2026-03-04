@@ -11,7 +11,7 @@ import { TabBar } from "./components/TabBar";
 import { SummaryTab } from "./components/SummaryTab";
 import { AnswersTab } from "./components/AnswersTab";
 import { CrossReferenceTab } from "./components/CrossReferenceTab";
-import { CreateDraftButton } from "@/components/CreateDraftButton";
+import { NewReviewButton } from "@/components/CreateDraftButton";
 
 export function ApplicationReviewClient({
   application,
@@ -90,7 +90,7 @@ export function ApplicationReviewClient({
   if (review.status === "failed") {
     return (
       <div className="space-y-4">
-        <Header application={application} fund={fund} />
+        <Header application={application} fund={fund} submittedAt={review?.created_at} />
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-900/20">
           <h2 className="font-semibold text-red-700 dark:text-red-400">Review Failed</h2>
           <p className="mt-2 text-sm text-red-600 dark:text-red-400">
@@ -115,7 +115,7 @@ export function ApplicationReviewClient({
 
     return (
       <div className="space-y-6">
-        <Header application={application} fund={fund} />
+        <Header application={application} fund={fund} submittedAt={review?.created_at} />
         <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="font-semibold">Review in progress</h2>
           <p className="mt-1 text-sm text-zinc-500">This page updates automatically.</p>
@@ -163,7 +163,7 @@ export function ApplicationReviewClient({
   if (!results?.scoring) {
     return (
       <div className="space-y-4">
-        <Header application={application} fund={fund} />
+        <Header application={application} fund={fund} submittedAt={review?.created_at} />
         <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-sm text-zinc-500">Review completed but results are unavailable.</p>
         </div>
@@ -206,7 +206,7 @@ export function ApplicationReviewClient({
 
   return (
     <div className="space-y-6">
-      <Header application={application} fund={fund} />
+      <Header application={application} fund={fund} submittedAt={review?.created_at} />
 
       {/* AI disclaimer */}
       <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-800/50">
@@ -227,10 +227,8 @@ export function ApplicationReviewClient({
               View latest review
             </Link>
           </span>
-          <CreateDraftButton
+          <NewReviewButton
             applicationId={application.id}
-            reviewId={review.id}
-            reviewNumber={review.review_number}
             className="rounded-lg border border-amber-400 bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-200 disabled:opacity-60 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40"
           />
         </div>
@@ -291,10 +289,8 @@ export function ApplicationReviewClient({
           Edit Current Draft
         </Link>
         {isHistorical && (
-          <CreateDraftButton
+          <NewReviewButton
             applicationId={application.id}
-            reviewId={review.id}
-            reviewNumber={review.review_number}
             className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
           />
         )}

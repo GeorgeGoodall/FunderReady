@@ -3,19 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-interface CreateDraftButtonProps {
+interface NewReviewButtonProps {
   applicationId: string;
-  reviewId: string;
-  reviewNumber: number;
   className?: string;
 }
 
-export function CreateDraftButton({
+export function NewReviewButton({
   applicationId,
-  reviewId,
-  reviewNumber,
   className,
-}: CreateDraftButtonProps) {
+}: NewReviewButtonProps) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -24,18 +20,17 @@ export function CreateDraftButton({
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/applications/${applicationId}/reviews/${reviewId}/create-draft`,
+        `/api/applications/${applicationId}/submit-for-review`,
         { method: "POST" }
       );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert((data as { error?: string }).error ?? "Failed to create draft");
+        alert((data as { error?: string }).error ?? "Failed to submit for review");
         return;
       }
-      const data = await res.json() as { applicationId: string };
-      router.push(`/applications/${data.applicationId}`);
+      router.push(`/applications/${applicationId}/review`);
     } catch {
-      alert("Failed to create draft");
+      alert("Failed to submit for review");
     } finally {
       setLoading(false);
     }
@@ -45,10 +40,10 @@ export function CreateDraftButton({
     <button
       onClick={handleClick}
       disabled={loading}
-      title={`Create a new draft pre-populated with Review #${reviewNumber}'s answers`}
+      title="Submit this application for a new review"
       className={className}
     >
-      {loading ? "Creating…" : "Create New Draft"}
+      {loading ? "Submitting…" : "New Review"}
     </button>
   );
 }
