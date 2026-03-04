@@ -4,10 +4,8 @@ import {
   CriterionSchema,
   CriteriaSetSchema,
   ParseCriteriaRequestSchema,
-  SubmitReviewRequestSchema,
   FundSchema,
   CreateFundSchema,
-  SubmitReviewRequestV2Schema,
   ExtendedQuestionSchema,
   CreateApplicationRequestSchema,
   SaveAnswersRequestSchema,
@@ -178,66 +176,6 @@ describe("ParseCriteriaRequestSchema", () => {
   });
 });
 
-describe("SubmitReviewRequestSchema", () => {
-  it("accepts a valid submit request", () => {
-    const result = SubmitReviewRequestSchema.safeParse({
-      bidFileName: "my-bid.docx",
-      bidFilePath: "user123/1234567890-my-bid.docx",
-      criteriaJson: {
-        name: "Test Criteria",
-        criteria: [
-          { id: "c1", criterion: "Need", sub_questions: [] },
-        ],
-      },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("rejects missing file name", () => {
-    const result = SubmitReviewRequestSchema.safeParse({
-      bidFileName: "",
-      bidFilePath: "some/path",
-      criteriaJson: {
-        name: "Test",
-        criteria: [{ id: "c1", criterion: "Need", sub_questions: [] }],
-      },
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects missing file path", () => {
-    const result = SubmitReviewRequestSchema.safeParse({
-      bidFileName: "bid.docx",
-      bidFilePath: "",
-      criteriaJson: {
-        name: "Test",
-        criteria: [{ id: "c1", criterion: "Need", sub_questions: [] }],
-      },
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects invalid nested criteria (empty criteria array)", () => {
-    const result = SubmitReviewRequestSchema.safeParse({
-      bidFileName: "bid.docx",
-      bidFilePath: "user/bid.docx",
-      criteriaJson: {
-        name: "Test",
-        criteria: [],
-      },
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects missing criteriaJson entirely", () => {
-    const result = SubmitReviewRequestSchema.safeParse({
-      bidFileName: "bid.docx",
-      bidFilePath: "user/bid.docx",
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
 describe("FundSchema", () => {
   it("accepts a valid fund with all fields", () => {
     const result = FundSchema.safeParse({
@@ -290,70 +228,6 @@ describe("CreateFundSchema", () => {
     });
     // strict mode strips extra keys but doesn't fail by default
     expect(result.success).toBe(true);
-  });
-});
-
-describe("SubmitReviewRequestV2Schema", () => {
-  const validV2 = {
-    bidFileName: "my-bid.docx",
-    bidFilePath: "user123/1234567890-my-bid.docx",
-    fundId: "550e8400-e29b-41d4-a716-446655440000",
-    criteriaSetId: "660e8400-e29b-41d4-a716-446655440000",
-  };
-
-  it("accepts a valid V2 request", () => {
-    const result = SubmitReviewRequestV2Schema.safeParse(validV2);
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts with optional questionsSetId", () => {
-    const result = SubmitReviewRequestV2Schema.safeParse({
-      ...validV2,
-      questionsSetId: "770e8400-e29b-41d4-a716-446655440000",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("defaults completeDraft to true", () => {
-    const result = SubmitReviewRequestV2Schema.safeParse(validV2);
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.completeDraft).toBe(true);
-    }
-  });
-
-  it("rejects non-uuid fundId", () => {
-    const result = SubmitReviewRequestV2Schema.safeParse({
-      ...validV2,
-      fundId: "not-a-uuid",
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects non-uuid criteriaSetId", () => {
-    const result = SubmitReviewRequestV2Schema.safeParse({
-      ...validV2,
-      criteriaSetId: "not-a-uuid",
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects missing fundId", () => {
-    const result = SubmitReviewRequestV2Schema.safeParse({
-      bidFileName: "bid.docx",
-      bidFilePath: "user/bid.docx",
-      criteriaSetId: "660e8400-e29b-41d4-a716-446655440000",
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects missing criteriaSetId", () => {
-    const result = SubmitReviewRequestV2Schema.safeParse({
-      bidFileName: "bid.docx",
-      bidFilePath: "user/bid.docx",
-      fundId: "550e8400-e29b-41d4-a716-446655440000",
-    });
-    expect(result.success).toBe(false);
   });
 });
 

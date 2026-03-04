@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ApplicationsList } from "./ApplicationsList";
 
@@ -8,11 +9,13 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (!user) redirect("/login");
+
   // Fetch applications
   const { data: applications } = await supabase
     .from("applications")
     .select("id, title, status, review_count, updated_at, fund_id, funds(name)")
-    .eq("user_id", user!.id)
+    .eq("user_id", user.id)
     .order("updated_at", { ascending: false });
 
   const hasApplications = applications && applications.length > 0;

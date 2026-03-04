@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { FundsList } from "./FundsList";
 
 export default async function FundsPage() {
@@ -7,10 +8,12 @@ export default async function FundsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (!user) redirect("/login");
+
   const { data: rawFunds } = await supabase
     .from("funds")
     .select("id, name, organisation_id, organisations(id, name), url, published, created_at")
-    .eq("created_by", user!.id)
+    .eq("created_by", user.id)
     .eq("creator_hidden", false)
     .order("created_at", { ascending: false });
 

@@ -2,6 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { QuestionsSetSchema, type QuestionsSet } from "@/lib/schemas/criteria";
 import { logAiUsage } from "./log-usage";
 
+let _client: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!_client) _client = new Anthropic();
+  return _client;
+}
+
 const SYSTEM_PROMPT = `You are an expert at analysing funder application forms and guidance documents.
 
 Given raw text (copied from a funder's application form, question list, or guidance document), extract structured questions with word count limits and field types.
@@ -47,7 +53,7 @@ Field type detection rules:
 - When in doubt, default to "text_long" — it's always safe.`;
 
 export async function parseQuestionsWithAI(rawText: string, userId?: string): Promise<QuestionsSet> {
-  const client = new Anthropic();
+  const client = getClient();
   const model = "claude-sonnet-4-6";
 
   const message = await client.messages.create({

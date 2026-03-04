@@ -2,6 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { CriteriaSetSchema, type CriteriaSet } from "@/lib/schemas/criteria";
 import { logAiUsage } from "./log-usage";
 
+let _client: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!_client) _client = new Anthropic();
+  return _client;
+}
+
 const SYSTEM_PROMPT = `You are an expert at analysing funder criteria for bid/tender applications.
 
 Given raw text (copied from a funder's guidance document, application form, or scoring matrix), extract structured evaluation criteria.
@@ -35,7 +41,7 @@ Rules:
 - Do NOT invent criteria that aren't supported by the text`;
 
 export async function parseCriteriaWithAI(rawText: string, userId?: string): Promise<CriteriaSet> {
-  const client = new Anthropic();
+  const client = getClient();
   const model = "claude-sonnet-4-6";
 
   const message = await client.messages.create({

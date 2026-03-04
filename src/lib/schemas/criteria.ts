@@ -77,16 +77,6 @@ export const ParseCriteriaRequestSchema = z.object({
 
 export type ParseCriteriaRequest = z.infer<typeof ParseCriteriaRequestSchema>;
 
-export const SubmitReviewRequestSchema = z.object({
-  bidFileName: z.string().min(1),
-  bidFilePath: z.string().min(1),
-  criteriaJson: CriteriaSetSchema,
-  completeDraft: z.boolean().optional().default(true),
-  questionsJson: QuestionsSetSchema.optional(),
-});
-
-export type SubmitReviewRequest = z.infer<typeof SubmitReviewRequestSchema>;
-
 // ---------------------------------------------------------------------------
 // Organisation schemas
 // ---------------------------------------------------------------------------
@@ -126,21 +116,6 @@ export type Fund = z.infer<typeof FundSchema>;
 export const CreateFundSchema = FundSchema.omit({ id: true });
 
 export type CreateFund = z.infer<typeof CreateFundSchema>;
-
-// ---------------------------------------------------------------------------
-// V2 submit request — uses fund + set IDs instead of inline JSONB
-// ---------------------------------------------------------------------------
-
-export const SubmitReviewRequestV2Schema = z.object({
-  bidFileName: z.string().min(1),
-  bidFilePath: z.string().min(1),
-  fundId: z.string().uuid(),
-  criteriaSetId: z.string().uuid(),
-  questionsSetId: z.string().uuid().optional(),
-  completeDraft: z.boolean().optional().default(true),
-});
-
-export type SubmitReviewRequestV2 = z.infer<typeof SubmitReviewRequestV2Schema>;
 
 // ---------------------------------------------------------------------------
 // Extended Question — adds field_type, options, char_limit, required, section

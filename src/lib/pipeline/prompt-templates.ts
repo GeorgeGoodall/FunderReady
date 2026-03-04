@@ -84,8 +84,7 @@ export const ANTI_HALLUCINATION = `
 1. Only cite evidence that appears in the bid text. If a criterion is not addressed, say "Not addressed" — do not invent or assume content.
 2. If you are unsure whether something is covered, flag it as "Possibly addressed — verify" rather than making a definitive claim.
 3. Every target_text value MUST be an exact quote from the bid text. Do not paraphrase or modify quotes.
-4. Every paragraph_id MUST correspond to a paragraph ID from the document map provided.
-5. Weight your feedback toward the highest-impact improvements. If you identify many issues, make clear which 3-5 would most improve the bid's chances.`;
+4. Weight your feedback toward the highest-impact improvements. If you identify many issues, make clear which 3-5 would most improve the bid's chances.`;
 
 export const QUALITY_DIMENSIONS = `
 ## Quality Dimensions

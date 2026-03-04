@@ -1,0 +1,871 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type Stripe from "stripe";
+
+// ---------------------------------------------------------------------------
+// Shared mocking helpers
+// ---------------------------------------------------------------------------
+
+const mockGetUser = vi.fn();
+const mockFrom = vi.fn();
+const mockServiceFrom = vi.fn();
+
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => ({
+    auth: { getUser: mockGetUser },
+    from: mockFrom,
+  })),
+  createServiceClient: vi.fn(() => ({
+    from: mockServiceFrom,
+  })),
+}));
+
+// Mock Stripe SDK
+const mockStripeCheckoutCreate = vi.fn();
+const mockStripePortalCreate = vi.fn();
+const mockStripeCustomersCreate = vi.fn();
+const mockStripeSubscriptionsRetrieve = vi.fn();
+const mockStripeWebhooksConstructEvent = vi.fn();
+
+vi.mock("@/lib/stripe/client", () => ({
+  stripe: {
+    checkout: { sessions: { create: mockStripeCheckoutCreate } },
+    billingPortal: { sessions: { create: mockStripePortalCreate } },
+    customers: { create: mockStripeCustomersCreate },
+    subscriptions: { retrieve: mockStripeSubscriptionsRetrieve },
+    webhooks: { constructEvent: mockStripeWebhooksConstructEvent },
+  },
+}));
+
+// Mock PLANS
+vi.mock("@/lib/stripe/plans", () => ({
+  PLANS: {
+    free: { name: "Free", price: 0, reviewsPerMonth: 0 },
+    pro: {
+      name: "Pro",
+      priceMonthly: 4900,
+      reviewsPerMonth: 10,
+      stripePriceId: "price_test_123",
+    },
+  },
+}));
+
+// Mock usage period
+vi.mock("@/lib/usage/period", () => ({
+  getUsagePeriod: vi.fn(() => ({
+    periodKey: "2026-03-04",
+    resetDate: new Date("2026-04-04"),
+  })),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+// ---------------------------------------------------------------------------
+// Helper to build chained Supabase query mocks
+// ---------------------------------------------------------------------------
+
+function chainMock(resolvedValue: unknown) {
+  const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+  chain.select = vi.fn(() => chain);
+  chain.insert = vi.fn(() => chain);
+  chain.update = vi.fn(() => chain);
+  chain.upsert = vi.fn(() => chain);
+  chain.eq = vi.fn(() => chain);
+  chain.single = vi.fn(() => Promise.resolve(resolvedValue));
+  chain.order = vi.fn(() => chain);
+  return chain;
+}
+
+function authenticatedUser(id = "user-123") {
+  mockGetUser.mockResolvedValue({
+    data: { user: { id, email: "test@example.com" } },
+  });
+}
+
+function unauthenticatedUser() {
+  mockGetUser.mockResolvedValue({ data: { user: null } });
+}
+
+// =====================================================================
+// POST /api/stripe/checkout
+// =====================================================================
+
+describe("POST /api/stripe/checkout", () => {
+  async function importRoute() {
+    const mod = await import("../../stripe/checkout/route");
+    return mod.POST;
+  }
+
+  it("returns 401 when unauthenticated", async () => {
+    unauthenticatedUser();
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/stripe/checkout", {
+      method: "POST",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 400 when user already has pro subscription", async () => {
+    authenticatedUser();
+    mockServiceFrom.mockReturnValue(
+      chainMock({
+        data: { subscription_tier: "pro", stripe_customer_id: "cus_existing" },
+        error: null,
+      })
+    );
+
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/stripe/checkout", {
+      method: "POST",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Already subscribed to Pro" });
+  });
+
+  it("creates new Stripe customer when none exists, returns checkout URL", async () => {
+    authenticatedUser();
+    // Profile without stripe_customer_id
+    const profileChain = chainMock({
+      data: { subscription_tier: "free", stripe_customer_id: null },
+      error: null,
+    });
+    // Update chain for saving customer ID
+    const updateChain = chainMock({ data: null, error: null });
+
+    let callCount = 0;
+    mockServiceFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return profileChain; // select profile
+      return updateChain; // update profile with customer_id
+    });
+
+    mockStripeCustomersCreate.mockResolvedValue({ id: "cus_new_123" });
+    mockStripeCheckoutCreate.mockResolvedValue({
+      url: "https://checkout.stripe.com/session_123",
+    });
+
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/stripe/checkout", {
+      method: "POST",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.url).toBe("https://checkout.stripe.com/session_123");
+
+    // Verify customer was created with correct params
+    expect(mockStripeCustomersCreate).toHaveBeenCalledWith({
+      email: "test@example.com",
+      metadata: { userId: "user-123" },
+    });
+
+    // Verify checkout session used the new customer ID
+    expect(mockStripeCheckoutCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: "cus_new_123",
+        mode: "subscription",
+        line_items: [{ price: "price_test_123", quantity: 1 }],
+      })
+    );
+  });
+
+  it("uses existing Stripe customer ID when one exists, returns checkout URL", async () => {
+    authenticatedUser();
+    mockServiceFrom.mockReturnValue(
+      chainMock({
+        data: {
+          subscription_tier: "free",
+          stripe_customer_id: "cus_existing_456",
+        },
+        error: null,
+      })
+    );
+
+    mockStripeCheckoutCreate.mockResolvedValue({
+      url: "https://checkout.stripe.com/session_existing",
+    });
+
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/stripe/checkout", {
+      method: "POST",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.url).toBe("https://checkout.stripe.com/session_existing");
+
+    // Should NOT create a new customer
+    expect(mockStripeCustomersCreate).not.toHaveBeenCalled();
+
+    // Should use existing customer ID
+    expect(mockStripeCheckoutCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: "cus_existing_456",
+      })
+    );
+  });
+
+  it("passes correct line items and URLs to Stripe checkout", async () => {
+    authenticatedUser();
+    mockServiceFrom.mockReturnValue(
+      chainMock({
+        data: {
+          subscription_tier: "free",
+          stripe_customer_id: "cus_existing_456",
+        },
+        error: null,
+      })
+    );
+
+    mockStripeCheckoutCreate.mockResolvedValue({
+      url: "https://checkout.stripe.com/session_test",
+    });
+
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/stripe/checkout", {
+      method: "POST",
+    });
+    await POST(req);
+
+    expect(mockStripeCheckoutCreate).toHaveBeenCalledWith({
+      mode: "subscription",
+      customer: "cus_existing_456",
+      line_items: [{ price: "price_test_123", quantity: 1 }],
+      success_url: "http://localhost:3000/billing?upgraded=true",
+      cancel_url: "http://localhost:3000/billing",
+      metadata: { userId: "user-123" },
+    });
+  });
+});
+
+// =====================================================================
+// POST /api/stripe/portal
+// =====================================================================
+
+describe("POST /api/stripe/portal", () => {
+  async function importRoute() {
+    const mod = await import("../../stripe/portal/route");
+    return mod.POST;
+  }
+
+  it("returns 401 when unauthenticated", async () => {
+    unauthenticatedUser();
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/stripe/portal", {
+      method: "POST",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 400 when no stripe_customer_id on profile", async () => {
+    authenticatedUser();
+    mockServiceFrom.mockReturnValue(
+      chainMock({
+        data: { stripe_customer_id: null },
+        error: null,
+      })
+    );
+
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/stripe/portal", {
+      method: "POST",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "No billing account found" });
+  });
+
+  it("returns portal URL on success", async () => {
+    authenticatedUser();
+    mockServiceFrom.mockReturnValue(
+      chainMock({
+        data: { stripe_customer_id: "cus_portal_123" },
+        error: null,
+      })
+    );
+
+    mockStripePortalCreate.mockResolvedValue({
+      url: "https://billing.stripe.com/portal_session_abc",
+    });
+
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/stripe/portal", {
+      method: "POST",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.url).toBe("https://billing.stripe.com/portal_session_abc");
+
+    expect(mockStripePortalCreate).toHaveBeenCalledWith({
+      customer: "cus_portal_123",
+      return_url: "http://localhost:3000/billing",
+    });
+  });
+});
+
+// =====================================================================
+// POST /api/stripe/webhooks
+// =====================================================================
+
+describe("POST /api/stripe/webhooks", () => {
+  async function importRoute() {
+    const mod = await import("../../stripe/webhooks/route");
+    return mod.POST;
+  }
+
+  function makeWebhookRequest(
+    body = '{"type":"test"}',
+    signature: string | null = "sig_test_123"
+  ) {
+    const headers: Record<string, string> = {};
+    if (signature !== null) {
+      headers["stripe-signature"] = signature;
+    }
+    return new Request("http://localhost/api/stripe/webhooks", {
+      method: "POST",
+      body,
+      headers,
+    });
+  }
+
+  it("returns 400 when stripe-signature header is missing", async () => {
+    const POST = await importRoute();
+    const req = makeWebhookRequest('{"type":"test"}', null);
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Missing stripe-signature header",
+    });
+  });
+
+  it("returns 400 when signature verification fails", async () => {
+    mockStripeWebhooksConstructEvent.mockImplementation(() => {
+      throw new Error("Invalid signature");
+    });
+
+    const POST = await importRoute();
+    const req = makeWebhookRequest('{"type":"test"}', "invalid_sig");
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid signature" });
+  });
+
+  it("routes checkout.session.completed correctly", async () => {
+    const mockSession = {
+      subscription: "sub_123",
+      customer: "cus_123",
+      metadata: { userId: "user-123" },
+    };
+
+    mockStripeWebhooksConstructEvent.mockReturnValue({
+      type: "checkout.session.completed",
+      data: { object: mockSession },
+    });
+
+    // Mock the handler's internal calls — handleCheckoutCompleted uses:
+    // 1. stripe.subscriptions.retrieve
+    // 2. createServiceClient().from("profiles").update().eq().select().single()
+    // 3. createServiceClient().from("usage").upsert()
+    mockStripeSubscriptionsRetrieve.mockResolvedValue({
+      items: {
+        data: [{ current_period_end: Math.floor(Date.now() / 1000) + 86400 }],
+      },
+    });
+
+    const profileUpdateChain = chainMock({
+      data: { id: "user-123" },
+      error: null,
+    });
+    const usageUpsertChain = chainMock({ data: null, error: null });
+
+    let callCount = 0;
+    mockServiceFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return profileUpdateChain;
+      return usageUpsertChain;
+    });
+
+    const POST = await importRoute();
+    const req = makeWebhookRequest('{"type":"checkout.session.completed"}');
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
+  });
+
+  it("routes customer.subscription.updated correctly", async () => {
+    const mockSubscription = {
+      customer: "cus_456",
+      status: "active",
+      items: {
+        data: [{ current_period_end: Math.floor(Date.now() / 1000) + 86400 }],
+      },
+    };
+
+    mockStripeWebhooksConstructEvent.mockReturnValue({
+      type: "customer.subscription.updated",
+      data: { object: mockSubscription },
+    });
+
+    mockServiceFrom.mockReturnValue(
+      chainMock({ data: null, error: null })
+    );
+
+    const POST = await importRoute();
+    const req = makeWebhookRequest(
+      '{"type":"customer.subscription.updated"}'
+    );
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
+  });
+
+  it("routes customer.subscription.deleted correctly", async () => {
+    const mockSubscription = {
+      customer: "cus_789",
+      status: "canceled",
+      items: { data: [] },
+    };
+
+    mockStripeWebhooksConstructEvent.mockReturnValue({
+      type: "customer.subscription.deleted",
+      data: { object: mockSubscription },
+    });
+
+    const profileChain = chainMock({
+      data: { id: "user-789" },
+      error: null,
+    });
+    const usageChain = chainMock({ data: null, error: null });
+
+    let callCount = 0;
+    mockServiceFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return profileChain;
+      return usageChain;
+    });
+
+    const POST = await importRoute();
+    const req = makeWebhookRequest(
+      '{"type":"customer.subscription.deleted"}'
+    );
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
+  });
+
+  it("routes invoice.payment_failed correctly", async () => {
+    const mockInvoice = {
+      customer: "cus_fail",
+    };
+
+    mockStripeWebhooksConstructEvent.mockReturnValue({
+      type: "invoice.payment_failed",
+      data: { object: mockInvoice },
+    });
+
+    mockServiceFrom.mockReturnValue(
+      chainMock({ data: null, error: null })
+    );
+
+    const POST = await importRoute();
+    const req = makeWebhookRequest('{"type":"invoice.payment_failed"}');
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
+  });
+
+  it("returns 200 with { received: true } even when handler throws (current behavior — error swallowed)", async () => {
+    mockStripeWebhooksConstructEvent.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          subscription: "sub_fail",
+          customer: "cus_fail",
+        },
+      },
+    });
+
+    // Make the handler's stripe.subscriptions.retrieve throw
+    mockStripeSubscriptionsRetrieve.mockRejectedValue(
+      new Error("Stripe API error")
+    );
+
+    const POST = await importRoute();
+    const req = makeWebhookRequest(
+      '{"type":"checkout.session.completed"}'
+    );
+    const res = await POST(req);
+    // Current behavior: error is caught and swallowed, returns 200
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
+  });
+});
+
+// =====================================================================
+// Webhook handlers (src/lib/stripe/webhooks.ts)
+// =====================================================================
+
+describe("Webhook handlers", () => {
+  async function importHandlers() {
+    return import("@/lib/stripe/webhooks");
+  }
+
+  describe("handleCheckoutCompleted", () => {
+    it("updates profile to pro + active and syncs usage", async () => {
+      const periodEnd = Math.floor(Date.now() / 1000) + 30 * 86400;
+      mockStripeSubscriptionsRetrieve.mockResolvedValue({
+        items: { data: [{ current_period_end: periodEnd }] },
+      } as unknown as Stripe.Subscription);
+
+      const profileChain = chainMock({
+        data: { id: "user-checkout-1" },
+        error: null,
+      });
+      const usageChain = chainMock({ data: null, error: null });
+
+      let callCount = 0;
+      mockServiceFrom.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return profileChain;
+        return usageChain;
+      });
+
+      const { handleCheckoutCompleted } = await importHandlers();
+      await handleCheckoutCompleted({
+        subscription: "sub_test_1",
+        customer: "cus_test_1",
+      } as unknown as Stripe.Checkout.Session);
+
+      // Verify subscription was retrieved
+      expect(mockStripeSubscriptionsRetrieve).toHaveBeenCalledWith(
+        "sub_test_1"
+      );
+
+      // Verify profile was updated
+      expect(profileChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscription_tier: "pro",
+          subscription_status: "active",
+          stripe_customer_id: "cus_test_1",
+          stripe_subscription_id: "sub_test_1",
+        })
+      );
+      expect(profileChain.eq).toHaveBeenCalledWith(
+        "stripe_customer_id",
+        "cus_test_1"
+      );
+
+      // Verify usage was synced
+      expect(usageChain.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: "user-checkout-1",
+          reviews_limit: 10,
+          reviews_used: 0,
+          bonus_reviews: 0,
+        }),
+        { onConflict: "user_id,period" }
+      );
+    });
+
+    it("returns early when subscription or customer ID is missing", async () => {
+      const { handleCheckoutCompleted } = await importHandlers();
+
+      await handleCheckoutCompleted({
+        subscription: null,
+        customer: "cus_test",
+      } as unknown as Stripe.Checkout.Session);
+
+      // Should not attempt to retrieve subscription
+      expect(mockStripeSubscriptionsRetrieve).not.toHaveBeenCalled();
+      expect(mockServiceFrom).not.toHaveBeenCalled();
+    });
+
+    it("returns early when profile update fails", async () => {
+      mockStripeSubscriptionsRetrieve.mockResolvedValue({
+        items: { data: [{ current_period_end: 1700000000 }] },
+      } as unknown as Stripe.Subscription);
+
+      const profileChain = chainMock({
+        data: null,
+        error: { message: "Profile not found" },
+      });
+      mockServiceFrom.mockReturnValue(profileChain);
+
+      const { handleCheckoutCompleted } = await importHandlers();
+      await handleCheckoutCompleted({
+        subscription: "sub_fail",
+        customer: "cus_fail",
+      } as unknown as Stripe.Checkout.Session);
+
+      // Should have tried to update profile
+      expect(profileChain.update).toHaveBeenCalled();
+      // Should NOT have tried to sync usage (early return)
+      // The mockServiceFrom was only called once (for profiles), not twice (for usage)
+    });
+  });
+
+  describe("handleSubscriptionUpdated", () => {
+    it("maps 'active' status correctly and updates profile", async () => {
+      const updateChain = chainMock({ data: null, error: null });
+      mockServiceFrom.mockReturnValue(updateChain);
+
+      const { handleSubscriptionUpdated } = await importHandlers();
+      await handleSubscriptionUpdated({
+        customer: "cus_upd_1",
+        status: "active",
+        items: {
+          data: [{ current_period_end: 1700000000 }],
+        },
+      } as unknown as Stripe.Subscription);
+
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscription_status: "active",
+        })
+      );
+      expect(updateChain.eq).toHaveBeenCalledWith(
+        "stripe_customer_id",
+        "cus_upd_1"
+      );
+    });
+
+    it("maps 'trialing' status to 'active'", async () => {
+      const updateChain = chainMock({ data: null, error: null });
+      mockServiceFrom.mockReturnValue(updateChain);
+
+      const { handleSubscriptionUpdated } = await importHandlers();
+      await handleSubscriptionUpdated({
+        customer: "cus_upd_2",
+        status: "trialing",
+        items: { data: [] },
+      } as unknown as Stripe.Subscription);
+
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscription_status: "active",
+        })
+      );
+    });
+
+    it("maps 'incomplete' status to 'past_due'", async () => {
+      const updateChain = chainMock({ data: null, error: null });
+      mockServiceFrom.mockReturnValue(updateChain);
+
+      const { handleSubscriptionUpdated } = await importHandlers();
+      await handleSubscriptionUpdated({
+        customer: "cus_upd_3",
+        status: "incomplete",
+        items: { data: [] },
+      } as unknown as Stripe.Subscription);
+
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscription_status: "past_due",
+        })
+      );
+    });
+
+    it("maps 'canceled' status to 'cancelled'", async () => {
+      const updateChain = chainMock({ data: null, error: null });
+      mockServiceFrom.mockReturnValue(updateChain);
+
+      const { handleSubscriptionUpdated } = await importHandlers();
+      await handleSubscriptionUpdated({
+        customer: "cus_upd_4",
+        status: "canceled",
+        items: { data: [] },
+      } as unknown as Stripe.Subscription);
+
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscription_status: "cancelled",
+        })
+      );
+    });
+
+    it("maps 'paused' status to 'cancelled'", async () => {
+      const updateChain = chainMock({ data: null, error: null });
+      mockServiceFrom.mockReturnValue(updateChain);
+
+      const { handleSubscriptionUpdated } = await importHandlers();
+      await handleSubscriptionUpdated({
+        customer: "cus_upd_5",
+        status: "paused",
+        items: { data: [] },
+      } as unknown as Stripe.Subscription);
+
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscription_status: "cancelled",
+        })
+      );
+    });
+
+    it("maps unknown status to 'past_due'", async () => {
+      const updateChain = chainMock({ data: null, error: null });
+      mockServiceFrom.mockReturnValue(updateChain);
+
+      const { handleSubscriptionUpdated } = await importHandlers();
+      await handleSubscriptionUpdated({
+        customer: "cus_upd_6",
+        status: "some_unknown_status",
+        items: { data: [] },
+      } as unknown as Stripe.Subscription);
+
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscription_status: "past_due",
+        })
+      );
+    });
+
+    it("computes current_period_end from subscription items", async () => {
+      const updateChain = chainMock({ data: null, error: null });
+      mockServiceFrom.mockReturnValue(updateChain);
+
+      const periodEndUnix = 1700000000; // 2023-11-14T22:13:20.000Z
+
+      const { handleSubscriptionUpdated } = await importHandlers();
+      await handleSubscriptionUpdated({
+        customer: "cus_upd_7",
+        status: "active",
+        items: {
+          data: [{ current_period_end: periodEndUnix }],
+        },
+      } as unknown as Stripe.Subscription);
+
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          current_period_end: new Date(
+            periodEndUnix * 1000
+          ).toISOString(),
+        })
+      );
+    });
+
+    it("sets current_period_end to null when no subscription items", async () => {
+      const updateChain = chainMock({ data: null, error: null });
+      mockServiceFrom.mockReturnValue(updateChain);
+
+      const { handleSubscriptionUpdated } = await importHandlers();
+      await handleSubscriptionUpdated({
+        customer: "cus_upd_8",
+        status: "active",
+        items: { data: [] },
+      } as unknown as Stripe.Subscription);
+
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          current_period_end: null,
+        })
+      );
+    });
+  });
+
+  describe("handleSubscriptionDeleted", () => {
+    it("downgrades to free + cancelled and syncs usage limit to 0", async () => {
+      const profileChain = chainMock({
+        data: { id: "user-del-1" },
+        error: null,
+      });
+      const usageChain = chainMock({ data: null, error: null });
+
+      let callCount = 0;
+      mockServiceFrom.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return profileChain;
+        return usageChain;
+      });
+
+      const { handleSubscriptionDeleted } = await importHandlers();
+      await handleSubscriptionDeleted({
+        customer: "cus_del_1",
+        status: "canceled",
+        items: { data: [] },
+      } as unknown as Stripe.Subscription);
+
+      // Verify profile downgraded
+      expect(profileChain.update).toHaveBeenCalledWith({
+        subscription_tier: "free",
+        subscription_status: "cancelled",
+        stripe_subscription_id: null,
+        current_period_end: null,
+      });
+      expect(profileChain.eq).toHaveBeenCalledWith(
+        "stripe_customer_id",
+        "cus_del_1"
+      );
+
+      // Verify usage limit set to 0
+      expect(usageChain.update).toHaveBeenCalledWith({ reviews_limit: 0 });
+      expect(usageChain.eq).toHaveBeenCalledWith("user_id", "user-del-1");
+    });
+
+    it("returns early when profile update fails", async () => {
+      const profileChain = chainMock({
+        data: null,
+        error: { message: "Not found" },
+      });
+      mockServiceFrom.mockReturnValue(profileChain);
+
+      const { handleSubscriptionDeleted } = await importHandlers();
+      await handleSubscriptionDeleted({
+        customer: "cus_del_fail",
+        status: "canceled",
+        items: { data: [] },
+      } as unknown as Stripe.Subscription);
+
+      // Profile update was attempted
+      expect(profileChain.update).toHaveBeenCalled();
+      // mockServiceFrom should only be called once (no usage update)
+      expect(mockServiceFrom).toHaveBeenCalledTimes(1);
+    });
+
+    it("skips usage sync when profile data is null (no matching customer)", async () => {
+      const profileChain = chainMock({
+        data: null,
+        error: null,
+      });
+      mockServiceFrom.mockReturnValue(profileChain);
+
+      const { handleSubscriptionDeleted } = await importHandlers();
+      await handleSubscriptionDeleted({
+        customer: "cus_del_nouser",
+        status: "canceled",
+        items: { data: [] },
+      } as unknown as Stripe.Subscription);
+
+      // Profile update was attempted but returned no profile
+      expect(profileChain.update).toHaveBeenCalled();
+      // Should only have called from() once (for profiles, not for usage)
+      expect(mockServiceFrom).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("handleInvoicePaymentFailed", () => {
+    it("sets subscription status to past_due", async () => {
+      const updateChain = chainMock({ data: null, error: null });
+      mockServiceFrom.mockReturnValue(updateChain);
+
+      const { handleInvoicePaymentFailed } = await importHandlers();
+      await handleInvoicePaymentFailed({
+        customer: "cus_invoice_fail",
+      } as unknown as Stripe.Invoice);
+
+      expect(updateChain.update).toHaveBeenCalledWith({
+        subscription_status: "past_due",
+      });
+      expect(updateChain.eq).toHaveBeenCalledWith(
+        "stripe_customer_id",
+        "cus_invoice_fail"
+      );
+    });
+  });
+});

@@ -3,10 +3,24 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { PLANS } from "@/lib/stripe/plans";
 import { getUsagePeriod } from "@/lib/usage/period";
 
-// DB constraint uses British spelling "cancelled"; Stripe uses American "canceled"
-function mapStripeStatus(status: string): string {
-  if (status === "canceled") return "cancelled";
-  return status;
+// Map Stripe subscription statuses to DB CHECK constraint values: 'active' | 'past_due' | 'cancelled'
+function mapStripeStatus(status: string): "active" | "past_due" | "cancelled" {
+  switch (status) {
+    case "active":
+    case "trialing":
+      return "active";
+    case "past_due":
+    case "incomplete":
+    case "incomplete_expired":
+    case "unpaid":
+      return "past_due";
+    case "canceled":
+    case "paused":
+      return "cancelled";
+    default:
+      console.warn(`[stripe] Unknown subscription status: ${status}, defaulting to past_due`);
+      return "past_due";
+  }
 }
 
 function getPeriodEnd(subscription: Stripe.Subscription): string | null {

@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockGetUser = vi.fn();
 const mockFrom = vi.fn();
 const mockServiceFrom = vi.fn();
+const mockServiceRpc = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
@@ -15,6 +16,7 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
   createServiceClient: vi.fn(() => ({
     from: mockServiceFrom,
+    rpc: mockServiceRpc,
   })),
 }));
 
@@ -688,8 +690,7 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     questions_set_id: QUESTIONS_SET_ID,
   };
 
-  const proProfile = { subscription_tier: "pro", current_period_end: null };
-  const usageUnderLimit = { reviews_used: 3, reviews_limit: 10, bonus_reviews: 0 };
+  const proProfile = { subscription_tier: "pro", subscription_status: "active", current_period_end: null };
   const nonEmptyAnswers = [{ question_id: "q1", answer_text: "Our answer." }];
 
   function setupSuccessfulMocks() {
@@ -702,11 +703,12 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     mockServiceFrom.mockImplementation(
       tableDispatch({
         profiles: { data: proProfile, error: null },
-        usage: { data: usageUnderLimit, error: null },
-        application_reviews: { data: { id: "review-001" }, error: null },
-        applications: { data: null, error: null },
       })
     );
+    mockServiceRpc.mockResolvedValue({
+      data: [{ review_id: "review-001", review_number: 1 }],
+      error: null,
+    });
   }
 
   it("returns 401 when not authenticated", async () => {
@@ -749,7 +751,7 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     mockFrom.mockImplementation(tableDispatch({ applications: { data: draftApp, error: null } }));
     mockServiceFrom.mockImplementation(
       tableDispatch({
-        profiles: { data: { subscription_tier: "free", current_period_end: null }, error: null },
+        profiles: { data: { subscription_tier: "free", subscription_status: null, current_period_end: null }, error: null },
       })
     );
     const POST = await importRoute();
@@ -758,30 +760,37 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     expect((await res.json()).error).toContain("subscription");
   });
 
-  it("returns 500 if usage row is missing after upsert", async () => {
+  it("returns 403 if subscription_status is not active", async () => {
     authenticatedUser();
     mockFrom.mockImplementation(tableDispatch({ applications: { data: draftApp, error: null } }));
     mockServiceFrom.mockImplementation(
       tableDispatch({
-        profiles: { data: proProfile, error: null },
-        usage: { data: null, error: null },
+        profiles: { data: { subscription_tier: "pro", subscription_status: "past_due", current_period_end: null }, error: null },
       })
     );
     const POST = await importRoute();
     const res = await POST(new Request("http://localhost"), routeParams(APP_ID));
-    expect(res.status).toBe(500);
-    expect((await res.json()).error).toContain("Usage check failed");
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toContain("subscription");
   });
 
-  it("returns 403 if monthly review limit reached", async () => {
+  it("returns 403 if monthly review limit reached (RPC)", async () => {
     authenticatedUser();
-    mockFrom.mockImplementation(tableDispatch({ applications: { data: draftApp, error: null } }));
+    mockFrom.mockImplementation(
+      tableDispatch({
+        applications: { data: draftApp, error: null },
+        application_answers: { data: nonEmptyAnswers, error: null },
+      })
+    );
     mockServiceFrom.mockImplementation(
       tableDispatch({
         profiles: { data: proProfile, error: null },
-        usage: { data: { reviews_used: 10, reviews_limit: 10, bonus_reviews: 0 }, error: null },
       })
     );
+    mockServiceRpc.mockResolvedValue({
+      data: null,
+      error: { message: "USAGE_LIMIT_EXCEEDED" },
+    });
     const POST = await importRoute();
     const res = await POST(new Request("http://localhost"), routeParams(APP_ID));
     expect(res.status).toBe(403);
@@ -802,7 +811,6 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     mockServiceFrom.mockImplementation(
       tableDispatch({
         profiles: { data: proProfile, error: null },
-        usage: { data: usageUnderLimit, error: null },
       })
     );
     const POST = await importRoute();
@@ -811,7 +819,7 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     expect((await res.json()).error).toContain("At least one answer");
   });
 
-  it("returns 500 if application_reviews insert fails", async () => {
+  it("returns 500 if RPC fails with non-usage error", async () => {
     authenticatedUser();
     mockFrom.mockImplementation(
       tableDispatch({
@@ -822,14 +830,16 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     mockServiceFrom.mockImplementation(
       tableDispatch({
         profiles: { data: proProfile, error: null },
-        usage: { data: usageUnderLimit, error: null },
-        application_reviews: { data: null, error: { message: "insert failed" } },
       })
     );
+    mockServiceRpc.mockResolvedValue({
+      data: null,
+      error: { message: "insert failed" },
+    });
     const POST = await importRoute();
     const res = await POST(new Request("http://localhost"), routeParams(APP_ID));
     expect(res.status).toBe(500);
-    expect((await res.json()).error).toContain("Failed to create review");
+    expect((await res.json()).error).toContain("Failed to submit review");
   });
 
   it("returns 201 and fires Inngest event on success", async () => {
@@ -854,7 +864,7 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     );
   });
 
-  it("uses bonus_reviews in limit calculation", async () => {
+  it("succeeds when RPC returns review (bonus_reviews handled atomically)", async () => {
     authenticatedUser();
     mockFrom.mockImplementation(
       tableDispatch({
@@ -862,15 +872,16 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
         application_answers: { data: nonEmptyAnswers, error: null },
       })
     );
-    // 10 used, 10 limit, but 2 bonus = 12 effective → should be allowed
     mockServiceFrom.mockImplementation(
       tableDispatch({
         profiles: { data: proProfile, error: null },
-        usage: { data: { reviews_used: 10, reviews_limit: 10, bonus_reviews: 2 }, error: null },
-        application_reviews: { data: { id: "review-002" }, error: null },
-        applications: { data: null, error: null },
       })
     );
+    // RPC succeeds — means bonus_reviews allowed it through atomically
+    mockServiceRpc.mockResolvedValue({
+      data: [{ review_id: "review-002", review_number: 1 }],
+      error: null,
+    });
     mockInngestSend.mockResolvedValue(undefined);
     const POST = await importRoute();
     const res = await POST(new Request("http://localhost"), routeParams(APP_ID));
