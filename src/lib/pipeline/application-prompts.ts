@@ -240,7 +240,7 @@ export function formatPreviousOverallContext(
   // NOTE: We intentionally do NOT include the previous overall_score or
   // submission_readiness here. Both create anchoring bias — the AI gravitates
   // toward the previous score/band rather than scoring purely on current evidence.
-  // submission_readiness labels like "Nearly ready" imply a numeric range (65-79)
+  // submission_readiness labels like "Good progress" imply a numeric range
   // which anchors the model just as effectively as the raw number.
   const topImprovements = Array.isArray(scoring.top_improvements)
     ? scoring.top_improvements.filter((v): v is string => typeof v === "string")
@@ -606,7 +606,7 @@ Return a JSON object:
   ],
   "overall_score": 72,
   "overall_descriptor": "Needs Revisions — Good foundation with specific gaps to address",
-  "submission_readiness": "Ready to submit|Nearly ready|Needs revisions|Major rework needed",
+  "submission_readiness": "Strong application|Good progress|Needs revisions|Major rework needed",
   "top_strengths": ["Strength 1", "Strength 2", "Strength 3"],
   "top_improvements": ["Improvement 1", "Improvement 2", "Improvement 3"],
   "improvement_appendix": [
@@ -639,7 +639,7 @@ Guidelines:
 - overall_score should be 0-100, reflecting the weighted assessment
 - Use the numeric ranges in the scoring rubric to guide your overall_score. The overall_score should be consistent with the distribution of individual criteria scores.
 - Overall score calibration: If the majority of criteria score Strong with one or more Excellent and no more than one Fair, the overall_score should be 78-90. If all criteria score Strong or Excellent, the overall_score should typically be 78-85 (the overall score is a holistic assessment, not an arithmetic mean of per-criterion scores). If all criteria score Excellent, the overall_score should be 90+. If the majority of criteria score Strong with no Excellent and at most one Fair, the overall_score should be 73-77. An overall_score below 70 should only occur when multiple criteria score Fair or below. An overall_score below 50 should only occur when the majority of criteria score Needs Improvement or below.
-- submission_readiness calibration: "Ready to submit" = overall_score 80+. "Nearly ready" = overall_score 65-79. "Needs revisions" = overall_score 50-64. "Major rework needed" = overall_score below 50.
+- submission_readiness calibration: "Strong application" = overall_score 75+. "Good progress" = overall_score 60-74. "Needs revisions" = overall_score 40-59. "Major rework needed" = overall_score below 40.
 - top_strengths and top_improvements should be the 3 highest-impact items
 - improvement_appendix should cover criteria scored Fair or below. For criteria scored Excellent or Strong, only include an entry if there is a meaningful, specific refinement — do not force suggestions where none are needed.
 - For each improvement_appendix item, set gap_type:

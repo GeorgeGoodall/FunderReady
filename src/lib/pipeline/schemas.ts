@@ -169,8 +169,8 @@ export const ApplicationScoringSchema = z.object({
   overall_score: z.number().min(0).max(100),
   overall_descriptor: z.string(),
   submission_readiness: z.enum([
-    "Ready to submit",
-    "Nearly ready",
+    "Strong application",
+    "Good progress",
     "Needs revisions",
     "Major rework needed",
   ]),

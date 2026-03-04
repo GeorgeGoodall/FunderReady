@@ -403,7 +403,7 @@ describe("ApplicationScoringSchema", () => {
       ],
       overall_score: 78,
       overall_descriptor: "Good",
-      submission_readiness: "Nearly ready" as const,
+      submission_readiness: "Good progress" as const,
       top_strengths: ["Strong needs assessment"],
       top_improvements: ["Add outcome metrics"],
     };
@@ -417,7 +417,7 @@ describe("ApplicationScoringSchema", () => {
         criteria_scores: [],
         overall_score: 150,
         overall_descriptor: "Excellent",
-        submission_readiness: "Ready to submit",
+        submission_readiness: "Strong application",
         top_strengths: ["Good"],
         top_improvements: ["Better"],
       })
@@ -431,7 +431,7 @@ describe("ApplicationScoringSchema", () => {
         criteria_scores: [],
         overall_score: 50,
         overall_descriptor: "OK",
-        submission_readiness: "Needs revisions",
+        submission_readiness: "Good progress",
         top_strengths: [],
         top_improvements: ["Something"],
       })
@@ -448,7 +448,7 @@ describe("ApplicationScoringSchema", () => {
       ],
       overall_score: 75,
       overall_descriptor: "Good",
-      submission_readiness: "Nearly ready" as const,
+      submission_readiness: "Good progress" as const,
       top_strengths: ["Clear need"],
       top_improvements: ["Add metrics"],
       quality_dimensions: [
@@ -472,7 +472,7 @@ describe("ApplicationScoringSchema", () => {
       ],
       overall_score: 75,
       overall_descriptor: "Good",
-      submission_readiness: "Nearly ready" as const,
+      submission_readiness: "Good progress" as const,
       top_strengths: ["Clear need"],
       top_improvements: ["Add metrics"],
     };

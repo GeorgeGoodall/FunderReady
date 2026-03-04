@@ -25,7 +25,7 @@ describe("SCORE_ORDER", () => {
 
 describe("colour maps have entries for all expected keys", () => {
   it("READINESS_COLOURS covers all readiness values", () => {
-    const expected = ["Ready to submit", "Nearly ready", "Needs revisions", "Major rework needed"];
+    const expected = ["Strong application", "Good progress", "Needs revisions", "Major rework needed"];
     for (const key of expected) {
       expect(READINESS_COLOURS[key]).toBeDefined();
     }
