@@ -36,19 +36,20 @@ export async function GET() {
     fundsCount,
     orgsCount,
   ] = await Promise.all([
-    // All-time aggregates
-    serviceClient.from("ai_usage_logs").select("pipeline_step, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd, cost_gbp"),
+    // All-time aggregates — explicit high limit to avoid Supabase's default 1000-row cap
+    serviceClient.from("ai_usage_logs").select("pipeline_step, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd, cost_gbp").limit(50000),
     // Recent 50 logs
     serviceClient
       .from("ai_usage_logs")
       .select("id, pipeline_step, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd, cost_gbp, is_retry, created_at")
       .order("created_at", { ascending: false })
       .limit(50),
-    // Last 30 days logs
+    // Last 30 days logs — explicit high limit to avoid Supabase's default 1000-row cap
     serviceClient
       .from("ai_usage_logs")
       .select("pipeline_step, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd, cost_gbp")
-      .gte("created_at", thirtyDaysAgo),
+      .gte("created_at", thirtyDaysAgo)
+      .limit(50000),
     // Recent reviews with cost columns
     serviceClient
       .from("application_reviews")

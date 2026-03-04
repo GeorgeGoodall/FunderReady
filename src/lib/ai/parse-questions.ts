@@ -1,33 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { QuestionsSetSchema, type QuestionsSet } from "@/lib/schemas/criteria";
+import type { ZodSchema } from "zod";
+import { callClaude, type ClaudeUsageData } from "./anthropic";
 import { logAiUsage } from "./log-usage";
-
-let _client: Anthropic | null = null;
-function getClient(): Anthropic {
-  if (!_client) _client = new Anthropic();
-  return _client;
-}
 
 const SYSTEM_PROMPT = `You are an expert at analysing funder application forms and guidance documents.
 
 Given raw text (copied from a funder's application form, question list, or guidance document), extract structured questions with word count limits and field types.
-
-Return ONLY valid JSON matching this schema:
-{
-  "questions": [
-    {
-      "id": "q1",
-      "question": "The question text as stated by the funder",
-      "word_count_min": 50 (if a minimum is mentioned, otherwise omit),
-      "word_count_max": 300 (if a maximum is mentioned, otherwise omit),
-      "guidance": "Any help text or guidance notes the funder provides for this question" (omit if none),
-      "priority": 3 (1-5, if weighting/priority is mentioned, otherwise omit),
-      "field_type": "text_long" (see rules below),
-      "options": ["Option A", "Option B"] (only for dropdown, radio, or checkbox — omit otherwise)
-    }
-  ],
-  "overall_word_limit": 5000 (if an overall application word limit is mentioned, otherwise omit)
-}
 
 Rules:
 - Extract 1-30 questions from the text
@@ -52,52 +30,24 @@ Field type detection rules:
 - "checkbox": Use when the funder asks to "select all that apply", "tick all that apply", or presents a multi-select list. Include the options in the "options" array.
 - When in doubt, default to "text_long" — it's always safe.`;
 
+const MODEL = "claude-sonnet-4-6";
+
 export async function parseQuestionsWithAI(rawText: string, userId?: string): Promise<QuestionsSet> {
-  const client = getClient();
-  const model = "claude-sonnet-4-6";
-
-  const message = await client.messages.create({
-    model,
-    max_tokens: 8192,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Extract structured questions and word count limits from this funder guidance:\n\n${rawText}`,
-      },
-    ],
-  });
-
-  void logAiUsage({
-    userId,
-    pipelineStep: "parse_questions",
-    model,
-    usage: {
-      input_tokens: message.usage.input_tokens,
-      output_tokens: message.usage.output_tokens,
-      cache_creation_input_tokens: (message.usage as unknown as Record<string, number>).cache_creation_input_tokens ?? 0,
-      cache_read_input_tokens: (message.usage as unknown as Record<string, number>).cache_read_input_tokens ?? 0,
+  return callClaude({
+    prompt: `Extract structured questions and word count limits from this funder guidance:\n\n${rawText}`,
+    systemPrompt: SYSTEM_PROMPT,
+    schema: QuestionsSetSchema as ZodSchema<QuestionsSet>,
+    model: MODEL,
+    maxTokens: 8192,
+    onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
+      if (!isRetry) {
+        void logAiUsage({
+          userId,
+          pipelineStep: "parse_questions",
+          model: MODEL,
+          usage,
+        });
+      }
     },
   });
-
-  console.log(`[parse-questions] stop_reason=${message.stop_reason}, usage: input=${message.usage.input_tokens} output=${message.usage.output_tokens}`);
-
-  if (message.stop_reason === "max_tokens") {
-    console.warn("[parse-questions] Response truncated — output hit max_tokens limit");
-  }
-
-  const textBlock = message.content.find((block) => block.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No text response from AI");
-  }
-
-  // Extract JSON from response (may be wrapped in markdown code block)
-  let jsonStr = textBlock.text.trim();
-  const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (jsonMatch) {
-    jsonStr = jsonMatch[1].trim();
-  }
-
-  const parsed = JSON.parse(jsonStr);
-  return QuestionsSetSchema.parse(parsed);
 }

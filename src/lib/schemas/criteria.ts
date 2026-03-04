@@ -72,7 +72,9 @@ export type QuestionsSet = z.infer<typeof QuestionsSetSchema>;
 // ---------------------------------------------------------------------------
 
 export const ParseCriteriaRequestSchema = z.object({
-  rawText: z.string().min(10, "Criteria text must be at least 10 characters"),
+  rawText: z.string()
+    .min(10, "Criteria text must be at least 10 characters")
+    .max(200000, "Text is too long (maximum 200,000 characters)"),
 });
 
 export type ParseCriteriaRequest = z.infer<typeof ParseCriteriaRequestSchema>;

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ParseCriteriaRequestSchema } from "@/lib/schemas/criteria";
 import { parseQuestionsWithAI } from "@/lib/ai/parse-questions";
-import { ZodError } from "zod";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -12,6 +11,20 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Pro-only endpoint — prevent free tier users from consuming AI credits
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("subscription_tier")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.subscription_tier !== "pro") {
+    return NextResponse.json(
+      { error: "Pro subscription required" },
+      { status: 403 }
+    );
   }
 
   let body: unknown;
@@ -34,22 +47,19 @@ export async function POST(request: Request) {
     const questions = await parseQuestionsWithAI(parsed.data.rawText, user.id);
     return NextResponse.json({ questions });
   } catch (err) {
-    if (err instanceof ZodError) {
-      return NextResponse.json(
-        { error: "AI returned invalid questions structure. Please try rephrasing your input." },
-        { status: 422 }
-      );
-    }
-    if (err instanceof SyntaxError) {
-      return NextResponse.json(
-        { error: "AI returned invalid JSON. Please try again." },
-        { status: 422 }
-      );
-    }
-    console.error("parse-questions error:", err);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const isValidation = errMsg.includes("validation") || errMsg.includes("failed");
+    const isTruncation = errMsg.includes("truncated") || errMsg.includes("max_tokens");
+    console.error("parse-questions error:", errMsg);
     return NextResponse.json(
-      { error: "Failed to parse questions. Please try again." },
-      { status: 500 }
+      {
+        error: isTruncation
+          ? "Input too long — the AI response was truncated. Try reducing the input text."
+          : isValidation
+            ? "AI returned an invalid structure. Please try rephrasing your input."
+            : "Failed to parse questions. Please try again.",
+      },
+      { status: isTruncation || isValidation ? 422 : 500 }
     );
   }
 }

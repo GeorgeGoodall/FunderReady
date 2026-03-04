@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ParseCriteriaRequestSchema } from "@/lib/schemas/criteria";
 import { parseCriteriaWithAI } from "@/lib/ai/parse-criteria";
-import { ZodError } from "zod";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -48,25 +47,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ criteria });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    if (err instanceof ZodError) {
-      const details = err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-      console.error("parse-criteria Zod error:", details);
-      return NextResponse.json(
-        { error: "AI returned invalid criteria structure. Please try rephrasing your input.", details },
-        { status: 422 }
-      );
-    }
-    if (err instanceof SyntaxError) {
-      console.error("parse-criteria JSON SyntaxError:", errMsg);
-      return NextResponse.json(
-        { error: "AI returned invalid JSON. This may be caused by a response that was too long and got truncated. Try reducing the input text.", details: errMsg },
-        { status: 422 }
-      );
-    }
-    console.error("parse-criteria error:", err);
+    const isValidation = errMsg.includes("validation") || errMsg.includes("failed");
+    const isTruncation = errMsg.includes("truncated") || errMsg.includes("max_tokens");
+    console.error("parse-criteria error:", errMsg);
     return NextResponse.json(
-      { error: "Failed to parse criteria. Please try again.", details: errMsg },
-      { status: 500 }
+      {
+        error: isTruncation
+          ? "Input too long — the AI response was truncated. Try reducing the input text."
+          : isValidation
+            ? "AI returned an invalid structure. Please try rephrasing your input."
+            : "Failed to parse criteria. Please try again.",
+      },
+      { status: isTruncation || isValidation ? 422 : 500 }
     );
   }
 }

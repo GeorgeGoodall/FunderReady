@@ -11,7 +11,7 @@ import { TabBar } from "./components/TabBar";
 import { SummaryTab } from "./components/SummaryTab";
 import { AnswersTab } from "./components/AnswersTab";
 import { CrossReferenceTab } from "./components/CrossReferenceTab";
-import { NewReviewButton } from "@/components/CreateDraftButton";
+import { NewReviewButton } from "@/components/NewReviewButton";
 
 export function ApplicationReviewClient({
   application,

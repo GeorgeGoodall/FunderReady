@@ -177,12 +177,13 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
 
   function emitUsage(msg: Anthropic.Message, isRetry: boolean) {
     if (onUsage && msg.usage) {
+      const usage = msg.usage as unknown as Record<string, number>;
       onUsage(
         {
           input_tokens: msg.usage.input_tokens,
           output_tokens: msg.usage.output_tokens,
-          cache_creation_input_tokens: (msg.usage as unknown as Record<string, number>).cache_creation_input_tokens ?? 0,
-          cache_read_input_tokens: (msg.usage as unknown as Record<string, number>).cache_read_input_tokens ?? 0,
+          cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
+          cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
         },
         isRetry
       );

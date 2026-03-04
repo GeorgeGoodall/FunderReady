@@ -27,13 +27,16 @@ export async function POST() {
     );
   }
 
-  // Create or retrieve Stripe customer
+  // Create or retrieve Stripe customer (idempotency key prevents duplicate customers on double-click)
   let customerId = profile?.stripe_customer_id;
   if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: user.email,
-      metadata: { userId: user.id },
-    });
+    const customer = await stripe.customers.create(
+      {
+        email: user.email,
+        metadata: { userId: user.id },
+      },
+      { idempotencyKey: `create-customer-${user.id}` }
+    );
     customerId = customer.id;
 
     await serviceClient

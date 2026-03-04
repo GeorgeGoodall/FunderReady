@@ -310,13 +310,18 @@ export const applicationReviewRequested = inngest.createFunction(
     concurrency: { key: "event.data.userId", limit: 1 },
     retries: 3,
     onFailure: async ({ event }) => {
-      const { applicationId, reviewId } = event.data.event.data;
+      const { applicationId, reviewId, userId } = event.data.event.data;
       if (applicationId && reviewId) {
         await markAppReviewFailed(
           reviewId,
           applicationId,
           "The review pipeline encountered an unexpected error. Please try again."
         );
+      }
+      // Rollback usage — user shouldn't lose quota for a failed pipeline
+      if (userId) {
+        const supabase = createServiceClient();
+        await supabase.rpc("rollback_usage", { p_user_id: userId });
       }
     },
   },

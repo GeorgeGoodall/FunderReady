@@ -44,7 +44,8 @@ export async function POST(
     .from("applications")
     .select("id", { count: "exact", head: true })
     .like("title", `%Review #${review.review_number} draft%`)
-    .eq("fund_id", sourceApp.fund_id);
+    .eq("fund_id", sourceApp.fund_id)
+    .eq("user_id", user.id);
 
   if ((count ?? 0) >= 5) {
     return NextResponse.json(

@@ -157,11 +157,11 @@ describe("POST /api/stripe/checkout", () => {
     const data = await res.json();
     expect(data.url).toBe("https://checkout.stripe.com/session_123");
 
-    // Verify customer was created with correct params
-    expect(mockStripeCustomersCreate).toHaveBeenCalledWith({
-      email: "test@example.com",
-      metadata: { userId: "user-123" },
-    });
+    // Verify customer was created with correct params + idempotency key
+    expect(mockStripeCustomersCreate).toHaveBeenCalledWith(
+      { email: "test@example.com", metadata: { userId: "user-123" } },
+      { idempotencyKey: "create-customer-user-123" }
+    );
 
     // Verify checkout session used the new customer ID
     expect(mockStripeCheckoutCreate).toHaveBeenCalledWith(
@@ -481,7 +481,7 @@ describe("POST /api/stripe/webhooks", () => {
     expect(await res.json()).toEqual({ received: true });
   });
 
-  it("returns 200 with { received: true } even when handler throws (current behavior — error swallowed)", async () => {
+  it("returns 500 when handler throws so Stripe retries", async () => {
     mockStripeWebhooksConstructEvent.mockReturnValue({
       type: "checkout.session.completed",
       data: {
@@ -502,9 +502,7 @@ describe("POST /api/stripe/webhooks", () => {
       '{"type":"checkout.session.completed"}'
     );
     const res = await POST(req);
-    // Current behavior: error is caught and swallowed, returns 200
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ received: true });
+    expect(res.status).toBe(500);
   });
 });
 

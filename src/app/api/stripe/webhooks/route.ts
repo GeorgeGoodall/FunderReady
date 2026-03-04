@@ -58,7 +58,10 @@ export async function POST(request: Request) {
     }
   } catch (err) {
     console.error(`Error handling ${event.type}:`, err);
-    // Still return 200 to prevent Stripe retries for handler errors
+    return NextResponse.json(
+      { error: `Failed to handle ${event.type}` },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ received: true });

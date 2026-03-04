@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { NewReviewButton } from "@/components/CreateDraftButton";
+import { NewReviewButton } from "@/components/NewReviewButton";
+import { READINESS_COLOURS } from "../review/constants";
+import { formatDateUTC } from "@/lib/date-utils";
 import {
   LineChart,
   Line,
@@ -40,13 +42,6 @@ interface HistoryClientProps {
 // ---------------------------------------------------------------------------
 // Colour helpers
 // ---------------------------------------------------------------------------
-
-const READINESS_COLOURS: Record<string, string> = {
-  "Strong application": "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  "Good progress": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  "Needs revisions": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  "Major rework needed": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
 
 function scoreColour(score: number): string {
   if (score >= 75) return "text-green-600 dark:text-green-400";
@@ -155,11 +150,6 @@ function ScoreChart({ reviews }: { reviews: ReviewSummary[] }) {
 // Review row
 // ---------------------------------------------------------------------------
 
-const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-function formatDateUTC(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
-}
 
 function ReviewRow({ review, applicationId }: { review: ReviewSummary; applicationId: string }) {
   const date = formatDateUTC(review.created_at);

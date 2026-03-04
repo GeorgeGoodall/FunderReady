@@ -133,10 +133,11 @@ describe("POST /api/parse-criteria", () => {
     expect(mockParseCriteriaWithAI).toHaveBeenCalledWith("Quality of delivery — 30%", "user-123");
   });
 
-  it("returns 422 when AI returns invalid Zod structure", async () => {
+  it("returns 422 when AI returns invalid structure (validation error)", async () => {
     authenticatedUser();
-    const { ZodError } = await import("zod");
-    mockParseCriteriaWithAI.mockRejectedValue(new ZodError([]));
+    mockParseCriteriaWithAI.mockRejectedValue(
+      new Error("Claude tool use failed validation after retry. Original errors: criteria: Required")
+    );
 
     const POST = await importRoute();
     const req = new Request("http://localhost/api/parse-criteria", {
@@ -146,12 +147,14 @@ describe("POST /api/parse-criteria", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(422);
-    expect((await res.json()).error).toContain("invalid criteria structure");
+    expect((await res.json()).error).toContain("invalid structure");
   });
 
-  it("returns 422 when AI returns invalid JSON", async () => {
+  it("returns 422 when AI response is truncated", async () => {
     authenticatedUser();
-    mockParseCriteriaWithAI.mockRejectedValue(new SyntaxError("Unexpected token"));
+    mockParseCriteriaWithAI.mockRejectedValue(
+      new Error("Claude response truncated (hit max_tokens=8192). Increase maxTokens for this call.")
+    );
 
     const POST = await importRoute();
     const req = new Request("http://localhost/api/parse-criteria", {
@@ -161,7 +164,7 @@ describe("POST /api/parse-criteria", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(422);
-    expect((await res.json()).error).toContain("invalid JSON");
+    expect((await res.json()).error).toContain("truncated");
   });
 
   it("returns 500 on unexpected error", async () => {
