@@ -1221,10 +1221,11 @@ describe("formatPreviousAnswerContext", () => {
     },
   };
 
-  it("returns context with score and weaknesses when data exists", () => {
+  it("returns context with weaknesses but NOT the answer score", () => {
     const result = formatPreviousAnswerContext("q1", previousResults, false, 2);
     expect(result).not.toBeNull();
-    expect(result).toContain('"Fair"');
+    // Score labels create anchoring bias — must NOT be included
+    expect(result).not.toContain('"Fair"');
     expect(result).toContain("No quantitative data");
     expect(result).toContain("Vague partner references");
   });
@@ -1251,10 +1252,11 @@ describe("formatPreviousAnswerContext", () => {
     expect(result).toContain("review #3");
   });
 
-  it("omits weaknesses section when no weaknesses", () => {
+  it("omits weaknesses section when no weaknesses and does not include score", () => {
     const result = formatPreviousAnswerContext("q2", previousResults, false, 2);
     expect(result).not.toBeNull();
-    expect(result).toContain('"Strong"');
+    // Score labels create anchoring bias — must NOT be included
+    expect(result).not.toContain('"Strong"');
     expect(result).not.toContain("Previous weaknesses flagged:");
   });
 
@@ -1278,7 +1280,8 @@ describe("formatPreviousAnswerContext", () => {
     };
     const result = formatPreviousAnswerContext("q10", results, false, 2);
     expect(result).not.toBeNull();
-    expect(result).toContain('"Good"');
+    // Score labels create anchoring bias — must NOT be included
+    expect(result).not.toContain('"Good"');
     expect(result).not.toContain("Previous weaknesses flagged:");
   });
 
@@ -1292,10 +1295,13 @@ describe("formatPreviousAnswerContext", () => {
     expect(formatPreviousAnswerContext("q1", results, false, 2)).toBeNull();
   });
 
-  it("defaults answer_score to Unknown when missing", () => {
+  it("does not include any score label even when answer_score is missing", () => {
     const results = { answer_feedback: { q1: { weaknesses: ["issue"] } } };
     const result = formatPreviousAnswerContext("q1", results, false, 2);
-    expect(result).toContain('"Unknown"');
+    // Score labels create anchoring bias — must NOT be included
+    expect(result).not.toContain('"Unknown"');
+    expect(result).not.toContain("scored this answer");
+    expect(result).toContain("issue");
   });
 
   it("filters out non-string weaknesses", () => {
@@ -1323,11 +1329,12 @@ describe("formatPreviousOverallContext", () => {
     },
   };
 
-  it("returns readiness and top improvements but NOT the numeric score", () => {
+  it("returns top improvements but NOT the numeric score or readiness label", () => {
     const result = formatPreviousOverallContext(previousResults, 2);
     expect(result).not.toBeNull();
+    // Neither numeric score nor readiness label should be included — both create anchoring bias
     expect(result).not.toContain("62");
-    expect(result).toContain("Needs revisions");
+    expect(result).not.toContain("Needs revisions");
     expect(result).toContain("Add evidence");
     expect(result).toContain("Strengthen partnerships section");
   });
@@ -1354,13 +1361,14 @@ describe("formatPreviousOverallContext", () => {
     expect(result).toContain("score on substance, not persistence");
   });
 
-  it("handles submission_readiness of 'Not ready'", () => {
+  it("does not include readiness label or numeric score", () => {
     const results = { scoring: { overall_score: 0, submission_readiness: "Not ready" } };
     const result = formatPreviousOverallContext(results, 2);
     expect(result).not.toBeNull();
-    expect(result).toContain("Not ready");
-    // Score should NOT be leaked
+    // Neither readiness label nor numeric score should be leaked — both create anchoring bias
+    expect(result).not.toContain("Not ready");
     expect(result).not.toContain("0/100");
+    expect(result).not.toContain("0");
   });
 
   it("handles missing top_improvements", () => {
@@ -1375,17 +1383,19 @@ describe("formatPreviousOverallContext", () => {
     expect(formatPreviousOverallContext({ scoring: null }, 2)).toBeNull();
   });
 
-  it("does not include numeric score even when overall_score is present", () => {
+  it("does not include numeric score or readiness even when both are present", () => {
     const results = { scoring: { overall_score: 85, submission_readiness: "Good" } };
     const result = formatPreviousOverallContext(results, 2);
     expect(result).not.toContain("85");
-    expect(result).toContain("Good");
+    expect(result).not.toContain("Good");
   });
 
-  it("defaults submission_readiness to Unknown when not a string", () => {
+  it("does not include readiness label even when missing from results", () => {
     const results = { scoring: { overall_score: 70 } };
     const result = formatPreviousOverallContext(results, 2);
-    expect(result).toContain('"Unknown"');
+    // No readiness label of any kind should appear
+    expect(result).not.toContain("readiness");
+    expect(result).not.toContain('"Unknown"');
   });
 
   it("filters out non-string top_improvements", () => {
