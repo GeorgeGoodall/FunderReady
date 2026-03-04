@@ -26,7 +26,8 @@ export function CriteriaInput({ onParsed }: CriteriaInputProps) {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Failed to parse criteria");
+        const detail = data.details ? `\n${data.details}` : "";
+        setError((data.error ?? "Failed to parse criteria") + detail);
         return;
       }
 
@@ -55,7 +56,7 @@ export function CriteriaInput({ onParsed }: CriteriaInputProps) {
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+        <div className="whitespace-pre-wrap rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
           {error}
         </div>
       )}

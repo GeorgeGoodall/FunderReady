@@ -47,21 +47,25 @@ export async function POST(request: Request) {
     const criteria = await parseCriteriaWithAI(parsed.data.rawText, user.id);
     return NextResponse.json({ criteria });
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     if (err instanceof ZodError) {
+      const details = err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+      console.error("parse-criteria Zod error:", details);
       return NextResponse.json(
-        { error: "AI returned invalid criteria structure. Please try rephrasing your input." },
+        { error: "AI returned invalid criteria structure. Please try rephrasing your input.", details },
         { status: 422 }
       );
     }
     if (err instanceof SyntaxError) {
+      console.error("parse-criteria JSON SyntaxError:", errMsg);
       return NextResponse.json(
-        { error: "AI returned invalid JSON. Please try again." },
+        { error: "AI returned invalid JSON. This may be caused by a response that was too long and got truncated. Try reducing the input text.", details: errMsg },
         { status: 422 }
       );
     }
     console.error("parse-criteria error:", err);
     return NextResponse.json(
-      { error: "Failed to parse criteria. Please try again." },
+      { error: "Failed to parse criteria. Please try again.", details: errMsg },
       { status: 500 }
     );
   }

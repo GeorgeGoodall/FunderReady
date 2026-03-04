@@ -40,7 +40,7 @@ export async function parseCriteriaWithAI(rawText: string, userId?: string): Pro
 
   const message = await client.messages.create({
     model,
-    max_tokens: 2048,
+    max_tokens: 8192,
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -62,6 +62,12 @@ export async function parseCriteriaWithAI(rawText: string, userId?: string): Pro
     },
   });
 
+  console.log(`[parse-criteria] stop_reason=${message.stop_reason}, usage: input=${message.usage.input_tokens} output=${message.usage.output_tokens}`);
+
+  if (message.stop_reason === "max_tokens") {
+    console.warn("[parse-criteria] Response truncated — output hit max_tokens limit");
+  }
+
   const textBlock = message.content.find((block) => block.type === "text");
   if (!textBlock || textBlock.type !== "text") {
     throw new Error("No text response from AI");
@@ -74,6 +80,19 @@ export async function parseCriteriaWithAI(rawText: string, userId?: string): Pro
     jsonStr = jsonMatch[1].trim();
   }
 
-  const parsed = JSON.parse(jsonStr);
-  return CriteriaSetSchema.parse(parsed);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch (err) {
+    console.error("[parse-criteria] JSON parse failed. Raw AI response (first 500 chars):", jsonStr.slice(0, 500));
+    console.error("[parse-criteria] Raw AI response (last 200 chars):", jsonStr.slice(-200));
+    throw err;
+  }
+
+  try {
+    return CriteriaSetSchema.parse(parsed);
+  } catch (err) {
+    console.error("[parse-criteria] Zod validation failed. Parsed JSON keys:", Object.keys(parsed as Record<string, unknown>));
+    throw err;
+  }
 }
