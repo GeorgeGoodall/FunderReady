@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { detectFundName } from "@/lib/ai/detect-fund";
 import { z } from "zod";
+import { requireProWithRateLimit, isGuardError } from "@/lib/usage/require-pro-with-rate-limit";
 
 const DetectFundRequestSchema = z.object({
   fileName: z.string().min(1),
@@ -9,28 +10,8 @@ const DetectFundRequestSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Pro-only endpoint — prevent free tier users from consuming AI credits
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("subscription_tier")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.subscription_tier !== "pro") {
-    return NextResponse.json(
-      { error: "Pro subscription required" },
-      { status: 403 }
-    );
-  }
+  const guard = await requireProWithRateLimit();
+  if (isGuardError(guard)) return guard;
 
   let body: unknown;
   try {
@@ -57,13 +38,14 @@ export async function POST(request: Request) {
 
   let detectedName: string | null = null;
   try {
-    detectedName = await detectFundName(detectionText, user.id);
+    detectedName = await detectFundName(detectionText, guard.userId);
   } catch (error) {
     console.error("Fund detection AI error:", error);
     // Non-fatal — continue without AI detection
   }
 
   // Search DB for matching fund if we got a name
+  const supabase = await createClient();
   let matchedFund = null;
   if (detectedName) {
     const tsQuery = detectedName

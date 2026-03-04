@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { stripe } from "@/lib/stripe/client";
+
+// Stripe imports preserved for re-enablement:
+// import { createClient, createServiceClient } from "@/lib/supabase/server";
+// import { stripe } from "@/lib/stripe/client";
 
 export async function POST() {
+  // Subscriptions disabled during beta — re-enable when Stripe is ready
+  return NextResponse.json(
+    { error: "Subscriptions are not yet available" },
+    { status: 503 }
+  );
+
+  /* --- Re-enable block below when Stripe is ready ---
   const supabase = await createClient();
   const {
     data: { user },
@@ -34,4 +43,5 @@ export async function POST() {
   });
 
   return NextResponse.json({ url: session.url });
+  --- end re-enable block */
 }

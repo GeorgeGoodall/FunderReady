@@ -31,6 +31,17 @@ vi.mock("@/lib/ai/detect-fund", () => ({
   detectFundName: (...args: unknown[]) => mockDetectFundName(...args),
 }));
 
+// Mock requireProWithRateLimit guard
+const mockRequireProWithRateLimit = vi.fn();
+vi.mock("@/lib/usage/require-pro-with-rate-limit", () => ({
+  requireProWithRateLimit: (...args: unknown[]) =>
+    mockRequireProWithRateLimit(...args),
+  isGuardError: (result: unknown) => {
+    const { NextResponse } = require("next/server");
+    return result instanceof NextResponse;
+  },
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -267,14 +278,15 @@ describe("POST /api/parse-questions", () => {
   }
 
   beforeEach(() => {
-    // Default: authenticated pro user
-    mockFrom.mockReturnValue(
-      chainMock({ data: { subscription_tier: "pro" }, error: null })
-    );
+    // Default: guard passes (authenticated pro user)
+    mockRequireProWithRateLimit.mockResolvedValue({ userId: "user-123" });
   });
 
-  it("returns 401 when not authenticated", async () => {
-    unauthenticatedUser();
+  it("returns 401 when guard rejects (unauthenticated)", async () => {
+    const { NextResponse } = await import("next/server");
+    mockRequireProWithRateLimit.mockResolvedValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    );
     const POST = await importRoute();
     const req = new Request("http://localhost/api/parse-questions", {
       method: "POST",
@@ -282,13 +294,12 @@ describe("POST /api/parse-questions", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Unauthorized" });
   });
 
-  it("returns 403 for non-pro users", async () => {
-    authenticatedUser();
-    mockFrom.mockReturnValue(
-      chainMock({ data: { subscription_tier: "free" }, error: null })
+  it("returns 403 when guard rejects (free tier)", async () => {
+    const { NextResponse } = await import("next/server");
+    mockRequireProWithRateLimit.mockResolvedValue(
+      NextResponse.json({ error: "Pro subscription required" }, { status: 403 })
     );
     const POST = await importRoute();
     const req = new Request("http://localhost/api/parse-questions", {
@@ -298,11 +309,24 @@ describe("POST /api/parse-questions", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: "Pro subscription required" });
+  });
+
+  it("returns 429 when guard rejects (rate limit)", async () => {
+    const { NextResponse } = await import("next/server");
+    mockRequireProWithRateLimit.mockResolvedValue(
+      NextResponse.json({ error: "Daily AI limit reached" }, { status: 429 })
+    );
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/parse-questions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rawText: "Question 1: Describe your project (max 300 words)" }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(429);
   });
 
   it("returns 400 for invalid JSON body", async () => {
-    authenticatedUser();
     const POST = await importRoute();
     const req = new Request("http://localhost/api/parse-questions", {
       method: "POST",
@@ -314,7 +338,6 @@ describe("POST /api/parse-questions", () => {
   });
 
   it("returns 400 when rawText is too short", async () => {
-    authenticatedUser();
     const POST = await importRoute();
     const req = new Request("http://localhost/api/parse-questions", {
       method: "POST",
@@ -326,7 +349,6 @@ describe("POST /api/parse-questions", () => {
   });
 
   it("returns 200 with parsed questions on success", async () => {
-    authenticatedUser();
     const mockQuestions = {
       questions: [
         {
@@ -358,7 +380,6 @@ describe("POST /api/parse-questions", () => {
   });
 
   it("returns 422 when AI returns invalid structure (validation error)", async () => {
-    authenticatedUser();
     mockParseQuestionsWithAI.mockRejectedValue(
       new Error(
         "Claude tool use failed validation after retry. Original errors: questions: Required"
@@ -379,7 +400,6 @@ describe("POST /api/parse-questions", () => {
   });
 
   it("returns 422 when AI response is truncated", async () => {
-    authenticatedUser();
     mockParseQuestionsWithAI.mockRejectedValue(
       new Error(
         "Claude response truncated (hit max_tokens=8192). Increase maxTokens for this call."
@@ -400,7 +420,6 @@ describe("POST /api/parse-questions", () => {
   });
 
   it("returns 500 on unexpected error", async () => {
-    authenticatedUser();
     mockParseQuestionsWithAI.mockRejectedValue(new Error("Network timeout"));
 
     const POST = await importRoute();
@@ -427,14 +446,15 @@ describe("POST /api/detect-fund", () => {
   }
 
   beforeEach(() => {
-    // Default: authenticated pro user
-    mockFrom.mockReturnValue(
-      chainMock({ data: { subscription_tier: "pro" }, error: null })
-    );
+    // Default: guard passes (authenticated pro user)
+    mockRequireProWithRateLimit.mockResolvedValue({ userId: "user-123" });
   });
 
-  it("returns 401 when not authenticated", async () => {
-    unauthenticatedUser();
+  it("returns 401 when guard rejects (unauthenticated)", async () => {
+    const { NextResponse } = await import("next/server");
+    mockRequireProWithRateLimit.mockResolvedValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    );
     const POST = await importRoute();
     const req = new Request("http://localhost/api/detect-fund", {
       method: "POST",
@@ -442,13 +462,12 @@ describe("POST /api/detect-fund", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Unauthorized" });
   });
 
-  it("returns 403 for non-pro users", async () => {
-    authenticatedUser();
-    mockFrom.mockReturnValue(
-      chainMock({ data: { subscription_tier: "free" }, error: null })
+  it("returns 403 when guard rejects (free tier)", async () => {
+    const { NextResponse } = await import("next/server");
+    mockRequireProWithRateLimit.mockResolvedValue(
+      NextResponse.json({ error: "Pro subscription required" }, { status: 403 })
     );
     const POST = await importRoute();
     const req = new Request("http://localhost/api/detect-fund", {
@@ -458,11 +477,24 @@ describe("POST /api/detect-fund", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: "Pro subscription required" });
+  });
+
+  it("returns 429 when guard rejects (rate limit)", async () => {
+    const { NextResponse } = await import("next/server");
+    mockRequireProWithRateLimit.mockResolvedValue(
+      NextResponse.json({ error: "Daily AI limit reached" }, { status: 429 })
+    );
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/detect-fund", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileName: "bid-document.docx" }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(429);
   });
 
   it("returns 400 for invalid JSON body", async () => {
-    authenticatedUser();
     const POST = await importRoute();
     const req = new Request("http://localhost/api/detect-fund", {
       method: "POST",
@@ -474,7 +506,6 @@ describe("POST /api/detect-fund", () => {
   });
 
   it("returns 400 when fileName is missing", async () => {
-    authenticatedUser();
     const POST = await importRoute();
     const req = new Request("http://localhost/api/detect-fund", {
       method: "POST",
@@ -486,10 +517,9 @@ describe("POST /api/detect-fund", () => {
   });
 
   it("returns 200 with detected fund name and matched fund", async () => {
-    authenticatedUser();
     mockDetectFundName.mockResolvedValue("Community Ownership Fund");
 
-    // The route does a textSearch on funds table after detection
+    // The route calls createClient() for the fund search
     const fundsChain = chainMock({
       data: [
         {
@@ -504,19 +534,7 @@ describe("POST /api/detect-fund", () => {
       ],
       error: null,
     });
-    // First mockFrom call is for profiles (subscription check)
-    // Second mockFrom call is for funds (textSearch)
-    let fromCallCount = 0;
-    mockFrom.mockImplementation(() => {
-      fromCallCount++;
-      if (fromCallCount === 1) {
-        return chainMock({
-          data: { subscription_tier: "pro" },
-          error: null,
-        });
-      }
-      return fundsChain;
-    });
+    mockFrom.mockReturnValue(fundsChain);
 
     const POST = await importRoute();
     const req = new Request("http://localhost/api/detect-fund", {
@@ -547,7 +565,6 @@ describe("POST /api/detect-fund", () => {
   });
 
   it("returns 200 with null detectedName when AI returns null", async () => {
-    authenticatedUser();
     mockDetectFundName.mockResolvedValue(null);
 
     const POST = await importRoute();
@@ -564,7 +581,6 @@ describe("POST /api/detect-fund", () => {
   });
 
   it("returns 200 with null matchedFund when AI errors (non-fatal)", async () => {
-    authenticatedUser();
     mockDetectFundName.mockRejectedValue(new Error("AI service down"));
 
     const POST = await importRoute();

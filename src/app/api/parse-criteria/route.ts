@@ -1,31 +1,11 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { ParseCriteriaRequestSchema } from "@/lib/schemas/criteria";
 import { parseCriteriaWithAI } from "@/lib/ai/parse-criteria";
+import { requireProWithRateLimit, isGuardError } from "@/lib/usage/require-pro-with-rate-limit";
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Pro-only endpoint — prevent free tier users from consuming AI credits
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("subscription_tier")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.subscription_tier !== "pro") {
-    return NextResponse.json(
-      { error: "Pro subscription required" },
-      { status: 403 }
-    );
-  }
+  const guard = await requireProWithRateLimit();
+  if (isGuardError(guard)) return guard;
 
   let body: unknown;
   try {
@@ -43,7 +23,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const criteria = await parseCriteriaWithAI(parsed.data.rawText, user.id);
+    const criteria = await parseCriteriaWithAI(parsed.data.rawText, guard.userId);
     return NextResponse.json({ criteria });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);

@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { stripe } from "@/lib/stripe/client";
-import { PLANS } from "@/lib/stripe/plans";
+
+// Stripe imports preserved for re-enablement:
+// import { createClient, createServiceClient } from "@/lib/supabase/server";
+// import { stripe } from "@/lib/stripe/client";
+// import { PLANS } from "@/lib/stripe/plans";
 
 export async function POST() {
+  // Subscriptions disabled during beta — re-enable when Stripe is ready
+  return NextResponse.json(
+    { error: "Subscriptions are not yet available" },
+    { status: 503 }
+  );
+
+  /* --- Re-enable block below when Stripe is ready ---
   const supabase = await createClient();
   const {
     data: { user },
@@ -27,7 +36,6 @@ export async function POST() {
     );
   }
 
-  // Create or retrieve Stripe customer (idempotency key prevents duplicate customers on double-click)
   let customerId = profile?.stripe_customer_id;
   if (!customerId) {
     const customer = await stripe.customers.create(
@@ -57,4 +65,5 @@ export async function POST() {
   });
 
   return NextResponse.json({ url: session.url });
+  --- end re-enable block */
 }

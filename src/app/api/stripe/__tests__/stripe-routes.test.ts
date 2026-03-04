@@ -97,147 +97,15 @@ describe("POST /api/stripe/checkout", () => {
     return mod.POST;
   }
 
-  it("returns 401 when unauthenticated", async () => {
-    unauthenticatedUser();
+  it("returns 503 — subscriptions disabled during beta", async () => {
     const POST = await importRoute();
     const req = new Request("http://localhost/api/stripe/checkout", {
       method: "POST",
     });
     const res = await POST(req);
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Unauthorized" });
-  });
-
-  it("returns 400 when user already has pro subscription", async () => {
-    authenticatedUser();
-    mockServiceFrom.mockReturnValue(
-      chainMock({
-        data: { subscription_tier: "pro", stripe_customer_id: "cus_existing" },
-        error: null,
-      })
-    );
-
-    const POST = await importRoute();
-    const req = new Request("http://localhost/api/stripe/checkout", {
-      method: "POST",
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "Already subscribed to Pro" });
-  });
-
-  it("creates new Stripe customer when none exists, returns checkout URL", async () => {
-    authenticatedUser();
-    // Profile without stripe_customer_id
-    const profileChain = chainMock({
-      data: { subscription_tier: "free", stripe_customer_id: null },
-      error: null,
-    });
-    // Update chain for saving customer ID
-    const updateChain = chainMock({ data: null, error: null });
-
-    let callCount = 0;
-    mockServiceFrom.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) return profileChain; // select profile
-      return updateChain; // update profile with customer_id
-    });
-
-    mockStripeCustomersCreate.mockResolvedValue({ id: "cus_new_123" });
-    mockStripeCheckoutCreate.mockResolvedValue({
-      url: "https://checkout.stripe.com/session_123",
-    });
-
-    const POST = await importRoute();
-    const req = new Request("http://localhost/api/stripe/checkout", {
-      method: "POST",
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.url).toBe("https://checkout.stripe.com/session_123");
-
-    // Verify customer was created with correct params + idempotency key
-    expect(mockStripeCustomersCreate).toHaveBeenCalledWith(
-      { email: "test@example.com", metadata: { userId: "user-123" } },
-      { idempotencyKey: "create-customer-user-123" }
-    );
-
-    // Verify checkout session used the new customer ID
-    expect(mockStripeCheckoutCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customer: "cus_new_123",
-        mode: "subscription",
-        line_items: [{ price: "price_test_123", quantity: 1 }],
-      })
-    );
-  });
-
-  it("uses existing Stripe customer ID when one exists, returns checkout URL", async () => {
-    authenticatedUser();
-    mockServiceFrom.mockReturnValue(
-      chainMock({
-        data: {
-          subscription_tier: "free",
-          stripe_customer_id: "cus_existing_456",
-        },
-        error: null,
-      })
-    );
-
-    mockStripeCheckoutCreate.mockResolvedValue({
-      url: "https://checkout.stripe.com/session_existing",
-    });
-
-    const POST = await importRoute();
-    const req = new Request("http://localhost/api/stripe/checkout", {
-      method: "POST",
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.url).toBe("https://checkout.stripe.com/session_existing");
-
-    // Should NOT create a new customer
-    expect(mockStripeCustomersCreate).not.toHaveBeenCalled();
-
-    // Should use existing customer ID
-    expect(mockStripeCheckoutCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customer: "cus_existing_456",
-      })
-    );
-  });
-
-  it("passes correct line items and URLs to Stripe checkout", async () => {
-    authenticatedUser();
-    mockServiceFrom.mockReturnValue(
-      chainMock({
-        data: {
-          subscription_tier: "free",
-          stripe_customer_id: "cus_existing_456",
-        },
-        error: null,
-      })
-    );
-
-    mockStripeCheckoutCreate.mockResolvedValue({
-      url: "https://checkout.stripe.com/session_test",
-    });
-
-    const POST = await importRoute();
-    const req = new Request("http://localhost/api/stripe/checkout", {
-      method: "POST",
-    });
-    await POST(req);
-
-    expect(mockStripeCheckoutCreate).toHaveBeenCalledWith({
-      mode: "subscription",
-      customer: "cus_existing_456",
-      line_items: [{ price: "price_test_123", quantity: 1 }],
-      success_url: "http://localhost:3000/billing?upgraded=true",
-      cancel_url: "http://localhost:3000/billing",
-      metadata: { userId: "user-123" },
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({
+      error: "Subscriptions are not yet available",
     });
   });
 });
@@ -252,60 +120,15 @@ describe("POST /api/stripe/portal", () => {
     return mod.POST;
   }
 
-  it("returns 401 when unauthenticated", async () => {
-    unauthenticatedUser();
+  it("returns 503 — subscriptions disabled during beta", async () => {
     const POST = await importRoute();
     const req = new Request("http://localhost/api/stripe/portal", {
       method: "POST",
     });
     const res = await POST(req);
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Unauthorized" });
-  });
-
-  it("returns 400 when no stripe_customer_id on profile", async () => {
-    authenticatedUser();
-    mockServiceFrom.mockReturnValue(
-      chainMock({
-        data: { stripe_customer_id: null },
-        error: null,
-      })
-    );
-
-    const POST = await importRoute();
-    const req = new Request("http://localhost/api/stripe/portal", {
-      method: "POST",
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "No billing account found" });
-  });
-
-  it("returns portal URL on success", async () => {
-    authenticatedUser();
-    mockServiceFrom.mockReturnValue(
-      chainMock({
-        data: { stripe_customer_id: "cus_portal_123" },
-        error: null,
-      })
-    );
-
-    mockStripePortalCreate.mockResolvedValue({
-      url: "https://billing.stripe.com/portal_session_abc",
-    });
-
-    const POST = await importRoute();
-    const req = new Request("http://localhost/api/stripe/portal", {
-      method: "POST",
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.url).toBe("https://billing.stripe.com/portal_session_abc");
-
-    expect(mockStripePortalCreate).toHaveBeenCalledWith({
-      customer: "cus_portal_123",
-      return_url: "http://localhost:3000/billing",
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({
+      error: "Subscriptions are not yet available",
     });
   });
 });

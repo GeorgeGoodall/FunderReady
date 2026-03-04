@@ -9,25 +9,15 @@ interface UpsellPromptProps {
 
 export function UpsellPrompt({ tier, used, limit, resetDate }: UpsellPromptProps) {
   if (tier !== "pro") {
-    // No subscription — prompt to subscribe
+    // No subscription — coming soon
     return (
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-900/20">
-        <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200">
-          Subscribe to get started
+      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-700 dark:bg-zinc-800/50">
+        <h3 className="text-lg font-semibold text-zinc-800 dark:text-zinc-200">
+          Coming Soon
         </h3>
-        <p className="mt-2 text-sm text-blue-700 dark:text-blue-300">
-          Subscribe to FunderReady Pro to start reviewing bids. Get 10 full
-          reviews per month with inline comments and improvement appendix.
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          Subscriptions are not yet available. Contact us for beta access.
         </p>
-
-        <div className="mt-4">
-          <a
-            href="/billing"
-            className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            Subscribe to Pro — £49/month
-          </a>
-        </div>
       </div>
     );
   }

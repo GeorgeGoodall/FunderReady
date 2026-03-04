@@ -4,11 +4,7 @@ import { checkUsage } from "@/lib/usage/check-usage";
 import { PLANS } from "@/lib/stripe/plans";
 import { BillingClient } from "./BillingClient";
 
-export default async function BillingPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ upgraded?: string }>;
-}) {
+export default async function BillingPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -27,9 +23,6 @@ export default async function BillingPage({
   const usage = await checkUsage(supabase, user.id);
   const plan = PLANS[tier];
 
-  const params = await searchParams;
-  const upgraded = params.upgraded === "true";
-
   const resetDate = usage.resetDate.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -38,15 +31,6 @@ export default async function BillingPage({
 
   return (
     <div className="space-y-6">
-      {upgraded && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
-          <p className="text-sm font-medium text-green-800 dark:text-green-200">
-            Welcome to FunderReady Pro! You now have access to full reviews with
-            inline comments and the improvement appendix.
-          </p>
-        </div>
-      )}
-
       <div>
         <h1 className="text-2xl font-bold">Billing</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">

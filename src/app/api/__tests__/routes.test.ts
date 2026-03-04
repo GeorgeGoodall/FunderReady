@@ -36,6 +36,17 @@ vi.mock("@/lib/ai/parse-criteria", () => ({
   parseCriteriaWithAI: (...args: unknown[]) => mockParseCriteriaWithAI(...args),
 }));
 
+// Mock requireProWithRateLimit guard
+const mockRequireProWithRateLimit = vi.fn();
+vi.mock("@/lib/usage/require-pro-with-rate-limit", () => ({
+  requireProWithRateLimit: (...args: unknown[]) =>
+    mockRequireProWithRateLimit(...args),
+  isGuardError: (result: unknown) => {
+    const { NextResponse } = require("next/server");
+    return result instanceof NextResponse;
+  },
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -76,12 +87,15 @@ describe("POST /api/parse-criteria", () => {
   }
 
   beforeEach(() => {
-    // Default: authenticated pro user for this suite
-    mockFrom.mockReturnValue(chainMock({ data: { subscription_tier: "pro" }, error: null }));
+    // Default: guard passes (authenticated pro user)
+    mockRequireProWithRateLimit.mockResolvedValue({ userId: "user-123" });
   });
 
-  it("returns 401 when not authenticated", async () => {
-    unauthenticatedUser();
+  it("returns 401 when guard rejects (unauthenticated)", async () => {
+    const { NextResponse } = await import("next/server");
+    mockRequireProWithRateLimit.mockResolvedValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    );
     const POST = await importRoute();
     const req = new Request("http://localhost/api/parse-criteria", {
       method: "POST",
@@ -89,11 +103,37 @@ describe("POST /api/parse-criteria", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 403 when guard rejects (free tier)", async () => {
+    const { NextResponse } = await import("next/server");
+    mockRequireProWithRateLimit.mockResolvedValue(
+      NextResponse.json({ error: "Pro subscription required" }, { status: 403 })
+    );
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/parse-criteria", {
+      method: "POST",
+      body: JSON.stringify({ rawText: "Some criteria text here" }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 429 when guard rejects (rate limit)", async () => {
+    const { NextResponse } = await import("next/server");
+    mockRequireProWithRateLimit.mockResolvedValue(
+      NextResponse.json({ error: "Daily AI limit reached" }, { status: 429 })
+    );
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/parse-criteria", {
+      method: "POST",
+      body: JSON.stringify({ rawText: "Quality of delivery — 30%" }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(429);
   });
 
   it("returns 400 for invalid JSON body", async () => {
-    authenticatedUser();
     const POST = await importRoute();
     const req = new Request("http://localhost/api/parse-criteria", {
       method: "POST",
@@ -104,7 +144,6 @@ describe("POST /api/parse-criteria", () => {
   });
 
   it("returns 400 when rawText is too short", async () => {
-    authenticatedUser();
     const POST = await importRoute();
     const req = new Request("http://localhost/api/parse-criteria", {
       method: "POST",
@@ -116,7 +155,6 @@ describe("POST /api/parse-criteria", () => {
   });
 
   it("returns 200 with parsed criteria on success", async () => {
-    authenticatedUser();
     const mockCriteria = { name: "Test", criteria: [{ id: "c1", criterion: "Quality" }] };
     mockParseCriteriaWithAI.mockResolvedValue(mockCriteria);
 
@@ -134,7 +172,6 @@ describe("POST /api/parse-criteria", () => {
   });
 
   it("returns 422 when AI returns invalid structure (validation error)", async () => {
-    authenticatedUser();
     mockParseCriteriaWithAI.mockRejectedValue(
       new Error("Claude tool use failed validation after retry. Original errors: criteria: Required")
     );
@@ -151,7 +188,6 @@ describe("POST /api/parse-criteria", () => {
   });
 
   it("returns 422 when AI response is truncated", async () => {
-    authenticatedUser();
     mockParseCriteriaWithAI.mockRejectedValue(
       new Error("Claude response truncated (hit max_tokens=8192). Increase maxTokens for this call.")
     );
@@ -168,7 +204,6 @@ describe("POST /api/parse-criteria", () => {
   });
 
   it("returns 500 on unexpected error", async () => {
-    authenticatedUser();
     mockParseCriteriaWithAI.mockRejectedValue(new Error("Network timeout"));
 
     const POST = await importRoute();
