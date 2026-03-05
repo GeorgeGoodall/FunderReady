@@ -12,7 +12,7 @@ interface Question {
   guidance?: string;
   field_type?: string;
   options?: string[];
-  char_limit?: number;
+  char_count_max?: number;
   required?: boolean;
   section?: string;
 }
