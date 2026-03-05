@@ -48,6 +48,7 @@ export const QuestionSchema = z.object({
   question: z.string().min(1),
   word_count_min: z.number().int().positive().optional(),
   word_count_max: z.number().int().positive().optional(),
+  char_count_max: z.number().int().positive().optional(),
   guidance: z.string().optional(),
   priority: z.number().int().min(1).max(5).optional(),
   field_type: z.enum(["text_short", "text_long", "dropdown", "radio", "checkbox", "email", "url", "phone", "number"]).optional(),
@@ -120,7 +121,7 @@ export const CreateFundSchema = FundSchema.omit({ id: true });
 export type CreateFund = z.infer<typeof CreateFundSchema>;
 
 // ---------------------------------------------------------------------------
-// Extended Question — adds field_type, options, char_limit, required, section
+// Extended Question — adds field_type, options, required, section (char_count_max inherited from QuestionSchema)
 // ---------------------------------------------------------------------------
 
 export const FIELD_TYPES = [
@@ -142,7 +143,6 @@ export type FieldType = z.infer<typeof FieldTypeSchema>;
 export const ExtendedQuestionSchema = QuestionSchema.extend({
   field_type: FieldTypeSchema.default("text_long"),
   options: z.array(z.string()).optional(),
-  char_limit: z.number().int().positive().optional(),
   required: z.boolean().default(true),
   section: z.string().optional(),
 });

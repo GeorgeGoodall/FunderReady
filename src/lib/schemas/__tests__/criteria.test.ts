@@ -7,6 +7,7 @@ import {
   FundSchema,
   CreateFundSchema,
   ExtendedQuestionSchema,
+  QuestionSchema,
   CreateApplicationRequestSchema,
   SaveAnswersRequestSchema,
 } from "../criteria";
@@ -240,7 +241,7 @@ describe("ExtendedQuestionSchema", () => {
       guidance: "Be specific about measurable outcomes",
       field_type: "text_long",
       options: [],
-      char_limit: 3000,
+      char_count_max: 3000,
       required: true,
       section: "Project Details",
     });
@@ -300,11 +301,31 @@ describe("ExtendedQuestionSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects non-positive char_limit", () => {
+  it("rejects non-positive char_count_max", () => {
     const result = ExtendedQuestionSchema.safeParse({
       id: "q1",
       question: "Test",
-      char_limit: 0,
+      char_count_max: 0,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("QuestionSchema", () => {
+  it("accepts a question with char_count_max", () => {
+    const result = QuestionSchema.safeParse({
+      id: "q1",
+      question: "Describe your project",
+      char_count_max: 3000,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects non-positive char_count_max on QuestionSchema", () => {
+    const result = QuestionSchema.safeParse({
+      id: "q1",
+      question: "Test",
+      char_count_max: 0,
     });
     expect(result.success).toBe(false);
   });
