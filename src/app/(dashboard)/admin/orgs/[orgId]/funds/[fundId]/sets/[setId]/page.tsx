@@ -1,94 +1,40 @@
-import { createServiceClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { createServiceClient, createClient } from "@/lib/supabase/server";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { AdminActionBar } from "../../../../../../components/AdminActionBar";
 import { AdminAmendForm } from "../../../../../../components/AdminAmendForm";
 import { SetContentDisplay } from "../../../../../../components/SetContentDisplay";
+import { formatDate } from "../../../../../../lib/format";
+import { CriteriaSetSchema, QuestionsSetSchema } from "@/lib/schemas/criteria";
 import type { CriteriaSet, QuestionsSet } from "@/lib/schemas/criteria";
-import type { Json } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
 function parseCriteriaSet(row: {
   name: string;
   description: string | null;
-  criteria_json: Json;
+  criteria_json: unknown;
 }): CriteriaSet {
-  const criteria = Array.isArray(row.criteria_json) ? row.criteria_json : [];
-  return {
+  const result = CriteriaSetSchema.safeParse({
     name: row.name || "Criteria",
     description: row.description ?? undefined,
-    criteria: criteria.map((c: Json, i: number) => {
-      const obj =
-        c && typeof c === "object" && !Array.isArray(c)
-          ? (c as Record<string, Json | undefined>)
-          : {};
-      return {
-        id: (obj.id as string) ?? `c${i + 1}`,
-        criterion: (obj.criterion as string) ?? "",
-        weight: typeof obj.weight === "string" ? obj.weight : undefined,
-        sub_questions: Array.isArray(obj.sub_questions)
-          ? (obj.sub_questions as Json[]).map((sq: Json) => {
-              if (typeof sq === "string") return { text: sq, required: true };
-              if (sq && typeof sq === "object" && !Array.isArray(sq)) {
-                const sqObj = sq as Record<string, Json | undefined>;
-                return {
-                  text: (sqObj.text as string) ?? "",
-                  required: sqObj.required !== false,
-                };
-              }
-              return { text: "", required: true };
-            })
-          : [],
-      };
-    }),
-  };
+    criteria: row.criteria_json,
+  });
+  if (result.success) return result.data;
+  // Fallback: return minimal valid shape
+  return { name: row.name || "Criteria", criteria: [] };
 }
 
 function parseQuestionsSet(row: {
-  questions_json: Json;
+  questions_json: unknown;
   overall_word_limit: number | null;
 }): QuestionsSet {
-  const questions = Array.isArray(row.questions_json)
-    ? row.questions_json
-    : [];
-  return {
-    questions: questions.map((q: Json, i: number) => {
-      const obj =
-        q && typeof q === "object" && !Array.isArray(q)
-          ? (q as Record<string, Json | undefined>)
-          : {};
-      return {
-        id: (obj.id as string) ?? `q${i + 1}`,
-        question: (obj.question as string) ?? "",
-        word_count_min:
-          typeof obj.word_count_min === "number"
-            ? obj.word_count_min
-            : undefined,
-        word_count_max:
-          typeof obj.word_count_max === "number"
-            ? obj.word_count_max
-            : undefined,
-        guidance:
-          typeof obj.guidance === "string" ? obj.guidance : undefined,
-        priority:
-          typeof obj.priority === "number" ? obj.priority : undefined,
-        field_type:
-          typeof obj.field_type === "string"
-            ? (obj.field_type as "text_long")
-            : undefined,
-        options: Array.isArray(obj.options)
-          ? (obj.options as string[])
-          : undefined,
-      };
-    }),
+  const result = QuestionsSetSchema.safeParse({
+    questions: row.questions_json,
     overall_word_limit: row.overall_word_limit ?? undefined,
-  };
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+  });
+  if (result.success) return result.data;
+  return { questions: [] };
 }
 
 export default async function SetDetailPage({
@@ -97,48 +43,33 @@ export default async function SetDetailPage({
   params: Promise<{ orgId: string; fundId: string; setId: string }>;
 }) {
   const { orgId, fundId, setId } = await params;
+
+  // Auth guard — defense in depth (layout also checks)
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
   const serviceClient = createServiceClient();
-
-  // Try criteria_sets first
-  let setType: "criteria" | "questions" = "criteria";
-  let parsedData: CriteriaSet | QuestionsSet;
-  let approved = false;
-  let createdAt = "";
-  let setName = "";
-
-  const { data: criteriaSet } = await serviceClient
-    .from("criteria_sets")
-    .select("*")
-    .eq("id", setId)
-    .eq("rejected", false)
+  const { data: profile } = await serviceClient
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
     .single();
+  if (!profile?.is_admin) redirect("/dashboard");
 
-  if (criteriaSet) {
-    setType = "criteria";
-    parsedData = parseCriteriaSet(criteriaSet);
-    approved = criteriaSet.approved;
-    createdAt = criteriaSet.created_at;
-    setName = criteriaSet.name || criteriaSet.label || "Criteria Set";
-  } else {
-    // Try questions_sets
-    const { data: questionsSet } = await serviceClient
+  // Query both set types and org/fund in parallel
+  const [{ data: criteriaSet }, { data: questionsSet }, { data: org, error: orgError }, { data: fund, error: fundError }] = await Promise.all([
+    serviceClient
+      .from("criteria_sets")
+      .select("*")
+      .eq("id", setId)
+      .eq("rejected", false)
+      .maybeSingle(),
+    serviceClient
       .from("questions_sets")
       .select("*")
       .eq("id", setId)
       .eq("rejected", false)
-      .single();
-
-    if (!questionsSet) notFound();
-
-    setType = "questions";
-    parsedData = parseQuestionsSet(questionsSet);
-    approved = questionsSet.approved;
-    createdAt = questionsSet.created_at;
-    setName = questionsSet.label || "Questions Set";
-  }
-
-  // Fetch org and fund for breadcrumb
-  const [{ data: org }, { data: fund }] = await Promise.all([
+      .maybeSingle(),
     serviceClient
       .from("organisations")
       .select("id, name")
@@ -153,7 +84,29 @@ export default async function SetDetailPage({
       .single(),
   ]);
 
-  if (!org || !fund) notFound();
+  if (orgError || fundError || !org || !fund) notFound();
+
+  let setType: "criteria" | "questions";
+  let parsedData: CriteriaSet | QuestionsSet;
+  let approved: boolean;
+  let createdAt: string;
+  let setName: string;
+
+  if (criteriaSet) {
+    setType = "criteria";
+    parsedData = parseCriteriaSet(criteriaSet);
+    approved = criteriaSet.approved;
+    createdAt = criteriaSet.created_at;
+    setName = criteriaSet.name || criteriaSet.label || "Criteria Set";
+  } else if (questionsSet) {
+    setType = "questions";
+    parsedData = parseQuestionsSet(questionsSet);
+    approved = questionsSet.approved;
+    createdAt = questionsSet.created_at;
+    setName = questionsSet.label || "Questions Set";
+  } else {
+    notFound();
+  }
 
   const entityType =
     setType === "criteria" ? "criteria-sets" : "questions-sets";
@@ -208,23 +161,22 @@ export default async function SetDetailPage({
         parentUrl={`/admin/orgs/${orgId}/funds/${fundId}`}
       />
 
-      {/* Amend Form (only for pending sets) */}
-      {!approved && (
-        <AdminAmendForm
-          setType={setType}
-          setId={setId}
-          fundId={fundId}
-          initialData={parsedData}
-        />
-      )}
-
-      {/* Content Display */}
-      <section>
-        <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
-          Content
-        </h3>
-        <SetContentDisplay type={setType} data={parsedData} />
-      </section>
+      {/* Amend Form — creates a new version (sets are immutable).
+           Content display is passed as children so it hides when editing. */}
+      <AdminAmendForm
+        setType={setType}
+        setId={setId}
+        fundId={fundId}
+        orgId={orgId}
+        initialData={parsedData}
+      >
+        <section className="mt-8">
+          <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
+            Content
+          </h3>
+          <SetContentDisplay type={setType} data={parsedData} />
+        </section>
+      </AdminAmendForm>
     </div>
   );
 }

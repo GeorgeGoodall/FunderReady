@@ -1,4 +1,4 @@
-import { AdminMetrics } from "../AdminMetrics";
+import { AdminMetrics } from "@/app/(dashboard)/admin/AdminMetrics";
 
 export const dynamic = "force-dynamic";
 

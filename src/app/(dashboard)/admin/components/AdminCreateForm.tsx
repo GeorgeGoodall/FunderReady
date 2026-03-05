@@ -115,7 +115,7 @@ export function AdminCreateForm({ entityType, parentId }: AdminCreateFormProps) 
           body = {
             fund_id: parentId,
             questions_json: parsedQuestions,
-            ...(overallWordLimit.trim() && {
+            ...(overallWordLimit.trim() && !Number.isNaN(parseInt(overallWordLimit, 10)) && {
               overall_word_limit: parseInt(overallWordLimit, 10),
             }),
           };

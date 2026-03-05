@@ -21,6 +21,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!Array.isArray(body.criteria_json)) {
+    return NextResponse.json(
+      { error: "criteria_json must be an array" },
+      { status: 400 }
+    );
+  }
+
   if (!body.name || typeof body.name !== "string") {
     return NextResponse.json(
       { error: "name is required" },
@@ -32,7 +39,7 @@ export async function POST(request: Request) {
     fund_id: body.fund_id,
     criteria_json: body.criteria_json,
     name: body.name,
-    approved: true,
+    approved: body.approved === false ? false : true,
     created_by: auth.userId,
   };
   if (typeof body.label === "string") record.label = body.label;

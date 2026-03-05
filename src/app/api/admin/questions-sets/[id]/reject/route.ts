@@ -12,14 +12,23 @@ export async function PATCH(
   const body = await request.json().catch(() => ({}));
   const reason = typeof body.reason === "string" ? body.reason : null;
 
-  const { error } = await auth.serviceClient
+  const { data, error } = await auth.serviceClient
     .from("questions_sets")
-    .update({ rejected: true, rejection_reason: reason })
-    .eq("id", id);
+    .update({ rejected: true, rejection_reason: reason, approved: false })
+    .eq("id", id)
+    .select("id")
+    .single();
 
   if (error) {
+    if (error.code === "PGRST116") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
     console.error("Reject questions set error:", error);
     return NextResponse.json({ error: "Failed to reject" }, { status: 500 });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   return NextResponse.json({ success: true });

@@ -157,7 +157,7 @@ for (const route of rejectRoutes) {
     });
 
     it("returns 200 on successful rejection with reason", async () => {
-      adminWith(() => chainMock({ data: null, error: null }));
+      adminWith(() => chainMock({ data: { id: "test-id-001" }, error: null }));
       const PATCH = await importRoute();
       const req = jsonRequest(
         `http://localhost/api/admin/${route.name}/test-id-001/reject`,
@@ -172,7 +172,7 @@ for (const route of rejectRoutes) {
     });
 
     it("returns 200 on rejection without reason", async () => {
-      adminWith(() => chainMock({ data: null, error: null }));
+      adminWith(() => chainMock({ data: { id: "test-id-001" }, error: null }));
       const PATCH = await importRoute();
       // Send empty body — reason should be null
       const req = new Request(
@@ -200,6 +200,114 @@ for (const route of rejectRoutes) {
     });
   });
 }
+
+// =====================================================================
+// APPROVE ROUTES
+// =====================================================================
+
+const approveRoutes = [
+  {
+    name: "funds",
+    table: "funds",
+    path: "../../api/admin/funds/[id]/approve/route",
+  },
+];
+
+for (const route of approveRoutes) {
+  describe(`PATCH /api/admin/${route.name}/[id]/approve`, () => {
+    async function importRoute() {
+      const mod = await import(route.path);
+      return mod.PATCH;
+    }
+
+    const params = Promise.resolve({ id: "test-id-001" });
+
+    it("returns 401 when not authenticated", async () => {
+      unauthenticatedUser();
+      const PATCH = await importRoute();
+      const req = new Request(
+        `http://localhost/api/admin/${route.name}/test-id-001/approve`,
+        { method: "PATCH" }
+      );
+      const res = await PATCH(req, { params });
+      expect(res.status).toBe(401);
+    });
+
+    it("returns 403 for non-admin users", async () => {
+      authenticatedUser();
+      mockServiceFrom.mockReturnValue(
+        chainMock({ data: { is_admin: false }, error: null })
+      );
+      const PATCH = await importRoute();
+      const req = new Request(
+        `http://localhost/api/admin/${route.name}/test-id-001/approve`,
+        { method: "PATCH" }
+      );
+      const res = await PATCH(req, { params });
+      expect(res.status).toBe(403);
+    });
+
+    it("returns 200 on successful approval", async () => {
+      adminWith(() => chainMock({ data: { id: "test-id-001" }, error: null }));
+      const PATCH = await importRoute();
+      const req = new Request(
+        `http://localhost/api/admin/${route.name}/test-id-001/approve`,
+        { method: "PATCH" }
+      );
+      const res = await PATCH(req, { params });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true });
+      expect(mockServiceFrom).toHaveBeenCalledWith(route.table);
+    });
+
+    it("returns 404 when entity not found (PGRST116)", async () => {
+      adminWith(() =>
+        chainMock({ data: null, error: { code: "PGRST116", message: "Not found" } })
+      );
+      const PATCH = await importRoute();
+      const req = new Request(
+        `http://localhost/api/admin/${route.name}/test-id-001/approve`,
+        { method: "PATCH" }
+      );
+      const res = await PATCH(req, { params });
+      expect(res.status).toBe(404);
+    });
+
+    it("returns 500 when database update fails", async () => {
+      adminWith(() =>
+        chainMock({ data: null, error: { message: "DB error" } })
+      );
+      const PATCH = await importRoute();
+      const req = new Request(
+        `http://localhost/api/admin/${route.name}/test-id-001/approve`,
+        { method: "PATCH" }
+      );
+      const res = await PATCH(req, { params });
+      expect(res.status).toBe(500);
+    });
+  });
+}
+
+// =====================================================================
+// REJECT/APPROVE 404 PATHS
+// =====================================================================
+
+describe("Reject route 404 (PGRST116)", () => {
+  it("returns 404 when entity not found", async () => {
+    adminWith(() =>
+      chainMock({ data: null, error: { code: "PGRST116", message: "Not found" } })
+    );
+    const mod = await import("../../api/admin/criteria-sets/[id]/reject/route");
+    const params = Promise.resolve({ id: "nonexistent" });
+    const req = jsonRequest(
+      "http://localhost/api/admin/criteria-sets/nonexistent/reject",
+      "PATCH",
+      { reason: "test" }
+    );
+    const res = await mod.PATCH(req, { params });
+    expect(res.status).toBe(404);
+  });
+});
 
 // =====================================================================
 // EDIT (PATCH) ROUTES — Task 5
@@ -254,7 +362,7 @@ describe("PATCH /api/admin/organisations/[id]", () => {
   });
 
   it("returns 200 on successful update", async () => {
-    adminWith(() => chainMock({ data: null, error: null }));
+    adminWith(() => chainMock({ data: { id: "org-001" }, error: null }));
     const PATCH = await importRoute();
     const req = jsonRequest(
       "http://localhost/api/admin/organisations/org-001",
@@ -317,7 +425,7 @@ describe("PATCH /api/admin/funds/[id]", () => {
   });
 
   it("returns 200 on successful update with allowed fields", async () => {
-    adminWith(() => chainMock({ data: null, error: null }));
+    adminWith(() => chainMock({ data: { id: "fund-001" }, error: null }));
     const PATCH = await importRoute();
     const req = jsonRequest(
       "http://localhost/api/admin/funds/fund-001",
@@ -467,8 +575,37 @@ describe("DELETE /api/admin/funds/[id]", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 204 on successful deletion", async () => {
-    adminWith(() => chainMock({ data: null, error: null }));
+  it("returns 409 when fund has dependent sets or applications", async () => {
+    adminWithMultiple([
+      // criteria_sets count check
+      () => chainMock({ data: null, error: null, count: 2 }),
+      // questions_sets count check
+      () => chainMock({ data: null, error: null, count: 0 }),
+      // applications count check
+      () => chainMock({ data: null, error: null, count: 0 }),
+    ]);
+    const DELETE = await importRoute();
+    const req = new Request("http://localhost/api/admin/funds/fund-001", {
+      method: "DELETE",
+    });
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Cannot delete fund with existing sets or applications",
+    });
+  });
+
+  it("returns 204 on successful deletion (no dependencies)", async () => {
+    adminWithMultiple([
+      // criteria_sets count check — 0
+      () => chainMock({ data: null, error: null, count: 0 }),
+      // questions_sets count check — 0
+      () => chainMock({ data: null, error: null, count: 0 }),
+      // applications count check — 0
+      () => chainMock({ data: null, error: null, count: 0 }),
+      // Delete operation
+      () => chainMock({ data: null, error: null }),
+    ]);
     const DELETE = await importRoute();
     const req = new Request("http://localhost/api/admin/funds/fund-001", {
       method: "DELETE",
@@ -478,9 +615,16 @@ describe("DELETE /api/admin/funds/[id]", () => {
   });
 
   it("returns 500 when delete fails", async () => {
-    adminWith(() =>
-      chainMock({ data: null, error: { message: "DB error" } })
-    );
+    adminWithMultiple([
+      // criteria_sets count check — 0
+      () => chainMock({ data: null, error: null, count: 0 }),
+      // questions_sets count check — 0
+      () => chainMock({ data: null, error: null, count: 0 }),
+      // applications count check — 0
+      () => chainMock({ data: null, error: null, count: 0 }),
+      // Delete fails
+      () => chainMock({ data: null, error: { message: "DB error" } }),
+    ]);
     const DELETE = await importRoute();
     const req = new Request("http://localhost/api/admin/funds/fund-001", {
       method: "DELETE",
@@ -510,8 +654,29 @@ describe("DELETE /api/admin/criteria-sets/[id]", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 204 on successful deletion", async () => {
-    adminWith(() => chainMock({ data: null, error: null }));
+  it("returns 409 when criteria set has applications", async () => {
+    adminWith(() =>
+      chainMock({ data: null, error: null, count: 3 })
+    );
+    const DELETE = await importRoute();
+    const req = new Request(
+      "http://localhost/api/admin/criteria-sets/cs-001",
+      { method: "DELETE" }
+    );
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Cannot delete criteria set with existing applications",
+    });
+  });
+
+  it("returns 204 on successful deletion (no applications)", async () => {
+    adminWithMultiple([
+      // Application count check — 0
+      () => chainMock({ data: null, error: null, count: 0 }),
+      // Delete operation
+      () => chainMock({ data: null, error: null }),
+    ]);
     const DELETE = await importRoute();
     const req = new Request(
       "http://localhost/api/admin/criteria-sets/cs-001",
@@ -523,9 +688,12 @@ describe("DELETE /api/admin/criteria-sets/[id]", () => {
   });
 
   it("returns 500 when delete fails", async () => {
-    adminWith(() =>
-      chainMock({ data: null, error: { message: "DB error" } })
-    );
+    adminWithMultiple([
+      // Application count check — 0
+      () => chainMock({ data: null, error: null, count: 0 }),
+      // Delete fails
+      () => chainMock({ data: null, error: { message: "DB error" } }),
+    ]);
     const DELETE = await importRoute();
     const req = new Request(
       "http://localhost/api/admin/criteria-sets/cs-001",
@@ -556,8 +724,29 @@ describe("DELETE /api/admin/questions-sets/[id]", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 204 on successful deletion", async () => {
-    adminWith(() => chainMock({ data: null, error: null }));
+  it("returns 409 when questions set has applications", async () => {
+    adminWith(() =>
+      chainMock({ data: null, error: null, count: 3 })
+    );
+    const DELETE = await importRoute();
+    const req = new Request(
+      "http://localhost/api/admin/questions-sets/qs-001",
+      { method: "DELETE" }
+    );
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Cannot delete questions set with existing applications",
+    });
+  });
+
+  it("returns 204 on successful deletion (no applications)", async () => {
+    adminWithMultiple([
+      // Application count check — 0
+      () => chainMock({ data: null, error: null, count: 0 }),
+      // Delete operation
+      () => chainMock({ data: null, error: null }),
+    ]);
     const DELETE = await importRoute();
     const req = new Request(
       "http://localhost/api/admin/questions-sets/qs-001",
@@ -569,9 +758,12 @@ describe("DELETE /api/admin/questions-sets/[id]", () => {
   });
 
   it("returns 500 when delete fails", async () => {
-    adminWith(() =>
-      chainMock({ data: null, error: { message: "DB error" } })
-    );
+    adminWithMultiple([
+      // Application count check — 0
+      () => chainMock({ data: null, error: null, count: 0 }),
+      // Delete fails
+      () => chainMock({ data: null, error: { message: "DB error" } }),
+    ]);
     const DELETE = await importRoute();
     const req = new Request(
       "http://localhost/api/admin/questions-sets/qs-001",
@@ -853,6 +1045,19 @@ describe("POST /api/admin/criteria-sets", () => {
     expect(mockServiceFrom).toHaveBeenCalledWith("criteria_sets");
   });
 
+  it("returns 400 when criteria_json is not an array", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const POST = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/criteria-sets",
+      "POST",
+      { fund_id: "f1", criteria_json: "not-an-array", name: "Set 1" }
+    );
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "criteria_json must be an array" });
+  });
+
   it("returns 500 when database insert fails", async () => {
     adminWith(() =>
       chainMock({ data: null, error: { message: "DB error" } })
@@ -943,6 +1148,19 @@ describe("POST /api/admin/questions-sets", () => {
     expect(mockServiceFrom).toHaveBeenCalledWith("questions_sets");
   });
 
+  it("returns 400 when questions_json is not an array", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const POST = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/questions-sets",
+      "POST",
+      { fund_id: "f1", questions_json: "not-an-array" }
+    );
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "questions_json must be an array" });
+  });
+
   it("returns 500 when database insert fails", async () => {
     adminWith(() =>
       chainMock({ data: null, error: { message: "DB error" } })
@@ -956,5 +1174,354 @@ describe("POST /api/admin/questions-sets", () => {
     const res = await POST(req);
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "Failed to create" });
+  });
+});
+
+// =====================================================================
+// VALIDATION EDGE CASES
+// =====================================================================
+
+describe("PATCH /api/admin/organisations/[id] — validation", () => {
+  async function importRoute() {
+    const mod = await import("../../api/admin/organisations/[id]/route");
+    return mod.PATCH;
+  }
+
+  const params = Promise.resolve({ id: "org-001" });
+
+  it("returns 400 when name is empty string", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const PATCH = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/organisations/org-001",
+      "PATCH",
+      { name: "  " }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "name must not be empty" });
+  });
+
+  it("returns 400 when name is wrong type", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const PATCH = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/organisations/org-001",
+      "PATCH",
+      { name: 123 }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "name must be a string" });
+  });
+
+  it("returns 400 when url has invalid protocol", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const PATCH = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/organisations/org-001",
+      "PATCH",
+      { url: "javascript:alert(1)" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "url must start with http:// or https://" });
+  });
+});
+
+describe("PATCH /api/admin/funds/[id] — validation", () => {
+  async function importRoute() {
+    const mod = await import("../../api/admin/funds/[id]/route");
+    return mod.PATCH;
+  }
+
+  const params = Promise.resolve({ id: "fund-001" });
+
+  it("returns 400 when name is empty string", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const PATCH = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/fund-001",
+      "PATCH",
+      { name: "" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "name must not be empty" });
+  });
+
+  it("returns 400 when published is wrong type", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const PATCH = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/fund-001",
+      "PATCH",
+      { published: "yes" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "published must be a boolean" });
+  });
+
+  it("returns 400 when url has invalid protocol", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const PATCH = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/fund-001",
+      "PATCH",
+      { url: "ftp://example.com" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "url must start with http:// or https://" });
+  });
+});
+
+// =====================================================================
+// APPROVED OVERRIDE TESTS
+// =====================================================================
+
+describe("POST /api/admin/criteria-sets — approved override", () => {
+  async function importRoute() {
+    const mod = await import("../../api/admin/criteria-sets/route");
+    return mod.POST;
+  }
+
+  it("creates set as unapproved when approved=false", async () => {
+    const createdRecord = { id: "cs-new", fund_id: "f1", approved: false };
+    adminWith(() => chainMock({ data: createdRecord, error: null }));
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/criteria-sets", "POST", {
+      fund_id: "f1", criteria_json: [{ id: "c1", criterion: "Test", sub_questions: [] }],
+      name: "Set 1", approved: false,
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+  });
+
+  it("defaults to approved=true when approved not specified", async () => {
+    const createdRecord = { id: "cs-new", fund_id: "f1", approved: true };
+    adminWith(() => chainMock({ data: createdRecord, error: null }));
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/criteria-sets", "POST", {
+      fund_id: "f1", criteria_json: [{ id: "c1", criterion: "Test", sub_questions: [] }],
+      name: "Set 1",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+  });
+});
+
+describe("POST /api/admin/questions-sets — approved override", () => {
+  async function importRoute() {
+    const mod = await import("../../api/admin/questions-sets/route");
+    return mod.POST;
+  }
+
+  it("creates set as unapproved when approved=false", async () => {
+    const createdRecord = { id: "qs-new", fund_id: "f1", approved: false };
+    adminWith(() => chainMock({ data: createdRecord, error: null }));
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/questions-sets", "POST", {
+      fund_id: "f1", questions_json: [{ id: "q1", question: "Test?" }],
+      approved: false,
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+  });
+
+  it("defaults to approved=true when approved not specified", async () => {
+    const createdRecord = { id: "qs-new", fund_id: "f1", approved: true };
+    adminWith(() => chainMock({ data: createdRecord, error: null }));
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/questions-sets", "POST", {
+      fund_id: "f1", questions_json: [{ id: "q1", question: "Test?" }],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+  });
+});
+
+// =====================================================================
+// DELETE FUND — questions_sets 409
+// =====================================================================
+
+describe("DELETE /api/admin/funds/[id] — questions_sets 409", () => {
+  async function importRoute() {
+    const mod = await import("../../api/admin/funds/[id]/route");
+    return mod.DELETE;
+  }
+
+  const params = Promise.resolve({ id: "fund-001" });
+
+  it("returns 409 when fund has questions_sets but no criteria_sets", async () => {
+    adminWithMultiple([
+      () => chainMock({ data: null, error: null, count: 0 }),  // criteria_sets = 0
+      () => chainMock({ data: null, error: null, count: 5 }),  // questions_sets = 5
+      () => chainMock({ data: null, error: null, count: 0 }),  // applications = 0
+    ]);
+    const DELETE = await importRoute();
+    const req = new Request("http://localhost/api/admin/funds/fund-001", {
+      method: "DELETE",
+    });
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Cannot delete fund with existing sets or applications",
+    });
+  });
+});
+
+// =====================================================================
+// POST /api/admin/amend-set
+// =====================================================================
+
+describe("POST /api/admin/amend-set", () => {
+  async function importRoute() {
+    const mod = await import("../../api/admin/amend-set/route");
+    return mod.POST;
+  }
+
+  it("returns 401 when not authenticated", async () => {
+    unauthenticatedUser();
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
+      set_type: "criteria", original_id: "cs-001", fund_id: "f1",
+      name: "Amended", criteria_json: [{ id: "c1", criterion: "Test", sub_questions: [] }],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 400 when set_type is invalid", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
+      set_type: "invalid", original_id: "cs-001", fund_id: "f1",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "set_type must be 'criteria' or 'questions'" });
+  });
+
+  it("returns 400 when original_id is missing", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
+      set_type: "criteria", fund_id: "f1",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "original_id is required" });
+  });
+
+  it("returns 400 when fund_id is missing", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
+      set_type: "criteria", original_id: "cs-001",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "fund_id is required" });
+  });
+
+  it("returns 400 when criteria name is missing", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
+      set_type: "criteria", original_id: "cs-001", fund_id: "f1",
+      criteria_json: [{ id: "c1", criterion: "Test", sub_questions: [] }],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "name is required" });
+  });
+
+  it("returns 400 when criteria_json is not an array", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
+      set_type: "criteria", original_id: "cs-001", fund_id: "f1",
+      name: "Amended", criteria_json: "not-array",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "criteria_json must be an array" });
+  });
+
+  it("returns 400 when questions_json is not an array", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
+      set_type: "questions", original_id: "qs-001", fund_id: "f1",
+      questions_json: "not-array",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "questions_json must be an array" });
+  });
+
+  it("returns 201 on successful criteria amend (create + reject)", async () => {
+    // adminWithMultiple: call 1 = profile check, call 2 = insert new set, call 3 = update (reject) original
+    adminWithMultiple([
+      () => chainMock({ data: { id: "cs-new", name: "Amended" }, error: null }),
+      () => chainMock({ data: { id: "cs-001" }, error: null }),
+    ]);
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
+      set_type: "criteria", original_id: "cs-001", fund_id: "f1",
+      name: "Amended", criteria_json: [{ id: "c1", criterion: "Test", sub_questions: [] }],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.id).toBe("cs-new");
+    expect(mockServiceFrom).toHaveBeenCalledWith("criteria_sets");
+  });
+
+  it("returns 201 on successful questions amend", async () => {
+    adminWithMultiple([
+      () => chainMock({ data: { id: "qs-new" }, error: null }),
+      () => chainMock({ data: { id: "qs-001" }, error: null }),
+    ]);
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
+      set_type: "questions", original_id: "qs-001", fund_id: "f1",
+      questions_json: [{ id: "q1", question: "Test?" }],
+      overall_word_limit: 5000,
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    expect(mockServiceFrom).toHaveBeenCalledWith("questions_sets");
+  });
+
+  it("returns 500 when create fails", async () => {
+    adminWith(() => chainMock({ data: null, error: { message: "DB error" } }));
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
+      set_type: "criteria", original_id: "cs-001", fund_id: "f1",
+      name: "Amended", criteria_json: [],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Failed to create amended set" });
+  });
+
+  it("returns 500 with id when reject fails after successful create", async () => {
+    adminWithMultiple([
+      () => chainMock({ data: { id: "cs-new" }, error: null }),
+      () => chainMock({ data: null, error: { message: "DB error" } }),
+    ]);
+    const POST = await importRoute();
+    const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
+      set_type: "criteria", original_id: "cs-001", fund_id: "f1",
+      name: "Amended", criteria_json: [],
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(500);
+    const data = await res.json();
+    expect(data.error).toBe("Amended set created but failed to reject original");
+    expect(data.id).toBe("cs-new");
   });
 });

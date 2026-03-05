@@ -27,14 +27,47 @@ export async function PATCH(
     );
   }
 
-  const { error } = await auth.serviceClient
+  const STRING_FIELDS = ["name", "url", "description"];
+  for (const field of STRING_FIELDS) {
+    if (field in updates && typeof updates[field] !== "string") {
+      return NextResponse.json(
+        { error: `${field} must be a string` },
+        { status: 400 }
+      );
+    }
+  }
+
+  if (typeof updates.name === "string" && updates.name.trim().length === 0) {
+    return NextResponse.json(
+      { error: "name must not be empty" },
+      { status: 400 }
+    );
+  }
+
+  if (typeof updates.url === "string" && updates.url.trim().length > 0 && !/^https?:\/\//i.test(updates.url as string)) {
+    return NextResponse.json(
+      { error: "url must start with http:// or https://" },
+      { status: 400 }
+    );
+  }
+
+  const { data, error } = await auth.serviceClient
     .from("organisations")
     .update(updates)
-    .eq("id", id);
+    .eq("id", id)
+    .select("id")
+    .single();
 
   if (error) {
+    if (error.code === "PGRST116") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
     console.error("Edit organisation error:", error);
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   return NextResponse.json({ success: true });

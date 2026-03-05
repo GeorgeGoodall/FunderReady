@@ -10,8 +10,13 @@ interface SetContentDisplayProps {
 }
 
 export function SetContentDisplay({ type, data }: SetContentDisplayProps) {
-  if (type === "criteria") {
-    return <CriteriaPreview criteriaSet={data as CriteriaSet} onChange={() => {}} />;
-  }
-  return <QuestionsPreview questionsSet={data as QuestionsSet} onChange={() => {}} />;
+  return (
+    <div className="pointer-events-none select-text [&_input]:bg-transparent [&_textarea]:bg-transparent [&_button]:hidden [&_select]:appearance-none">
+      {type === "criteria" ? (
+        <CriteriaPreview criteriaSet={data as CriteriaSet} onChange={() => {}} />
+      ) : (
+        <QuestionsPreview questionsSet={data as QuestionsSet} onChange={() => {}} />
+      )}
+    </div>
+  );
 }

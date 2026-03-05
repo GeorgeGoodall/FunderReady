@@ -10,14 +10,18 @@ interface AdminAmendFormProps {
   setType: "criteria" | "questions";
   setId: string;
   fundId: string;
+  orgId: string;
   initialData: CriteriaSet | QuestionsSet;
+  children?: React.ReactNode;
 }
 
 export function AdminAmendForm({
   setType,
   setId,
   fundId,
+  orgId,
   initialData,
+  children,
 }: AdminAmendFormProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -30,68 +34,42 @@ export function AdminAmendForm({
     setSaving(true);
 
     try {
-      // Step 1: Create the amended set
-      let createUrl: string;
-      let createBody: Record<string, unknown>;
+      const body: Record<string, unknown> = {
+        set_type: setType,
+        original_id: setId,
+        fund_id: fundId,
+      };
 
       if (setType === "criteria") {
         const criteriaData = data as CriteriaSet;
-        createUrl = "/api/admin/criteria-sets";
-        createBody = {
-          fund_id: fundId,
-          name: criteriaData.name,
-          criteria_json: criteriaData.criteria,
-          ...(criteriaData.description && {
-            description: criteriaData.description,
-          }),
-        };
+        body.name = criteriaData.name;
+        body.criteria_json = criteriaData.criteria;
+        if (criteriaData.description) body.description = criteriaData.description;
       } else {
         const questionsData = data as QuestionsSet;
-        createUrl = "/api/admin/questions-sets";
-        createBody = {
-          fund_id: fundId,
-          questions_json: questionsData.questions,
-          ...(questionsData.overall_word_limit && {
-            overall_word_limit: questionsData.overall_word_limit,
-          }),
-        };
+        body.questions_json = questionsData.questions;
+        if (questionsData.overall_word_limit) body.overall_word_limit = questionsData.overall_word_limit;
       }
 
-      const createRes = await fetch(createUrl, {
+      const res = await fetch("/api/admin/amend-set", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(createBody),
+        body: JSON.stringify(body),
       });
 
-      if (!createRes.ok) {
-        const errData = await createRes.json().catch(() => ({}));
-        setError(errData.error || `Failed to create amended set (${createRes.status})`);
-        return;
-      }
-
-      // Step 2: Reject the original set
-      const rejectEntityType =
-        setType === "criteria" ? "criteria-sets" : "questions-sets";
-      const rejectRes = await fetch(
-        `/api/admin/${rejectEntityType}/${setId}/reject`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: "Amended by admin" }),
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || `Failed to amend set (${res.status})`);
+        // If amended set was created but reject failed, still navigate to it
+        if (errData.id) {
+          router.push(`/admin/orgs/${orgId}/funds/${fundId}/sets/${errData.id}`);
         }
-      );
-
-      if (!rejectRes.ok) {
-        const errData = await rejectRes.json().catch(() => ({}));
-        setError(
-          errData.error ||
-            `Amended set created but failed to reject original (${rejectRes.status})`
-        );
         return;
       }
 
+      const created = await res.json();
       setOpen(false);
-      router.refresh();
+      router.push(`/admin/orgs/${orgId}/funds/${fundId}/sets/${created.id}`);
     } catch {
       setError("Network error");
     } finally {
@@ -101,16 +79,19 @@ export function AdminAmendForm({
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setData(initialData);
-          setOpen(true);
-        }}
-        className="px-3 py-1.5 text-sm rounded-md bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 disabled:opacity-50"
-      >
-        Amend
-      </button>
+      <>
+        <button
+          type="button"
+          onClick={() => {
+            setData(initialData);
+            setOpen(true);
+          }}
+          className="px-3 py-1.5 text-sm rounded-md bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 disabled:opacity-50"
+        >
+          Amend
+        </button>
+        {children}
+      </>
     );
   }
 

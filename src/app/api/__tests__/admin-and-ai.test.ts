@@ -132,8 +132,8 @@ describe("PATCH /api/admin/criteria-sets/[id]/approve", () => {
         // Profile lookup
         return chainMock({ data: { is_admin: true }, error: null });
       }
-      // Update criteria_sets — returns no error
-      return chainMock({ data: null, error: null });
+      // Update criteria_sets — returns updated row
+      return chainMock({ data: { id: "cs-001" }, error: null });
     });
 
     const PATCH = await importRoute();
@@ -227,7 +227,7 @@ describe("PATCH /api/admin/questions-sets/[id]/approve", () => {
       if (callCount === 1) {
         return chainMock({ data: { is_admin: true }, error: null });
       }
-      return chainMock({ data: null, error: null });
+      return chainMock({ data: { id: "qs-001" }, error: null });
     });
 
     const PATCH = await importRoute();

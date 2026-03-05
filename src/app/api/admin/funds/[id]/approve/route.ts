@@ -10,8 +10,8 @@ export async function PATCH(
   if (auth.error) return auth.error;
 
   const { data, error } = await auth.serviceClient
-    .from("questions_sets")
-    .update({ approved: true, rejected: false, rejection_reason: null })
+    .from("funds")
+    .update({ published: true, rejected: false, rejection_reason: null })
     .eq("id", id)
     .select("id")
     .single();
@@ -20,7 +20,7 @@ export async function PATCH(
     if (error.code === "PGRST116") {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    console.error("Approve questions set error:", error);
+    console.error("Approve fund error:", error);
     return NextResponse.json({ error: "Failed to approve" }, { status: 500 });
   }
 

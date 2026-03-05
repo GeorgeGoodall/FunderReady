@@ -1,17 +1,12 @@
-import { createServiceClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { createServiceClient, createClient } from "@/lib/supabase/server";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { AdminActionBar } from "../../../../components/AdminActionBar";
-import { AdminCreateForm } from "../../../../components/AdminCreateForm";
 import { HistoricalSets } from "../../../../components/HistoricalSets";
+import { formatDate } from "../../../../lib/format";
 import type { Json } from "@/types/database";
 
 export const dynamic = "force-dynamic";
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
-}
 
 function countJson(json: Json): number {
   return Array.isArray(json) ? json.length : 0;
@@ -105,7 +100,12 @@ function CriteriaSetsSection({ criteriaSets, orgId, fundId }: { criteriaSets: Cr
         <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
           Criteria Sets
         </h3>
-        <AdminCreateForm entityType="criteria-set" parentId={fundId} />
+        <Link
+          href={`/admin/orgs/${orgId}/funds/${fundId}/new-set/criteria`}
+          className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          + New Criteria Set
+        </Link>
       </div>
 
       {criteriaSets.length === 0 ? (
@@ -153,7 +153,12 @@ function QuestionsSetsSection({ questionsSets, orgId, fundId }: { questionsSets:
         <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
           Questions Sets
         </h3>
-        <AdminCreateForm entityType="questions-set" parentId={fundId} />
+        <Link
+          href={`/admin/orgs/${orgId}/funds/${fundId}/new-set/questions`}
+          className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          + New Questions Set
+        </Link>
       </div>
 
       {questionsSets.length === 0 ? (
@@ -196,7 +201,18 @@ export default async function FundDetailPage({
   params: Promise<{ orgId: string; fundId: string }>;
 }) {
   const { orgId, fundId } = await params;
+
+  // Auth guard — defense in depth (layout also checks)
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
   const serviceClient = createServiceClient();
+  const { data: profile } = await serviceClient
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+  if (!profile?.is_admin) redirect("/dashboard");
 
   // Fetch fund
   const { data: fund } = await serviceClient

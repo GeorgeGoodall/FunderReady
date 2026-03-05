@@ -9,6 +9,23 @@ export async function DELETE(
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
 
+  const { count, error: countError } = await auth.serviceClient
+    .from("applications")
+    .select("id", { count: "exact", head: true })
+    .eq("questions_set_id", id);
+
+  if (countError) {
+    console.error("Check questions set dependencies error:", countError);
+    return NextResponse.json({ error: "Failed to check dependencies" }, { status: 500 });
+  }
+
+  if (count && count > 0) {
+    return NextResponse.json(
+      { error: "Cannot delete questions set with existing applications" },
+      { status: 409 }
+    );
+  }
+
   const { error } = await auth.serviceClient
     .from("questions_sets")
     .delete()

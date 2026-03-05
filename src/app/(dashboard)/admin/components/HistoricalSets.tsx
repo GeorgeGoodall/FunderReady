@@ -10,6 +10,7 @@ export function HistoricalSets({ children, count }: { children: React.ReactNode;
   return (
     <div className="mt-3">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1 text-xs font-medium text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
       >

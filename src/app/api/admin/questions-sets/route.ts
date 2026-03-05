@@ -21,10 +21,17 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!Array.isArray(body.questions_json)) {
+    return NextResponse.json(
+      { error: "questions_json must be an array" },
+      { status: 400 }
+    );
+  }
+
   const record: Record<string, unknown> = {
     fund_id: body.fund_id,
     questions_json: body.questions_json,
-    approved: true,
+    approved: body.approved === false ? false : true,
     created_by: auth.userId,
   };
   if (typeof body.label === "string") record.label = body.label;

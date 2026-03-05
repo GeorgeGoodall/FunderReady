@@ -206,8 +206,8 @@ describe("PATCH /api/admin/organisations/[id]/approve", () => {
         // profiles lookup
         return chainMock({ data: { is_admin: true }, error: null });
       }
-      // organisations update
-      return chainMock({ data: null, error: null });
+      // organisations update — returns updated row
+      return chainMock({ data: { id: "org-1" }, error: null });
     });
 
     const PATCH = await importRoute();
