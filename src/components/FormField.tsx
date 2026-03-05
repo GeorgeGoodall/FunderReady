@@ -57,15 +57,17 @@ function CharCounter({ text, max }: { text: string; max: number }) {
   const count = text.length;
   const ratio = count / max;
   const colour =
-    ratio > 0.95
-      ? "text-red-600 dark:text-red-400"
-      : ratio > 0.8
-        ? "text-amber-600 dark:text-amber-400"
-        : "text-zinc-500";
+    ratio > 1
+      ? "text-red-600 dark:text-red-400 font-semibold"
+      : ratio > 0.95
+        ? "text-red-600 dark:text-red-400"
+        : ratio > 0.8
+          ? "text-amber-600 dark:text-amber-400"
+          : "text-zinc-500";
 
   return (
     <span className={`text-xs ${colour}`}>
-      {count} / {max} chars
+      {count} / {max} chars{count > max ? " (over limit)" : ""}
     </span>
   );
 }
@@ -137,7 +139,7 @@ export function FormField({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
-            maxLength={question.char_count_max}
+            maxLength={question.char_count_max ? Math.floor(question.char_count_max * 1.5) : undefined}
             className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
           />
         )}
@@ -190,7 +192,7 @@ export function FormField({
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
             rows={Math.max(4, Math.min(12, Math.ceil(value.length / 80)))}
-            maxLength={question.char_count_max}
+            maxLength={question.char_count_max ? Math.floor(question.char_count_max * 1.5) : undefined}
             className="w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
           />
         )}
