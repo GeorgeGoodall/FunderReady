@@ -9,22 +9,25 @@ import { useEffect, useRef, useState } from "react";
  * @param duration - Animation duration in ms (default 1000)
  */
 export function useCountUp(target: number, shouldAnimate: boolean, duration = 1000): number {
-  const [value, setValue] = useState(shouldAnimate ? 0 : target);
+  const [value, setValue] = useState(() => shouldAnimate ? 0 : target);
   const rafRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!shouldAnimate) {
+      // Not animating — show target immediately.
+      // The setValue here is intentional: it handles the case where
+      // shouldAnimate transitions from true back to false.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setValue(target);
       return;
     }
 
     setValue(0);
-    startTimeRef.current = null;
+    let startTime: number | null = null;
 
     const animate = (timestamp: number) => {
-      if (startTimeRef.current === null) startTimeRef.current = timestamp;
-      const elapsed = timestamp - startTimeRef.current;
+      if (startTime === null) startTime = timestamp;
+      const elapsed = timestamp - startTime;
       const progress = Math.min(elapsed / duration, 1);
       // Ease-out: 1 - (1 - t)^3
       const eased = 1 - Math.pow(1 - progress, 3);

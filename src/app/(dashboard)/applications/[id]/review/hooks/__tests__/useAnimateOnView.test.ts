@@ -3,15 +3,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useAnimateOnView } from "../useAnimateOnView";
 
-let observerCallback: IntersectionObserverCallback;
 const mockObserve = vi.fn();
 const mockDisconnect = vi.fn();
 
 beforeEach(() => {
   vi.stubGlobal(
     "IntersectionObserver",
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     vi.fn((cb: IntersectionObserverCallback) => {
-      observerCallback = cb;
       return { observe: mockObserve, unobserve: vi.fn(), disconnect: mockDisconnect };
     })
   );
