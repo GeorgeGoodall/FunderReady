@@ -255,6 +255,21 @@ function SortableQuestionCard({
 
             <span className="mx-1 text-zinc-300 dark:text-zinc-700">|</span>
 
+            <label className="text-xs text-zinc-500">Chars:</label>
+            <input
+              type="number"
+              value={question.char_count_max ?? ""}
+              onChange={(e) =>
+                onUpdate({
+                  char_count_max: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                })
+              }
+              placeholder="Max"
+              className="w-20 rounded border border-zinc-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            />
+
+            <span className="mx-1 text-zinc-300 dark:text-zinc-700">|</span>
+
             <label className="text-xs text-zinc-500">Priority:</label>
             <select
               value={question.priority ?? ""}
