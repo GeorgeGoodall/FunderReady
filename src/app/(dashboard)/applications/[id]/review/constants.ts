@@ -41,3 +41,17 @@ export const SCORE_ORDER: Record<string, number> = {
 };
 
 export const GOOD_SCORES = new Set(["Excellent", "Strong"]);
+
+/**
+ * Converts a 0-100 score to an HSL colour string.
+ * 0 = red (hsl 0), 50 = amber (hsl 40), 100 = green (hsl 130).
+ * Returns grey for null scores.
+ */
+export function scoreToHsl(score: number | null): string {
+  if (score === null) return "hsl(0, 0%, 60%)";
+  const clamped = Math.max(0, Math.min(100, score));
+  const hue = clamped <= 50
+    ? (clamped / 50) * 40
+    : 40 + ((clamped - 50) / 50) * 90;
+  return `hsl(${Math.round(hue)}, 70%, 45%)`;
+}
