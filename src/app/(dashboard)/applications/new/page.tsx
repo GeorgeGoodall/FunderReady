@@ -13,11 +13,12 @@ export default async function NewApplicationPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("subscription_tier")
+    .select("subscription_tier, is_admin")
     .eq("id", user.id)
     .single();
 
   const tier = (profile?.subscription_tier ?? "free") as "free" | "pro";
+  const isAdmin = profile?.is_admin ?? false;
   const usage = await checkUsage(supabase, user.id);
 
   return (
@@ -27,7 +28,7 @@ export default async function NewApplicationPage() {
         Select a fund to start filling out your application form.
       </p>
       <div className="mt-6">
-        <NewApplicationForm userId={user.id} tier={tier} usage={usage} />
+        <NewApplicationForm userId={user.id} tier={tier} usage={usage} isAdmin={isAdmin} />
       </div>
     </div>
   );

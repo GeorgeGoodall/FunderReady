@@ -16,6 +16,7 @@ interface NewApplicationFormProps {
   userId: string;
   tier: "free" | "pro";
   usage: UsageResult;
+  isAdmin?: boolean;
 }
 
 interface FundInfo {
@@ -36,7 +37,7 @@ const STEPS: { key: Step; label: string }[] = [
   { key: "confirm", label: "Create" },
 ];
 
-export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicationFormProps) {
+export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: NewApplicationFormProps) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("fund");
   const [error, setError] = useState("");
@@ -348,7 +349,7 @@ export function NewApplicationForm({ userId: _userId, tier, usage }: NewApplicat
           )}
 
           {!criteriaSet ? (
-            <CriteriaInput onParsed={setCriteriaSet} />
+            <CriteriaInput onParsed={setCriteriaSet} isAdmin={isAdmin} />
           ) : (
             <>
               <CriteriaPreview criteriaSet={criteriaSet} onChange={handleCriteriaChange} />

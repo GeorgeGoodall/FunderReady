@@ -48,11 +48,25 @@ interface PlatformStats {
   organisations: number;
 }
 
+interface ScrapingData {
+  total_calls: number;
+  filter_links_calls: number;
+  relevance_check_calls: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cost_usd: number;
+  total_cost_gbp: number;
+}
+
 interface MetricsData {
   all_time: AggregateData;
   last_30_days: AggregateData;
   recent_logs: RecentLog[];
   recent_reviews: RecentReview[];
+  scraping: {
+    all_time: ScrapingData;
+    last_30_days: ScrapingData;
+  };
   platform: PlatformStats;
 }
 
@@ -116,7 +130,7 @@ export function AdminMetrics() {
   if (error) return <p className="text-sm text-red-500">Error: {error}</p>;
   if (!data) return null;
 
-  const { all_time, last_30_days, recent_logs, recent_reviews, platform } = data;
+  const { all_time, last_30_days, recent_logs, recent_reviews, scraping, platform } = data;
 
   // Build chart data from all_time.by_step
   const chartData = Object.entries(all_time.by_step).map(([step, count]) => ({
@@ -157,6 +171,35 @@ export function AdminMetrics() {
           <MiniCard label="Organisations" value={platform.organisations} />
         </div>
       </div>
+
+      {/* Scraping Costs */}
+      {scraping.all_time.total_calls > 0 && (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-zinc-600 dark:text-zinc-400">Scraping Costs</h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <SummaryCard
+              label="Scraping Cost (All Time)"
+              value={`$${scraping.all_time.total_cost_usd.toFixed(4)}`}
+              sub={`£${scraping.all_time.total_cost_gbp.toFixed(4)}`}
+            />
+            <SummaryCard
+              label="Scraping Cost (30 Days)"
+              value={`$${scraping.last_30_days.total_cost_usd.toFixed(4)}`}
+              sub={`${scraping.last_30_days.total_calls} calls`}
+            />
+            <SummaryCard
+              label="Filter Links Calls"
+              value={scraping.all_time.filter_links_calls.toLocaleString()}
+              sub={`${scraping.last_30_days.filter_links_calls} last 30 days`}
+            />
+            <SummaryCard
+              label="Relevance Checks"
+              value={scraping.all_time.relevance_check_calls.toLocaleString()}
+              sub={`${scraping.last_30_days.relevance_check_calls} last 30 days`}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Bar Chart */}
       {chartData.length > 0 && (

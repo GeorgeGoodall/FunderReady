@@ -24,6 +24,12 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     cache_write: 1.0,
     cache_read: 0.08,
   },
+  "gemini-2.5-flash-lite": {
+    input: 0.075,
+    output: 0.30,
+    cache_write: 0,
+    cache_read: 0,
+  },
 };
 
 export const USD_TO_GBP = 0.79;

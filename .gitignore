@@ -45,3 +45,4 @@ REVIEW-FEEDBACK.md
 .audit/*
 tmp-analysis/*
 docs/plans/*
+logs/

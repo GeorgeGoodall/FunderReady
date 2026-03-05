@@ -8,6 +8,7 @@ const mockGetUser = vi.fn();
 const mockFrom = vi.fn();
 
 const mockServiceFrom = vi.fn();
+const mockServiceRpc = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
@@ -16,6 +17,7 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
   createServiceClient: vi.fn(() => ({
     from: mockServiceFrom,
+    rpc: mockServiceRpc,
   })),
 }));
 
@@ -615,6 +617,7 @@ describe("GET /api/admin/metrics", () => {
     chain.update = vi.fn(() => chain);
     chain.upsert = vi.fn(() => chain);
     chain.eq = vi.fn(() => chain);
+    chain.in = vi.fn(() => chain);
     chain.gte = vi.fn(() => chain);
     chain.order = vi.fn(() => chain);
     chain.limit = vi.fn(() => Promise.resolve(resolvedValue));
@@ -647,23 +650,29 @@ describe("GET /api/admin/metrics", () => {
   it("returns 200 with aggregated metrics", async () => {
     authenticatedUser();
 
-    const sampleLogs = [
-      { pipeline_step: "answer_analysis", model: "claude-sonnet", input_tokens: 1000, output_tokens: 200, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cost_usd: "0.005", cost_gbp: "0.004" },
-      { pipeline_step: "scoring", model: "claude-sonnet", input_tokens: 500, output_tokens: 100, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cost_usd: "0.003", cost_gbp: "0.002" },
+    const sampleAggRows = [
+      { pipeline_step: "answer_analysis", model: "claude-sonnet", total_calls: 10, total_input_tokens: 1000, total_output_tokens: 200, total_cost_usd: 0.005, total_cost_gbp: 0.004 },
+      { pipeline_step: "scoring", model: "claude-sonnet", total_calls: 5, total_input_tokens: 500, total_output_tokens: 100, total_cost_usd: 0.003, total_cost_gbp: 0.002 },
     ];
 
+    const sampleScrapingRows = [
+      { pipeline_step: "filter_links", total_calls: 3, total_input_tokens: 300, total_output_tokens: 30, total_cost_usd: 0.001, total_cost_gbp: 0.0008 },
+    ];
+
+    // Profile check via .from()
     let serviceCallCount = 0;
     mockServiceFrom.mockImplementation(() => {
       serviceCallCount++;
       if (serviceCallCount === 1) {
-        // Profile check
         return metricsChainMock({ data: { is_admin: true }, error: null });
       }
-      // All subsequent calls return appropriate data
-      // The route runs 9 queries in Promise.all
-      // We'll return sample data for all of them
-      return metricsChainMock({ data: sampleLogs, error: null, count: 5 });
+      return metricsChainMock({ data: [], error: null, count: 5 });
     });
+
+    // RPC calls return aggregate rows
+    mockServiceRpc.mockImplementation(() =>
+      metricsChainMock({ data: sampleAggRows, error: null })
+    );
 
     const GET = await importRoute();
     const res = await GET();
@@ -673,8 +682,11 @@ describe("GET /api/admin/metrics", () => {
     expect(body).toHaveProperty("last_30_days");
     expect(body).toHaveProperty("recent_logs");
     expect(body).toHaveProperty("recent_reviews");
+    expect(body).toHaveProperty("scraping");
     expect(body).toHaveProperty("platform");
     expect(body.all_time.total_calls).toBeGreaterThanOrEqual(0);
+    expect(body.scraping).toHaveProperty("all_time");
+    expect(body.scraping).toHaveProperty("last_30_days");
   });
 
   it("returns 200 with empty data (all zeros)", async () => {
@@ -688,6 +700,10 @@ describe("GET /api/admin/metrics", () => {
       }
       return metricsChainMock({ data: null, error: null, count: 0 });
     });
+
+    mockServiceRpc.mockImplementation(() =>
+      metricsChainMock({ data: null, error: null })
+    );
 
     const GET = await importRoute();
     const res = await GET();
@@ -720,6 +736,10 @@ describe("GET /api/admin/metrics", () => {
       }
       return metricsChainMock({ data: null, error: null, count: null });
     });
+
+    mockServiceRpc.mockImplementation(() =>
+      metricsChainMock({ data: null, error: null })
+    );
 
     const GET = await importRoute();
     const res = await GET();
