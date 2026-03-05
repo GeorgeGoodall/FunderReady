@@ -17,6 +17,18 @@ export type {
 } from "@/lib/pipeline/schemas";
 
 import type { ApplicationScoring, CrossReference, AnswerAnalysis } from "@/lib/pipeline/schemas";
+import { ApplicationScoringSchema } from "@/lib/pipeline/schemas";
+import { z } from "zod";
+
+const ReviewResultsSchema = z.object({
+  answer_feedback: z.record(z.string(), z.any()),
+  cross_reference: z.object({}).passthrough(),
+  scoring: ApplicationScoringSchema,
+  projected_score: z.number().optional(),
+  gap_count: z.number().optional(),
+  total_criteria_count: z.number().optional(),
+  disabled_questions: z.array(z.object({ question_id: z.string(), question_text: z.string() })).optional(),
+});
 
 export interface ReviewResults {
   answer_feedback: Record<string, AnswerAnalysis>;
@@ -67,17 +79,12 @@ export function safeNumber(value: unknown, fallback = 0): number {
 
 /**
  * Validate that an unknown value has the required shape to be treated as ReviewResults.
+ * Uses Zod safeParse for thorough validation at the Supabase JSON boundary.
  * Returns the typed value or null if the shape is invalid.
  */
 export function parseReviewResults(raw: Record<string, unknown> | null): ReviewResults | null {
   if (!raw) return null;
-  const scoring = raw.scoring;
-  if (!scoring || typeof scoring !== "object") return null;
-  // Validate minimum required scoring fields
-  const s = scoring as Record<string, unknown>;
-  if (typeof s.overall_score !== "number" || !Array.isArray(s.criteria_scores)) return null;
-  // Validate answer_feedback and cross_reference exist as objects
-  if (!raw.answer_feedback || typeof raw.answer_feedback !== "object") return null;
-  if (!raw.cross_reference || typeof raw.cross_reference !== "object") return null;
-  return raw as unknown as ReviewResults;
+  const result = ReviewResultsSchema.safeParse(raw);
+  if (!result.success) return null;
+  return result.data as ReviewResults;
 }

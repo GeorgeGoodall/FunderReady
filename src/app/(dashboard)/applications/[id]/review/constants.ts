@@ -42,6 +42,9 @@ export const SCORE_ORDER: Record<string, number> = {
 
 export const GOOD_SCORES = new Set(["Excellent", "Strong"]);
 
+export const ANIMATE_ON_VIEW_THRESHOLD = 0.1;
+export const ANIMATE_ON_VIEW_THRESHOLD_RELAXED = 0.2;
+
 /**
  * Converts a 0-100 score to an HSL colour string.
  * 0 = red (hsl 0), 50 = amber (hsl 40), 100 = green (hsl 130).

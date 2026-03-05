@@ -26,6 +26,12 @@ describe("scoreToHsl", () => {
     expect(hsl).toMatch(/^hsl\(20,/);
   });
 
+  it("interpolates linearly between 50 and 100", () => {
+    const hsl = scoreToHsl(75);
+    // hue = 40 + ((75-50)/50) * 90 = 40 + 45 = 85
+    expect(hsl).toMatch(/^hsl\(85,/);
+  });
+
   it("clamps scores below 0", () => {
     expect(scoreToHsl(-10)).toBe(scoreToHsl(0));
   });

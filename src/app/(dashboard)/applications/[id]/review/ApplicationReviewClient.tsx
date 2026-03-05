@@ -13,6 +13,7 @@ import { AnswersTab } from "./components/AnswersTab";
 import { CrossReferenceTab } from "./components/CrossReferenceTab";
 import { NewReviewButton } from "@/components/NewReviewButton";
 import { useAnimateOnView } from "./hooks/useAnimateOnView";
+import { ANIMATE_ON_VIEW_THRESHOLD } from "./constants";
 
 function FadeInSection({
   children,
@@ -21,7 +22,7 @@ function FadeInSection({
   children: React.ReactNode;
   delay?: number;
 }) {
-  const { ref, isVisible } = useAnimateOnView(0.1);
+  const { ref, isVisible } = useAnimateOnView(ANIMATE_ON_VIEW_THRESHOLD);
   return (
     <div
       ref={ref}
@@ -154,7 +155,7 @@ export function ApplicationReviewClient({
                 <div key={step.key} className="flex items-center gap-3">
                   {isDone && (
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                      <svg className="h-3.5 w-3.5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                      <svg className="h-3.5 w-3.5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                       </svg>
                     </span>

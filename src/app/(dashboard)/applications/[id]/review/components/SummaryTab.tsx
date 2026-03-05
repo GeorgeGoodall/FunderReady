@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useMemo, useState } from "react";
 import type { ApplicationScoring, ImprovementAppendixItem, ReviewResults } from "../types";
-import { SCORE_COLOURS, SCORE_ORDER, READINESS_COLOURS } from "../constants";
+import { SCORE_COLOURS, SCORE_ORDER, READINESS_COLOURS, ANIMATE_ON_VIEW_THRESHOLD } from "../constants";
 import { InlineRefs } from "./InlineRefs";
 import { QualityDimensionCircles } from "./QualityDimensionCircles";
 import { ImprovementDetail } from "./ImprovementDetail";
@@ -35,11 +34,12 @@ export function SummaryTab({
   const hasGaps = (gap_count ?? 0) > 0 && projected_score !== undefined;
 
   // Build appendix map for O(1) lookup
-  const appendixMap = new Map(
-    (scoring.improvement_appendix ?? []).map((item) => [item.criterion_id, item])
+  const appendixMap = useMemo(
+    () => new Map((scoring.improvement_appendix ?? []).map((item) => [item.criterion_id, item])),
+    [scoring.improvement_appendix],
   );
 
-  const { ref: scoreRef, isVisible: scoreVisible } = useAnimateOnView(0.1);
+  const { ref: scoreRef, isVisible: scoreVisible } = useAnimateOnView(ANIMATE_ON_VIEW_THRESHOLD);
   const animatedScore = useCountUp(scoring.overall_score, scoreVisible);
   const animatedProjected = useCountUp(
     projected_score !== undefined ? Math.round(projected_score) : 0,
@@ -70,12 +70,6 @@ export function SummaryTab({
           <span className={`rounded-full px-3 py-1 text-sm font-medium ${READINESS_COLOURS[scoring.submission_readiness] ?? ""}`}>
             {scoring.submission_readiness}
           </span>
-          <Link
-            href={`/applications/${applicationId}`}
-            className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            Edit Current Draft
-          </Link>
         </div>
 
         <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
@@ -171,7 +165,7 @@ function CriteriaScoresSection({
           title={sortAsc ? "Showing best first — click for worst first" : "Showing worst first — click for best first"}
         >
           {sortAsc ? "Best first" : "Worst first"}
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
             {sortAsc ? (
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75L17.25 9m0 0L21 12.75M17.25 9v12" />
             ) : (
@@ -188,8 +182,17 @@ function CriteriaScoresSection({
           return (
             <div key={cs.criterion_id}>
               <div
+                role={appendixItem ? "button" : undefined}
+                tabIndex={appendixItem ? 0 : undefined}
+                aria-expanded={appendixItem ? isExpanded : undefined}
                 className={`flex items-center justify-between px-5 py-3 ${appendixItem ? "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50" : ""}`}
                 onClick={() => appendixItem && setExpandedId(isExpanded ? null : cs.criterion_id)}
+                onKeyDown={(e) => {
+                  if (appendixItem && (e.key === "Enter" || e.key === " ")) {
+                    e.preventDefault();
+                    setExpandedId(isExpanded ? null : cs.criterion_id);
+                  }
+                }}
               >
                 <div className="min-w-0 flex-1 pr-4">
                   <p className="text-sm font-medium">{cs.criterion}</p>
@@ -204,7 +207,7 @@ function CriteriaScoresSection({
                   {appendixItem && (
                     <svg
                       className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                      fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
+                      fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                     </svg>
