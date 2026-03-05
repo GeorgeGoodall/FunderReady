@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AdminActionBar } from "../../../../components/AdminActionBar";
 import { AdminCreateForm } from "../../../../components/AdminCreateForm";
+import { HistoricalSets } from "../../../../components/HistoricalSets";
 import type { Json } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,179 @@ function formatDate(iso: string): string {
 
 function countJson(json: Json): number {
   return Array.isArray(json) ? json.length : 0;
+}
+
+interface CriteriaSetRow {
+  id: string;
+  name: string;
+  label: string | null;
+  description: string | null;
+  criteria_json: Json;
+  approved: boolean;
+  created_at: string;
+}
+
+interface QuestionsSetRow {
+  id: string;
+  label: string | null;
+  questions_json: Json;
+  overall_word_limit: number | null;
+  approved: boolean;
+  created_at: string;
+}
+
+function CriteriaSetCard({ cs, orgId, fundId }: { cs: CriteriaSetRow; orgId: string; fundId: string }) {
+  return (
+    <Link
+      href={`/admin/orgs/${orgId}/funds/${fundId}/sets/${cs.id}`}
+      className="block bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 hover:bg-zinc-50 dark:hover:bg-zinc-750"
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+          {cs.name || cs.label || "Untitled"}
+        </span>
+        <span className="text-xs text-zinc-500">
+          {countJson(cs.criteria_json)} criteria
+        </span>
+        <span className={`text-xs px-2 py-0.5 rounded-full ${
+          cs.approved
+            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+            : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+        }`}>
+          {cs.approved ? "approved" : "pending"}
+        </span>
+      </div>
+      <p className="text-xs text-zinc-400 mt-0.5">{formatDate(cs.created_at)}</p>
+    </Link>
+  );
+}
+
+function QuestionsSetCard({ qs, orgId, fundId }: { qs: QuestionsSetRow; orgId: string; fundId: string }) {
+  return (
+    <Link
+      href={`/admin/orgs/${orgId}/funds/${fundId}/sets/${qs.id}`}
+      className="block bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 hover:bg-zinc-50 dark:hover:bg-zinc-750"
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+          {qs.label || "Untitled"}
+        </span>
+        <span className="text-xs text-zinc-500">
+          {countJson(qs.questions_json)} questions
+        </span>
+        {qs.overall_word_limit && (
+          <span className="text-xs text-zinc-500">
+            ({qs.overall_word_limit} word limit)
+          </span>
+        )}
+        <span className={`text-xs px-2 py-0.5 rounded-full ${
+          qs.approved
+            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+            : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+        }`}>
+          {qs.approved ? "approved" : "pending"}
+        </span>
+      </div>
+      <p className="text-xs text-zinc-400 mt-0.5">{formatDate(qs.created_at)}</p>
+    </Link>
+  );
+}
+
+function CriteriaSetsSection({ criteriaSets, orgId, fundId }: { criteriaSets: CriteriaSetRow[]; orgId: string; fundId: string }) {
+  // Latest approved set is "active", pending sets need action, rest are historical
+  const latestApproved = criteriaSets.find((cs) => cs.approved);
+  const pending = criteriaSets.filter((cs) => !cs.approved);
+  const historical = criteriaSets.filter((cs) => cs.approved && cs !== latestApproved);
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+          Criteria Sets
+        </h3>
+        <AdminCreateForm entityType="criteria-set" parentId={fundId} />
+      </div>
+
+      {criteriaSets.length === 0 ? (
+        <p className="text-sm text-zinc-500">No criteria sets.</p>
+      ) : (
+        <div>
+          {/* Active (latest approved) */}
+          {latestApproved && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Active</p>
+              <CriteriaSetCard cs={latestApproved} orgId={orgId} fundId={fundId} />
+            </div>
+          )}
+
+          {/* Pending (need admin action) */}
+          {pending.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">Pending ({pending.length})</p>
+              {pending.map((cs) => (
+                <CriteriaSetCard key={cs.id} cs={cs} orgId={orgId} fundId={fundId} />
+              ))}
+            </div>
+          )}
+
+          {/* Historical */}
+          <HistoricalSets count={historical.length}>
+            {historical.map((cs) => (
+              <CriteriaSetCard key={cs.id} cs={cs} orgId={orgId} fundId={fundId} />
+            ))}
+          </HistoricalSets>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function QuestionsSetsSection({ questionsSets, orgId, fundId }: { questionsSets: QuestionsSetRow[]; orgId: string; fundId: string }) {
+  const latestApproved = questionsSets.find((qs) => qs.approved);
+  const pending = questionsSets.filter((qs) => !qs.approved);
+  const historical = questionsSets.filter((qs) => qs.approved && qs !== latestApproved);
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+          Questions Sets
+        </h3>
+        <AdminCreateForm entityType="questions-set" parentId={fundId} />
+      </div>
+
+      {questionsSets.length === 0 ? (
+        <p className="text-sm text-zinc-500">No questions sets.</p>
+      ) : (
+        <div>
+          {/* Active (latest approved) */}
+          {latestApproved && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Active</p>
+              <QuestionsSetCard qs={latestApproved} orgId={orgId} fundId={fundId} />
+            </div>
+          )}
+
+          {/* Pending (need admin action) */}
+          {pending.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">Pending ({pending.length})</p>
+              {pending.map((qs) => (
+                <QuestionsSetCard key={qs.id} qs={qs} orgId={orgId} fundId={fundId} />
+              ))}
+            </div>
+          )}
+
+          {/* Historical */}
+          <HistoricalSets count={historical.length}>
+            {historical.map((qs) => (
+              <QuestionsSetCard key={qs.id} qs={qs} orgId={orgId} fundId={fundId} />
+            ))}
+          </HistoricalSets>
+        </div>
+      )}
+    </section>
+  );
 }
 
 export default async function FundDetailPage({
@@ -111,89 +285,18 @@ export default async function FundDetailPage({
       />
 
       {/* Criteria Sets */}
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-            Criteria Sets ({(criteriaSets ?? []).length})
-          </h3>
-          <AdminCreateForm entityType="criteria-set" parentId={fundId} />
-        </div>
-        {(criteriaSets ?? []).length === 0 ? (
-          <p className="text-sm text-zinc-500">No criteria sets.</p>
-        ) : (
-          <div className="space-y-2">
-            {(criteriaSets ?? []).map((cs) => (
-              <Link
-                key={cs.id}
-                href={`/admin/orgs/${orgId}/funds/${fundId}/sets/${cs.id}`}
-                className="block bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 hover:bg-zinc-50 dark:hover:bg-zinc-750"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                    {cs.name || cs.label || "Untitled"}
-                  </span>
-                  <span className="text-xs text-zinc-500">
-                    {countJson(cs.criteria_json)} criteria
-                  </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    cs.approved
-                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
-                      : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                  }`}>
-                    {cs.approved ? "approved" : "pending"}
-                  </span>
-                </div>
-                <p className="text-xs text-zinc-400 mt-0.5">{formatDate(cs.created_at)}</p>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
+      <CriteriaSetsSection
+        criteriaSets={criteriaSets ?? []}
+        orgId={orgId}
+        fundId={fundId}
+      />
 
       {/* Questions Sets */}
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-            Questions Sets ({(questionsSets ?? []).length})
-          </h3>
-          <AdminCreateForm entityType="questions-set" parentId={fundId} />
-        </div>
-        {(questionsSets ?? []).length === 0 ? (
-          <p className="text-sm text-zinc-500">No questions sets.</p>
-        ) : (
-          <div className="space-y-2">
-            {(questionsSets ?? []).map((qs) => (
-              <Link
-                key={qs.id}
-                href={`/admin/orgs/${orgId}/funds/${fundId}/sets/${qs.id}`}
-                className="block bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 hover:bg-zinc-50 dark:hover:bg-zinc-750"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                    {qs.label || "Untitled"}
-                  </span>
-                  <span className="text-xs text-zinc-500">
-                    {countJson(qs.questions_json)} questions
-                  </span>
-                  {qs.overall_word_limit && (
-                    <span className="text-xs text-zinc-500">
-                      ({qs.overall_word_limit} word limit)
-                    </span>
-                  )}
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    qs.approved
-                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
-                      : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                  }`}>
-                    {qs.approved ? "approved" : "pending"}
-                  </span>
-                </div>
-                <p className="text-xs text-zinc-400 mt-0.5">{formatDate(qs.created_at)}</p>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
+      <QuestionsSetsSection
+        questionsSets={questionsSets ?? []}
+        orgId={orgId}
+        fundId={fundId}
+      />
     </div>
   );
 }
