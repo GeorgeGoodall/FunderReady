@@ -42,49 +42,51 @@ export function ImportResultModal({ result, onConfirm, onCancel }: ImportResultM
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+      <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900 max-h-[85vh] flex flex-col">
         <h2 className="text-lg font-semibold">Import Results</h2>
 
-        {/* Errors */}
-        {hasErrors && (
-          <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 dark:bg-red-900/20">
-            <p className="text-sm font-medium text-red-800 dark:text-red-300">
-              Import cannot proceed — {result.errors.length} error{result.errors.length !== 1 ? "s" : ""} found:
-            </p>
-            <ul className="mt-2 space-y-1">
-              {result.errors.map((e, i) => (
-                <li key={`err-${e.question_id ?? i}`} className="text-sm text-red-700 dark:text-red-400">
-                  {formatErrorItem(e)}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+          {/* Errors */}
+          {hasErrors && (
+            <div className="rounded-lg bg-red-50 px-4 py-3 dark:bg-red-900/20">
+              <p className="text-sm font-medium text-red-800 dark:text-red-300">
+                Import cannot proceed — {result.errors.length} error{result.errors.length !== 1 ? "s" : ""} found:
+              </p>
+              <ul className="mt-2 space-y-1">
+                {result.errors.map((e, i) => (
+                  <li key={`err-${e.question_id ?? i}`} className="text-sm text-red-700 dark:text-red-400">
+                    {formatErrorItem(e)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-        {/* Warnings */}
-        {hasWarnings && (
-          <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 dark:bg-amber-900/20">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-              {result.warnings.length} warning{result.warnings.length !== 1 ? "s" : ""}:
-            </p>
-            <ul className="mt-2 space-y-1">
-              {result.warnings.map((w, i) => (
-                <li key={`warn-${w.question_id ?? i}`} className="text-sm text-amber-700 dark:text-amber-400">
-                  {formatErrorItem(w)}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+          {/* Warnings */}
+          {hasWarnings && (
+            <div className="rounded-lg bg-amber-50 px-4 py-3 dark:bg-amber-900/20">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                {result.warnings.length} warning{result.warnings.length !== 1 ? "s" : ""}:
+              </p>
+              <ul className="mt-2 space-y-1">
+                {result.warnings.map((w, i) => (
+                  <li key={`warn-${w.question_id ?? i}`} className="text-sm text-amber-700 dark:text-amber-400">
+                    {formatErrorItem(w)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-        {/* Clean success */}
-        {!hasErrors && !hasWarnings && (
-          <div className="mt-4 rounded-lg bg-green-50 px-4 py-3 dark:bg-green-900/20">
-            <p className="text-sm font-medium text-green-800 dark:text-green-300">
-              File parsed successfully. {result.answers.length} answer{result.answers.length !== 1 ? "s" : ""} ready to import.
-            </p>
-          </div>
-        )}
+          {/* Clean success */}
+          {!hasErrors && !hasWarnings && (
+            <div className="rounded-lg bg-green-50 px-4 py-3 dark:bg-green-900/20">
+              <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                File parsed successfully. {result.answers.length} answer{result.answers.length !== 1 ? "s" : ""} ready to import.
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Actions */}
         <div className="mt-6 flex justify-end gap-3">
