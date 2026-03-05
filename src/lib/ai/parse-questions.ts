@@ -5,13 +5,15 @@ import { logAiUsage } from "./log-usage";
 
 const SYSTEM_PROMPT = `You are an expert at analysing funder application forms and guidance documents.
 
-Given raw text (copied from a funder's application form, question list, or guidance document), extract structured questions with word count limits and field types.
+Given raw text (copied from a funder's application form, question list, or guidance document), extract structured questions with word count limits, character limits, and field types.
 
 Rules:
 - Extract 1-30 questions from the text
 - Use sequential IDs: q1, q2, q3, etc.
 - Each question should be the actual question/prompt from the funder
 - Look for word count limits in formats like: "50 to 300 words", "max 500 words", "up to 1000 words", "(300 words)", "Word limit: 250"
+- Look for character limits in formats like: "max 3000 characters", "3000 character limit", "(3000 chars)", "Character limit: 3000", "maximum of 2000 characters"
+- When a character limit is found, set char_count_max. A question can have both word limits AND character limits.
 - Extract guidance/help text if the funder provides hints, examples, or "here are some ideas" sections
 - Extract priority/weighting if mentioned (map to 1-5 scale)
 - If the text mentions an overall word limit for the whole application, include it
@@ -34,7 +36,7 @@ const MODEL = "claude-sonnet-4-6";
 
 export async function parseQuestionsWithAI(rawText: string, userId?: string): Promise<QuestionsSet> {
   return callClaude({
-    prompt: `Extract structured questions and word count limits from this funder guidance:\n\n${rawText}`,
+    prompt: `Extract structured questions, word count limits, character limits, and field types from this funder guidance:\n\n${rawText}`,
     systemPrompt: SYSTEM_PROMPT,
     schema: QuestionsSetSchema as ZodSchema<QuestionsSet>,
     model: MODEL,
