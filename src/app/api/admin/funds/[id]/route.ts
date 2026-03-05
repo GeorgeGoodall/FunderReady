@@ -1,0 +1,68 @@
+import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth/require-admin";
+
+const ALLOWED_FIELDS = [
+  "name",
+  "url",
+  "notes",
+  "published",
+  "organisation_id",
+] as const;
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const auth = await requireAdmin();
+  if (auth.error) return auth.error;
+
+  const body = await request.json().catch(() => ({}));
+
+  const updates: Record<string, unknown> = {};
+  for (const field of ALLOWED_FIELDS) {
+    if (field in body) {
+      updates[field] = body[field];
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json(
+      { error: "No valid fields provided" },
+      { status: 400 }
+    );
+  }
+
+  const { error } = await auth.serviceClient
+    .from("funds")
+    .update(updates)
+    .eq("id", id);
+
+  if (error) {
+    console.error("Edit fund error:", error);
+    return NextResponse.json({ error: "Failed to update" }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const auth = await requireAdmin();
+  if (auth.error) return auth.error;
+
+  const { error } = await auth.serviceClient
+    .from("funds")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Delete fund error:", error);
+    return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
+  }
+
+  return new NextResponse(null, { status: 204 });
+}
