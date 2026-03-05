@@ -25,6 +25,7 @@ export default async function NewQuestionsSetPage({
     .from("funds")
     .select("id, name")
     .eq("id", fundId)
+    .eq("rejected", false)
     .single();
 
   if (!fund) redirect("/dashboard");
@@ -38,6 +39,7 @@ export default async function NewQuestionsSetPage({
       .from("questions_sets")
       .select("questions_json, overall_word_limit")
       .eq("id", from)
+      .eq("rejected", false)
       .single();
 
     if (qs?.questions_json && Array.isArray(qs.questions_json)) {

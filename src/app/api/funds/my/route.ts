@@ -16,6 +16,7 @@ export async function GET() {
     .select("id, name, organisation_id, organisations(id, name), url, notes, published, created_at")
     .eq("created_by", user.id)
     .eq("creator_hidden", false)
+    .eq("rejected", false)
     .order("created_at", { ascending: false });
 
   if (error) {

@@ -69,8 +69,8 @@ export async function GET() {
     serviceClient.from("profiles").select("id", { count: "exact", head: true }),
     serviceClient.from("applications").select("id", { count: "exact", head: true }),
     serviceClient.from("application_reviews").select("id", { count: "exact", head: true }).eq("status", "completed"),
-    serviceClient.from("funds").select("id", { count: "exact", head: true }),
-    serviceClient.from("organisations").select("id", { count: "exact", head: true }),
+    serviceClient.from("funds").select("id", { count: "exact", head: true }).eq("rejected", false),
+    serviceClient.from("organisations").select("id", { count: "exact", head: true }).eq("rejected", false),
     // Scraping-specific: all-time
     serviceClient.rpc("aggregate_scraping_usage", {}).select() as unknown as {
       data: ScrapingAggregateRow[] | null;

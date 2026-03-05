@@ -15,6 +15,7 @@ export default async function FundsPage() {
     .select("id, name, organisation_id, organisations(id, name), url, published, created_at")
     .eq("created_by", user.id)
     .eq("creator_hidden", false)
+    .eq("rejected", false)
     .order("created_at", { ascending: false });
 
   // Normalise Supabase join shape → { organisation: { id, name } | null }

@@ -59,6 +59,7 @@ export async function POST(request: Request) {
         .from("funds")
         .select("id, name, organisation_id, organisations(id, name), url, notes, created_at")
         .textSearch("name", tsQuery)
+        .eq("rejected", false)
         .order("created_at", { ascending: false })
         .limit(1);
 

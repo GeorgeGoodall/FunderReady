@@ -21,6 +21,7 @@ export async function DELETE(
     .select("id, created_by")
     .eq("id", id)
     .eq("created_by", user.id)
+    .eq("rejected", false)
     .single();
 
   if (!fund) {
@@ -60,6 +61,7 @@ export async function GET(
     .from("funds")
     .select("id, name, organisation_id, organisations(id, name, url, description), url, notes, created_by, created_at")
     .eq("id", id)
+    .eq("rejected", false)
     .single();
 
   if (fundError || !fund) {
@@ -72,6 +74,7 @@ export async function GET(
     .select("id, label, name, description, criteria_json, approved, created_by, created_at")
     .eq("fund_id", id)
     .eq("approved", true)
+    .eq("rejected", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -83,6 +86,7 @@ export async function GET(
     .eq("fund_id", id)
     .eq("created_by", user.id)
     .eq("approved", false)
+    .eq("rejected", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -93,6 +97,7 @@ export async function GET(
     .select("id, label, questions_json, overall_word_limit, approved, created_by, created_at")
     .eq("fund_id", id)
     .eq("approved", true)
+    .eq("rejected", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -104,6 +109,7 @@ export async function GET(
     .eq("fund_id", id)
     .eq("created_by", user.id)
     .eq("approved", false)
+    .eq("rejected", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

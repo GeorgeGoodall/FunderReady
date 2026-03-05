@@ -38,6 +38,7 @@ export default async function ApplicationPage({
     .from("funds")
     .select("id, name, organisation_id, organisations(id, name)")
     .eq("id", application.fund_id)
+    .eq("rejected", false)
     .single();
 
   const fund = rawFund
@@ -48,12 +49,14 @@ export default async function ApplicationPage({
     .from("questions_sets")
     .select("id, questions_json, overall_word_limit, created_at, approved")
     .eq("id", application.questions_set_id)
+    .eq("rejected", false)
     .single();
 
   const { data: criteriaSet } = await supabase
     .from("criteria_sets")
     .select("id, criteria_json")
     .eq("id", application.criteria_set_id)
+    .eq("rejected", false)
     .single();
 
   // Fetch all approved questions sets for this fund (for swap UI)
@@ -63,6 +66,7 @@ export default async function ApplicationPage({
     .select("id, label, created_at, questions_json")
     .eq("fund_id", application.fund_id)
     .eq("approved", true)
+    .eq("rejected", false)
     .order("created_at", { ascending: false });
 
   const availableQuestionsSets = (availableSetsRaw ?? []).map((s) => ({

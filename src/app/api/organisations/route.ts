@@ -21,6 +21,7 @@ export async function GET(request: Request) {
       .from("organisations")
       .select("id, name, url, description, approved")
       .eq("created_by", user.id)
+      .eq("rejected", false)
       .order("created_at", { ascending: false })
       .limit(10);
 
@@ -43,6 +44,7 @@ export async function GET(request: Request) {
     .select("id, name, url, description, approved")
     .textSearch("name", tsQuery)
     .or(`approved.eq.true,created_by.eq.${user.id}`)
+    .eq("rejected", false)
     .order("approved", { ascending: false })
     .order("name")
     .limit(10);

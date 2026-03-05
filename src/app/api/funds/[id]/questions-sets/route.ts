@@ -36,6 +36,7 @@ export async function POST(
     .from("funds")
     .select("id")
     .eq("id", fundId)
+    .eq("rejected", false)
     .single();
 
   if (!fund) {
@@ -46,7 +47,8 @@ export async function POST(
   const { count } = await supabase
     .from("questions_sets")
     .select("id", { count: "exact", head: true })
-    .eq("fund_id", fundId);
+    .eq("fund_id", fundId)
+    .eq("rejected", false);
 
   const isFirstSet = (count ?? 0) === 0;
 

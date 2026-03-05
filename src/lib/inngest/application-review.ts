@@ -361,6 +361,7 @@ export const applicationReviewRequested = inngest.createFunction(
         .from("criteria_sets")
         .select("criteria_json")
         .eq("id", app.criteria_set_id)
+        .eq("rejected", false)
         .single();
 
       if (!criteriaSet?.criteria_json) {
@@ -372,6 +373,7 @@ export const applicationReviewRequested = inngest.createFunction(
         .from("questions_sets")
         .select("questions_json, overall_word_limit")
         .eq("id", app.questions_set_id)
+        .eq("rejected", false)
         .single();
 
       if (!questionsSet?.questions_json) {
