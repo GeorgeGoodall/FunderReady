@@ -1,40 +1,31 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth/require-admin";
 
 export async function PATCH(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await requireAdmin();
+  if (auth.error) return auth.error;
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Check admin
-  const serviceClient = createServiceClient();
-  const { data: profile } = await serviceClient
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", user.id)
+  const { data, error } = await auth.serviceClient
+    .from("criteria_sets")
+    .update({ approved: true, rejected: false, rejection_reason: null })
+    .eq("id", id)
+    .select("id")
     .single();
 
-  if (!profile?.is_admin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const { error } = await serviceClient
-    .from("criteria_sets")
-    .update({ approved: true })
-    .eq("id", id);
-
   if (error) {
+    if (error.code === "PGRST116") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
     console.error("Approve criteria set error:", error);
     return NextResponse.json({ error: "Failed to approve" }, { status: 500 });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   return NextResponse.json({ success: true });

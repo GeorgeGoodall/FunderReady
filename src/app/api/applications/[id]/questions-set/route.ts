@@ -71,6 +71,7 @@ export async function PATCH(
     .from("questions_sets")
     .select("id, fund_id, approved, created_by, questions_json")
     .eq("id", questionsSetId)
+    .eq("rejected", false)
     .single();
 
   if (!newSet) {

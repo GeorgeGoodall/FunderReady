@@ -106,16 +106,19 @@ export async function GET(
       .from("funds")
       .select("id, name, organisation_id, organisations(id, name)")
       .eq("id", application.fund_id)
+      .eq("rejected", false)
       .single(),
     serviceClient
       .from("criteria_sets")
       .select("id, name, description, criteria_json")
       .eq("id", application.criteria_set_id)
+      .eq("rejected", false)
       .single(),
     serviceClient
       .from("questions_sets")
       .select("id, questions_json, overall_word_limit")
       .eq("id", application.questions_set_id)
+      .eq("rejected", false)
       .single(),
   ]);
 

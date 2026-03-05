@@ -35,6 +35,7 @@ export async function POST(request: Request) {
     .from("criteria_sets")
     .select("id, fund_id")
     .eq("id", criteriaSetId)
+    .eq("rejected", false)
     .single();
 
   if (!criteriaSet || criteriaSet.fund_id !== fundId) {
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
     .from("questions_sets")
     .select("id, fund_id, questions_json")
     .eq("id", questionsSetId)
+    .eq("rejected", false)
     .single();
 
   if (!questionsSet || questionsSet.fund_id !== fundId) {

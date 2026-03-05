@@ -14,51 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
-      ai_usage_logs: {
+      ai_daily_usage: {
         Row: {
-          id: string
-          application_review_id: string | null
-          user_id: string | null
-          pipeline_step: string
-          model: string
-          input_tokens: number
-          output_tokens: number
-          cache_creation_input_tokens: number
-          cache_read_input_tokens: number
-          cost_usd: number
-          cost_gbp: number
-          is_retry: boolean
-          created_at: string
+          call_count: number
+          usage_date: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          application_review_id?: string | null
-          user_id?: string | null
-          pipeline_step: string
-          model: string
-          input_tokens?: number
-          output_tokens?: number
-          cache_creation_input_tokens?: number
-          cache_read_input_tokens?: number
-          cost_usd?: number
-          cost_gbp?: number
-          is_retry?: boolean
-          created_at?: string
+          call_count?: number
+          usage_date?: string
+          user_id: string
         }
         Update: {
-          id?: string
+          call_count?: number
+          usage_date?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_usage_logs: {
+        Row: {
+          application_review_id: string | null
+          cache_creation_input_tokens: number
+          cache_read_input_tokens: number
+          cost_gbp: number
+          cost_usd: number
+          created_at: string
+          id: string
+          input_tokens: number
+          is_retry: boolean
+          model: string
+          output_tokens: number
+          pipeline_step: string
+          user_id: string | null
+        }
+        Insert: {
           application_review_id?: string | null
-          user_id?: string | null
-          pipeline_step?: string
-          model?: string
-          input_tokens?: number
-          output_tokens?: number
           cache_creation_input_tokens?: number
           cache_read_input_tokens?: number
-          cost_usd?: number
           cost_gbp?: number
-          is_retry?: boolean
+          cost_usd?: number
           created_at?: string
+          id?: string
+          input_tokens?: number
+          is_retry?: boolean
+          model: string
+          output_tokens?: number
+          pipeline_step: string
+          user_id?: string | null
+        }
+        Update: {
+          application_review_id?: string | null
+          cache_creation_input_tokens?: number
+          cache_read_input_tokens?: number
+          cost_gbp?: number
+          cost_usd?: number
+          created_at?: string
+          id?: string
+          input_tokens?: number
+          is_retry?: boolean
+          model?: string
+          output_tokens?: number
+          pipeline_step?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -70,106 +88,41 @@ export type Database = {
           },
         ]
       }
-      applications: {
-        Row: {
-          id: string
-          user_id: string
-          fund_id: string
-          criteria_set_id: string
-          questions_set_id: string
-          title: string | null
-          status: string
-          review_count: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          fund_id: string
-          criteria_set_id: string
-          questions_set_id: string
-          title?: string | null
-          status?: string
-          review_count?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          fund_id?: string
-          criteria_set_id?: string
-          questions_set_id?: string
-          title?: string | null
-          status?: string
-          review_count?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "applications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "applications_fund_id_fkey"
-            columns: ["fund_id"]
-            isOneToOne: false
-            referencedRelation: "funds"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "applications_criteria_set_id_fkey"
-            columns: ["criteria_set_id"]
-            isOneToOne: false
-            referencedRelation: "criteria_sets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "applications_questions_set_id_fkey"
-            columns: ["questions_set_id"]
-            isOneToOne: false
-            referencedRelation: "questions_sets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       application_answers: {
         Row: {
-          id: string
-          application_id: string
-          question_id: string
           answer_text: string
-          field_type: string
-          selected_options: Json | null
-          last_reviewed_text: string | null
+          application_id: string
           created_at: string
+          field_type: string
+          id: string
+          is_disabled: boolean
+          last_reviewed_text: string | null
+          question_id: string
+          selected_options: Json | null
           updated_at: string
         }
         Insert: {
-          id?: string
-          application_id: string
-          question_id: string
           answer_text?: string
-          field_type?: string
-          selected_options?: Json | null
-          last_reviewed_text?: string | null
+          application_id: string
           created_at?: string
+          field_type?: string
+          id?: string
+          is_disabled?: boolean
+          last_reviewed_text?: string | null
+          question_id: string
+          selected_options?: Json | null
           updated_at?: string
         }
         Update: {
-          id?: string
-          application_id?: string
-          question_id?: string
           answer_text?: string
-          field_type?: string
-          selected_options?: Json | null
-          last_reviewed_text?: string | null
+          application_id?: string
           created_at?: string
+          field_type?: string
+          id?: string
+          is_disabled?: boolean
+          last_reviewed_text?: string | null
+          question_id?: string
+          selected_options?: Json | null
           updated_at?: string
         }
         Relationships: [
@@ -184,58 +137,58 @@ export type Database = {
       }
       application_reviews: {
         Row: {
-          id: string
           application_id: string
+          created_at: string
+          criteria_set_id: string | null
+          error_message: string | null
+          id: string
+          progress: Json
+          questions_set_id: string | null
+          results: Json | null
           review_number: number
           status: string
-          progress: Json
-          results: Json | null
-          error_message: string | null
-          questions_set_id: string | null
-          criteria_set_id: string | null
-          total_input_tokens: number
-          total_output_tokens: number
           total_cache_creation_tokens: number
           total_cache_read_tokens: number
-          total_cost_usd: number
           total_cost_gbp: number
-          created_at: string
+          total_cost_usd: number
+          total_input_tokens: number
+          total_output_tokens: number
         }
         Insert: {
-          id?: string
           application_id: string
+          created_at?: string
+          criteria_set_id?: string | null
+          error_message?: string | null
+          id?: string
+          progress?: Json
+          questions_set_id?: string | null
+          results?: Json | null
           review_number?: number
           status?: string
-          progress?: Json
-          results?: Json | null
-          error_message?: string | null
-          questions_set_id?: string | null
-          criteria_set_id?: string | null
-          total_input_tokens?: number
-          total_output_tokens?: number
           total_cache_creation_tokens?: number
           total_cache_read_tokens?: number
-          total_cost_usd?: number
           total_cost_gbp?: number
-          created_at?: string
+          total_cost_usd?: number
+          total_input_tokens?: number
+          total_output_tokens?: number
         }
         Update: {
-          id?: string
           application_id?: string
+          created_at?: string
+          criteria_set_id?: string | null
+          error_message?: string | null
+          id?: string
+          progress?: Json
+          questions_set_id?: string | null
+          results?: Json | null
           review_number?: number
           status?: string
-          progress?: Json
-          results?: Json | null
-          error_message?: string | null
-          questions_set_id?: string | null
-          criteria_set_id?: string | null
-          total_input_tokens?: number
-          total_output_tokens?: number
           total_cache_creation_tokens?: number
           total_cache_read_tokens?: number
-          total_cost_usd?: number
           total_cost_gbp?: number
-          created_at?: string
+          total_cost_usd?: number
+          total_input_tokens?: number
+          total_output_tokens?: number
         }
         Relationships: [
           {
@@ -246,63 +199,130 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "application_reviews_questions_set_id_fkey"
-            columns: ["questions_set_id"]
-            isOneToOne: false
-            referencedRelation: "questions_sets"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "application_reviews_criteria_set_id_fkey"
             columns: ["criteria_set_id"]
             isOneToOne: false
             referencedRelation: "criteria_sets"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "application_reviews_questions_set_id_fkey"
+            columns: ["questions_set_id"]
+            isOneToOne: false
+            referencedRelation: "questions_sets"
+            referencedColumns: ["id"]
+          },
         ]
       }
-      criteria_sets: {
+      applications: {
         Row: {
-          id: string
-          fund_id: string
-          label: string | null
-          name: string
-          description: string | null
-          criteria_json: Json
-          approved: boolean
-          created_by: string
           created_at: string
+          criteria_set_id: string
+          fund_id: string
+          id: string
+          questions_set_id: string
+          review_count: number
+          status: string
+          title: string | null
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          fund_id: string
-          label?: string | null
-          name: string
-          description?: string | null
-          criteria_json: Json
-          approved?: boolean
-          created_by: string
           created_at?: string
+          criteria_set_id: string
+          fund_id: string
+          id?: string
+          questions_set_id: string
+          review_count?: number
+          status?: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          id?: string
-          fund_id?: string
-          label?: string | null
-          name?: string
-          description?: string | null
-          criteria_json?: Json
-          approved?: boolean
-          created_by?: string
           created_at?: string
+          criteria_set_id?: string
+          fund_id?: string
+          id?: string
+          questions_set_id?: string
+          review_count?: number
+          status?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "criteria_sets_fund_id_fkey"
+            foreignKeyName: "applications_criteria_set_id_fkey"
+            columns: ["criteria_set_id"]
+            isOneToOne: false
+            referencedRelation: "criteria_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "applications_fund_id_fkey"
             columns: ["fund_id"]
             isOneToOne: false
             referencedRelation: "funds"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "applications_questions_set_id_fkey"
+            columns: ["questions_set_id"]
+            isOneToOne: false
+            referencedRelation: "questions_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      criteria_sets: {
+        Row: {
+          approved: boolean
+          created_at: string
+          created_by: string
+          criteria_json: Json
+          description: string | null
+          fund_id: string
+          id: string
+          label: string | null
+          name: string
+          rejected: boolean
+          rejection_reason: string | null
+        }
+        Insert: {
+          approved?: boolean
+          created_at?: string
+          created_by: string
+          criteria_json: Json
+          description?: string | null
+          fund_id: string
+          id?: string
+          label?: string | null
+          name: string
+          rejected?: boolean
+          rejection_reason?: string | null
+        }
+        Update: {
+          approved?: boolean
+          created_at?: string
+          created_by?: string
+          criteria_json?: Json
+          description?: string | null
+          fund_id?: string
+          id?: string
+          label?: string | null
+          name?: string
+          rejected?: boolean
+          rejection_reason?: string | null
+        }
+        Relationships: [
           {
             foreignKeyName: "criteria_sets_created_by_fkey"
             columns: ["created_by"]
@@ -310,44 +330,57 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "criteria_sets_fund_id_fkey"
+            columns: ["fund_id"]
+            isOneToOne: false
+            referencedRelation: "funds"
+            referencedColumns: ["id"]
+          },
         ]
       }
       funds: {
         Row: {
+          created_at: string
+          created_by: string
+          creator_hidden: boolean
           id: string
           name: string
-          organisation_id: string | null
-          url: string | null
           notes: string | null
+          organisation_id: string
           published: boolean
-          creator_hidden: boolean
-          created_by: string
-          created_at: string
+          rejected: boolean
+          rejection_reason: string | null
           updated_at: string
+          url: string | null
         }
         Insert: {
+          created_at?: string
+          created_by: string
+          creator_hidden?: boolean
           id?: string
           name: string
-          organisation_id?: string | null
-          url?: string | null
           notes?: string | null
+          organisation_id: string
           published?: boolean
-          creator_hidden?: boolean
-          created_by: string
-          created_at?: string
+          rejected?: boolean
+          rejection_reason?: string | null
           updated_at?: string
+          url?: string | null
         }
         Update: {
+          created_at?: string
+          created_by?: string
+          creator_hidden?: boolean
           id?: string
           name?: string
-          organisation_id?: string | null
-          url?: string | null
           notes?: string | null
+          organisation_id?: string
           published?: boolean
-          creator_hidden?: boolean
-          created_by?: string
-          created_at?: string
+          rejected?: boolean
+          rejection_reason?: string | null
           updated_at?: string
+          url?: string | null
         }
         Relationships: [
           {
@@ -368,34 +401,40 @@ export type Database = {
       }
       organisations: {
         Row: {
+          approved: boolean
+          created_at: string
+          created_by: string
+          description: string | null
           id: string
           name: string
-          url: string | null
-          description: string | null
-          approved: boolean
-          created_by: string
-          created_at: string
+          rejected: boolean
+          rejection_reason: string | null
           updated_at: string
+          url: string | null
         }
         Insert: {
+          approved?: boolean
+          created_at?: string
+          created_by: string
+          description?: string | null
           id?: string
           name: string
-          url?: string | null
-          description?: string | null
-          approved?: boolean
-          created_by: string
-          created_at?: string
+          rejected?: boolean
+          rejection_reason?: string | null
           updated_at?: string
+          url?: string | null
         }
         Update: {
+          approved?: boolean
+          created_at?: string
+          created_by?: string
+          description?: string | null
           id?: string
           name?: string
-          url?: string | null
-          description?: string | null
-          approved?: boolean
-          created_by?: string
-          created_at?: string
+          rejected?: boolean
+          rejection_reason?: string | null
           updated_at?: string
+          url?: string | null
         }
         Relationships: [
           {
@@ -448,43 +487,42 @@ export type Database = {
       }
       questions_sets: {
         Row: {
-          id: string
-          fund_id: string
-          label: string | null
-          questions_json: Json
-          overall_word_limit: number | null
           approved: boolean
-          created_by: string
           created_at: string
+          created_by: string
+          fund_id: string
+          id: string
+          label: string | null
+          overall_word_limit: number | null
+          questions_json: Json
+          rejected: boolean
+          rejection_reason: string | null
         }
         Insert: {
-          id?: string
-          fund_id: string
-          label?: string | null
-          questions_json: Json
-          overall_word_limit?: number | null
           approved?: boolean
-          created_by: string
           created_at?: string
+          created_by: string
+          fund_id: string
+          id?: string
+          label?: string | null
+          overall_word_limit?: number | null
+          questions_json: Json
+          rejected?: boolean
+          rejection_reason?: string | null
         }
         Update: {
-          id?: string
-          fund_id?: string
-          label?: string | null
-          questions_json?: Json
-          overall_word_limit?: number | null
           approved?: boolean
-          created_by?: string
           created_at?: string
+          created_by?: string
+          fund_id?: string
+          id?: string
+          label?: string | null
+          overall_word_limit?: number | null
+          questions_json?: Json
+          rejected?: boolean
+          rejection_reason?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "questions_sets_fund_id_fkey"
-            columns: ["fund_id"]
-            isOneToOne: false
-            referencedRelation: "funds"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "questions_sets_created_by_fkey"
             columns: ["created_by"]
@@ -492,38 +530,45 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "questions_sets_fund_id_fkey"
+            columns: ["fund_id"]
+            isOneToOne: false
+            referencedRelation: "funds"
+            referencedColumns: ["id"]
+          },
         ]
       }
       review_feedback: {
         Row: {
+          created_at: string | null
           id: string
-          review_id: string
-          user_id: string
           item_path: string
           item_type: string
+          review_id: string
           sentiment: string
-          created_at: string
-          updated_at: string
+          updated_at: string | null
+          user_id: string
         }
         Insert: {
+          created_at?: string | null
           id?: string
-          review_id: string
-          user_id: string
           item_path: string
           item_type: string
+          review_id: string
           sentiment: string
-          created_at?: string
-          updated_at?: string
+          updated_at?: string | null
+          user_id: string
         }
         Update: {
+          created_at?: string | null
           id?: string
-          review_id?: string
-          user_id?: string
           item_path?: string
           item_type?: string
+          review_id?: string
           sentiment?: string
-          created_at?: string
-          updated_at?: string
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -669,10 +714,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "reviews_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "reviews_criteria_set_id_fkey"
+            columns: ["criteria_set_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "criteria_sets"
             referencedColumns: ["id"]
           },
           {
@@ -683,17 +728,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "reviews_criteria_set_id_fkey"
-            columns: ["criteria_set_id"]
-            isOneToOne: false
-            referencedRelation: "criteria_sets"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "reviews_questions_set_id_fkey"
             columns: ["questions_set_id"]
             isOneToOne: false
             referencedRelation: "questions_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -738,7 +783,72 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      aggregate_ai_usage: {
+        Args: never
+        Returns: {
+          model: string
+          pipeline_step: string
+          total_calls: number
+          total_cost_gbp: number
+          total_cost_usd: number
+          total_input_tokens: number
+          total_output_tokens: number
+        }[]
+      }
+      aggregate_ai_usage_since: {
+        Args: { since_date: string }
+        Returns: {
+          model: string
+          pipeline_step: string
+          total_calls: number
+          total_cost_gbp: number
+          total_cost_usd: number
+          total_input_tokens: number
+          total_output_tokens: number
+        }[]
+      }
+      aggregate_scraping_usage: {
+        Args: never
+        Returns: {
+          pipeline_step: string
+          total_calls: number
+          total_cost_gbp: number
+          total_cost_usd: number
+          total_input_tokens: number
+          total_output_tokens: number
+        }[]
+      }
+      aggregate_scraping_usage_since: {
+        Args: { since_date: string }
+        Returns: {
+          pipeline_step: string
+          total_calls: number
+          total_cost_gbp: number
+          total_cost_usd: number
+          total_input_tokens: number
+          total_output_tokens: number
+        }[]
+      }
+      increment_ai_daily_usage: {
+        Args: { p_limit: number; p_user_id: string }
+        Returns: number
+      }
+      rollback_usage: { Args: { p_user_id: string }; Returns: undefined }
+      submit_review: {
+        Args: {
+          p_application_id: string
+          p_criteria_set_id: string
+          p_default_limit?: number
+          p_period: string
+          p_questions_set_id: string
+          p_review_number: number
+          p_user_id: string
+        }
+        Returns: {
+          review_id: string
+          review_number: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

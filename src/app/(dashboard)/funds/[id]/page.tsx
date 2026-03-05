@@ -19,6 +19,7 @@ export default async function FundDetailPage({
       "id, name, organisation_id, organisations(id, name, url), url, notes, published, created_at"
     )
     .eq("id", id)
+    .eq("rejected", false)
     .single();
 
   if (fundError || !fund) {
@@ -31,6 +32,7 @@ export default async function FundDetailPage({
     .select("id, label, name, description, criteria_json, created_at")
     .eq("fund_id", id)
     .eq("approved", true)
+    .eq("rejected", false)
     .order("created_at", { ascending: false });
 
   // All approved questions sets
@@ -39,6 +41,7 @@ export default async function FundDetailPage({
     .select("id, label, questions_json, overall_word_limit, created_at")
     .eq("fund_id", id)
     .eq("approved", true)
+    .eq("rejected", false)
     .order("created_at", { ascending: false });
 
   // Application count (service client to bypass RLS)

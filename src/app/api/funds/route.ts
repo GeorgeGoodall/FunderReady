@@ -30,6 +30,7 @@ export async function GET(request: Request) {
     .from("funds")
     .select("id, name, organisation_id, organisations(id, name), url, notes, created_at")
     .textSearch("name", tsQuery)
+    .eq("rejected", false)
     .order("created_at", { ascending: false })
     .limit(10);
 
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
     .select("id")
     .textSearch("name", tsQuery)
     .or(`approved.eq.true,created_by.eq.${user.id}`)
+    .eq("rejected", false)
     .limit(20);
 
   let fundsByOrg: typeof fundsByName = [];
@@ -53,6 +55,7 @@ export async function GET(request: Request) {
       .from("funds")
       .select("id, name, organisation_id, organisations(id, name), url, notes, created_at")
       .in("organisation_id", orgIds)
+      .eq("rejected", false)
       .order("created_at", { ascending: false })
       .limit(10);
     fundsByOrg = orgFunds ?? [];
@@ -106,6 +109,7 @@ export async function POST(request: Request) {
       .from("organisations")
       .select("id")
       .eq("id", organisation_id)
+      .eq("rejected", false)
       .single();
     if (!org) {
       return NextResponse.json({ error: "Organisation not found" }, { status: 400 });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth/require-admin";
 
 interface AggregateRow {
   pipeline_step: string;
@@ -21,25 +21,9 @@ interface ScrapingAggregateRow {
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const serviceClient = createServiceClient();
-  const { data: profile } = await serviceClient
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile?.is_admin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireAdmin();
+  if (auth.error) return auth.error;
+  const { serviceClient } = auth;
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const scrapingSteps = ["filter_links", "check_criteria_relevance"];
@@ -85,8 +69,8 @@ export async function GET() {
     serviceClient.from("profiles").select("id", { count: "exact", head: true }),
     serviceClient.from("applications").select("id", { count: "exact", head: true }),
     serviceClient.from("application_reviews").select("id", { count: "exact", head: true }).eq("status", "completed"),
-    serviceClient.from("funds").select("id", { count: "exact", head: true }),
-    serviceClient.from("organisations").select("id", { count: "exact", head: true }),
+    serviceClient.from("funds").select("id", { count: "exact", head: true }).eq("rejected", false),
+    serviceClient.from("organisations").select("id", { count: "exact", head: true }).eq("rejected", false),
     // Scraping-specific: all-time
     serviceClient.rpc("aggregate_scraping_usage", {}).select() as unknown as {
       data: ScrapingAggregateRow[] | null;

@@ -35,6 +35,7 @@ export default async function ApplicationReviewPage({
     .from("funds")
     .select("id, name, organisation_id, organisations(id, name)")
     .eq("id", application.fund_id)
+    .eq("rejected", false)
     .single();
 
   const fund = rawFund
@@ -68,6 +69,7 @@ export default async function ApplicationReviewPage({
       .from("questions_sets")
       .select("questions_json")
       .eq("id", questionsSetId)
+      .eq("rejected", false)
       .single();
     if (qs?.questions_json && Array.isArray(qs.questions_json)) {
       questions = qs.questions_json as unknown as typeof questions;
@@ -82,6 +84,7 @@ export default async function ApplicationReviewPage({
       .from("criteria_sets")
       .select("criteria_json")
       .eq("id", criteriaSetId)
+      .eq("rejected", false)
       .single();
     if (cs?.criteria_json && Array.isArray(cs.criteria_json)) {
       criteria = cs.criteria_json as unknown as typeof criteria;

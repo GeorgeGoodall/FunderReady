@@ -1,65 +1,103 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import { AdminDashboard } from "./AdminDashboard";
-import { AdminMetrics } from "./AdminMetrics";
+import { getOrgsWithCounts } from "./lib/admin-queries";
+import { formatDate, truncate } from "./lib/format";
+import Link from "next/link";
+import { AdminCreateForm } from "./components/AdminCreateForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const orgs = await getOrgsWithCounts();
 
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile?.is_admin) redirect("/dashboard");
-
-  // Fetch unapproved criteria sets with fund info
-  const { data: pendingCriteriaSets } = await supabase
-    .from("criteria_sets")
-    .select("id, name, description, criteria_json, created_at, fund_id, created_by, funds(name)")
-    .eq("approved", false)
-    .order("created_at", { ascending: false });
-
-  // Fetch unapproved questions sets with fund info
-  const { data: pendingQuestionsSets } = await supabase
-    .from("questions_sets")
-    .select("id, questions_json, overall_word_limit, created_at, fund_id, created_by, funds(name)")
-    .eq("approved", false)
-    .order("created_at", { ascending: false });
-
-  // Fetch unapproved organisations
-  const { data: pendingOrganisations } = await supabase
-    .from("organisations")
-    .select("id, name, url, description, created_at, created_by")
-    .eq("approved", false)
-    .order("created_at", { ascending: false });
+  const pendingOrgs = orgs.filter((o) => !o.approved);
+  const approvedOrgs = orgs.filter((o) => o.approved);
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-      <p className="mt-1 text-sm text-zinc-500">Approve or review pending criteria, questions sets, and organisations.</p>
-      <div className="mt-6">
-        <AdminDashboard
-          pendingCriteriaSets={pendingCriteriaSets ?? []}
-          pendingQuestionsSets={pendingQuestionsSets ?? []}
-          pendingOrganisations={pendingOrganisations ?? []}
-        />
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-zinc-500">
+          Manage organisations, funds, and content sets.
+        </p>
+        <AdminCreateForm entityType="org" />
       </div>
-      <div className="mt-10">
-        <h2 className="text-lg font-semibold">AI Usage Metrics</h2>
-        <p className="mt-1 text-sm text-zinc-500">Token consumption, costs, and platform statistics.</p>
-        <div className="mt-4">
-          <AdminMetrics />
-        </div>
-      </div>
+
+      {pendingOrgs.length > 0 && (
+        <section>
+          <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
+            Pending Organisations ({pendingOrgs.length})
+          </h2>
+          <div className="space-y-2">
+            {pendingOrgs.map((org) => (
+              <Link
+                key={org.id}
+                href={`/admin/orgs/${org.id}`}
+                className="block bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 hover:bg-zinc-50 dark:hover:bg-zinc-750"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                    {org.name}
+                  </span>
+                  <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 text-xs px-2 py-0.5 rounded-full">
+                    pending
+                  </span>
+                  {org.pending_total > 0 && (
+                    <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 text-xs px-2 py-0.5 rounded-full">
+                      {org.pending_total} pending items
+                    </span>
+                  )}
+                </div>
+                {org.description && (
+                  <p className="text-sm text-zinc-500 mt-0.5">
+                    {truncate(org.description, 100)}
+                  </p>
+                )}
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  {org.total_funds} fund{org.total_funds !== 1 ? "s" : ""} &middot;{" "}
+                  {formatDate(org.created_at)}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section>
+        <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
+          Approved Organisations ({approvedOrgs.length})
+        </h2>
+        {approvedOrgs.length === 0 ? (
+          <p className="text-sm text-zinc-500">No approved organisations yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {approvedOrgs.map((org) => (
+              <Link
+                key={org.id}
+                href={`/admin/orgs/${org.id}`}
+                className="block bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 hover:bg-zinc-50 dark:hover:bg-zinc-750"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                    {org.name}
+                  </span>
+                  {org.pending_total > 0 && (
+                    <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 text-xs px-2 py-0.5 rounded-full">
+                      {org.pending_total} pending
+                    </span>
+                  )}
+                </div>
+                {org.description && (
+                  <p className="text-sm text-zinc-500 mt-0.5">
+                    {truncate(org.description, 100)}
+                  </p>
+                )}
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  {org.total_funds} fund{org.total_funds !== 1 ? "s" : ""} &middot;{" "}
+                  {formatDate(org.created_at)}
+                </p>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

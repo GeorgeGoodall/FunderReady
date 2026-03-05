@@ -29,6 +29,7 @@ export default async function ApplicationHistoryPage({
     .from("funds")
     .select("name, organisation_id, organisations(id, name)")
     .eq("id", application.fund_id)
+    .eq("rejected", false)
     .single();
 
   const fund = rawFund

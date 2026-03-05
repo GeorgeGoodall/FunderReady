@@ -65,6 +65,7 @@ export async function POST(
     .from("questions_sets")
     .select("questions_json")
     .eq("id", questionsSetId)
+    .eq("rejected", false)
     .single();
 
   const questions = Array.isArray(questionsSet?.questions_json)
