@@ -7,6 +7,8 @@ const ALLOWED_FIELDS = [
   "notes",
   "published",
   "organisation_id",
+  "opens_at",
+  "closes_at",
 ] as const;
 
 export async function PATCH(
@@ -35,6 +37,7 @@ export async function PATCH(
 
   const STRING_FIELDS = ["name", "url", "notes", "organisation_id"];
   const BOOLEAN_FIELDS = ["published"];
+  const NULLABLE_STRING_FIELDS = ["opens_at", "closes_at"];
   for (const field of STRING_FIELDS) {
     if (field in updates && typeof updates[field] !== "string") {
       return NextResponse.json(
@@ -49,6 +52,26 @@ export async function PATCH(
         { error: `${field} must be a boolean` },
         { status: 400 }
       );
+    }
+  }
+  for (const field of NULLABLE_STRING_FIELDS) {
+    if (field in updates) {
+      const val = updates[field];
+      if (val === "" || val === null) {
+        updates[field] = null;
+      } else if (typeof val === "string") {
+        if (isNaN(Date.parse(val))) {
+          return NextResponse.json(
+            { error: `${field} must be a valid date` },
+            { status: 400 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { error: `${field} must be a string or null` },
+          { status: 400 }
+        );
+      }
     }
   }
 

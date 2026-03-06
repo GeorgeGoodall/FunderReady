@@ -280,6 +280,16 @@ export default async function FundDetailPage({
           </a>
         )}
         {fund.notes && <p className="mt-1 text-sm text-zinc-500">{fund.notes}</p>}
+        {(fund.opens_at || fund.closes_at) && (
+          <div className="mt-2 flex gap-4 text-sm text-zinc-500">
+            {fund.opens_at && (
+              <span>Opens: <strong className="text-zinc-700 dark:text-zinc-300">{formatDate(fund.opens_at)}</strong></span>
+            )}
+            {fund.closes_at && (
+              <span>Deadline: <strong className="text-zinc-700 dark:text-zinc-300">{formatDate(fund.closes_at)}</strong></span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Action Bar */}
@@ -292,11 +302,15 @@ export default async function FundDetailPage({
           { name: "name", label: "Name", type: "text" },
           { name: "url", label: "URL", type: "text" },
           { name: "notes", label: "Notes", type: "textarea" },
+          { name: "opens_at", label: "Opens", type: "date" },
+          { name: "closes_at", label: "Deadline", type: "date" },
         ]}
         initialValues={{
           name: fund.name,
           url: fund.url ?? "",
           notes: fund.notes ?? "",
+          opens_at: fund.opens_at ? fund.opens_at.slice(0, 10) : "",
+          closes_at: fund.closes_at ? fund.closes_at.slice(0, 10) : "",
         }}
       />
 
