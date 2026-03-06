@@ -551,6 +551,20 @@ export const applicationReviewRequested = inngest.createFunction(
       "answer-analyses",
       async () => {
         const stepUsage: LogAiUsageParams[] = [];
+
+        // Split into fresh (need Claude) and reusable (pull from previous review)
+        const freshContexts: AnswerContext[] = [];
+        const reusedAnalyses: AnswerAnalysis[] = [];
+
+        for (const ctx of answerContexts) {
+          const cached = reusableAnalyses[ctx.question_id];
+          if (cached) {
+            reusedAnalyses.push(cached);
+          } else {
+            freshContexts.push(ctx);
+          }
+        }
+
         const systemPrompt = buildAnswerAnalysisSystemPrompt(criteria);
 
         const analyseAnswer = (ctx: AnswerContext) => {
@@ -599,8 +613,10 @@ export const applicationReviewRequested = inngest.createFunction(
           return results;
         }
 
-        // First pass
-        let settled = await runBatched(answerContexts);
+        // First pass (only fresh answers need Claude calls)
+        let settled = freshContexts.length > 0
+          ? await runBatched(freshContexts)
+          : [];
 
         // Retry only failures (up to 2 additional attempts)
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -612,7 +628,7 @@ export const applicationReviewRequested = inngest.createFunction(
           // Exponential backoff before retrying (2s, then 8s)
           await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt + 1) * 1000));
 
-          const retryContexts = failedIndices.map((i) => answerContexts[i]);
+          const retryContexts = failedIndices.map((i) => freshContexts[i]);
           const retryResults = await runBatched(retryContexts);
 
           // Merge retry results back into settled
@@ -622,10 +638,13 @@ export const applicationReviewRequested = inngest.createFunction(
         }
 
         // Collect results — throw on any remaining failures
-        const analyses = settled.map((result) => {
+        const freshAnalyses = settled.map((result) => {
           if (result.status === "fulfilled") return result.value;
           throw result.reason;
         });
+
+        // Merge: reused analyses + fresh analyses
+        const analyses = [...reusedAnalyses, ...freshAnalyses];
 
         return { analyses, usage: stepUsage };
       }
