@@ -147,8 +147,6 @@ function buildAnswerTable(
 /*  Main export builder                                                */
 /* ------------------------------------------------------------------ */
 
-let bookmarkIdCounter = 0;
-
 export async function generateDocxBuffer(params: GenerateMarkdownParams): Promise<Buffer> {
   const {
     application,
@@ -162,7 +160,7 @@ export async function generateDocxBuffer(params: GenerateMarkdownParams): Promis
     exportedAt,
   } = params;
 
-  bookmarkIdCounter = 0;
+  let bookmarkIdCounter = 0;
   const children: (Paragraph | Table)[] = [];
 
   // Title

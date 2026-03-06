@@ -167,18 +167,45 @@ function findQuestionRegions(
 function extractAnswerFromRegion(
   region: QuestionRegion,
   question: ImportQuestion,
-): { answer: ParsedAnswer; warnings: ImportError[] } {
+): { answer: ParsedAnswer; warnings: ImportError[]; errors?: ImportError[] } {
   const warnings: ImportError[] = [];
   const ft = question.field_type ?? "text_long";
 
   if (ft === "radio" || ft === "dropdown") {
     const selected: string[] = [];
+    const allowedSet = new Set(question.options ?? []);
     for (const line of region.lines) {
       const match = line.match(/^\(x\)\s+(.+)$/);
       if (match) {
-        selected.push(match[1].trim());
+        const value = match[1].trim();
+        selected.push(value);
+        if (allowedSet.size > 0 && !allowedSet.has(value)) {
+          warnings.push({
+            type: "warning",
+            message: `Question "${question.question}" has unrecognised option: "${value}"`,
+            question_id: region.questionId,
+          });
+        }
       }
     }
+
+    if (selected.length > 1) {
+      return {
+        answer: {
+          question_id: region.questionId,
+          answer_text: selected[0] ?? "",
+          selected_options: selected,
+          is_disabled: region.isDisabled,
+        },
+        warnings,
+        errors: [{
+          type: "error" as const,
+          message: `${ft === "radio" ? "Radio" : "Dropdown"} question "${question.question}" has multiple selections — only one is allowed.`,
+          question_id: region.questionId,
+        }],
+      };
+    }
+
     const answerText = selected[0] ?? "";
     return {
       answer: {
@@ -193,10 +220,19 @@ function extractAnswerFromRegion(
 
   if (ft === "checkbox") {
     const selected: string[] = [];
+    const allowedSet = new Set(question.options ?? []);
     for (const line of region.lines) {
       const match = line.match(/^\[x\]\s+(.+)$/);
       if (match) {
-        selected.push(match[1].trim());
+        const value = match[1].trim();
+        selected.push(value);
+        if (allowedSet.size > 0 && !allowedSet.has(value)) {
+          warnings.push({
+            type: "warning",
+            message: `Question "${question.question}" has unrecognised option: "${value}"`,
+            question_id: region.questionId,
+          });
+        }
       }
     }
     const answerText = selected.join(", ");
@@ -319,9 +355,10 @@ export async function parseDocx(
   // 6. Extract answers from regions
   for (const region of regions) {
     const question = questionMap.get(region.questionId)!;
-    const { answer, warnings: answerWarnings } = extractAnswerFromRegion(region, question);
+    const { answer, warnings: answerWarnings, errors: answerErrors } = extractAnswerFromRegion(region, question);
     answers.push(answer);
     warnings.push(...answerWarnings);
+    if (answerErrors) errors.push(...answerErrors);
   }
 
   return {
