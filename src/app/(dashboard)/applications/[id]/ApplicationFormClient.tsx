@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormField } from "@/components/FormField";
 import { ApplicationStatusBadge } from "@/components/ApplicationStatusBadge";
+import { FundDateBanner } from "@/components/FundDateBanner";
 import { ImportResultModal } from "@/components/ImportResultModal";
 import type { Json } from "@/types/database";
 import {
@@ -58,6 +59,8 @@ interface FundData {
   id: string;
   name: string;
   organisation: { id: string; name: string } | null;
+  opens_at: string | null;
+  closes_at: string | null;
 }
 
 interface QuestionsSetData {
@@ -244,6 +247,9 @@ export function ApplicationFormClient({
           {error}
         </div>
       )}
+
+      {/* Fund date banner */}
+      {fund && <FundDateBanner opensAt={fund.opens_at} closesAt={fund.closes_at} />}
 
       {/* Review in progress notice */}
       {isReviewing && (
