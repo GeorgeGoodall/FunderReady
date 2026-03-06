@@ -452,6 +452,76 @@ describe("PATCH /api/admin/funds/[id]", () => {
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "Failed to update" });
   });
+
+  it("accepts valid ISO date fields", async () => {
+    adminWith(() => chainMock({ data: { id: "fund-001" }, error: null }));
+    const PATCH = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/fund-001",
+      "PATCH",
+      { opens_at: "2026-03-01T00:00:00Z", closes_at: "2026-04-30T00:00:00Z" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+  });
+
+  it("rejects non-ISO date strings", async () => {
+    adminWith(() => chainMock({ data: { id: "fund-001" }, error: null }));
+    const PATCH = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/fund-001",
+      "PATCH",
+      { closes_at: "April 30, 2026" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "closes_at must be a valid ISO 8601 datetime or null",
+    });
+  });
+
+  it("coerces empty string dates to null", async () => {
+    adminWith(() => chainMock({ data: { id: "fund-001" }, error: null }));
+    const PATCH = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/fund-001",
+      "PATCH",
+      { closes_at: "" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects opens_at after closes_at", async () => {
+    adminWith(() => chainMock({ data: { id: "fund-001" }, error: null }));
+    const PATCH = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/fund-001",
+      "PATCH",
+      { opens_at: "2026-06-01T00:00:00Z", closes_at: "2026-04-30T00:00:00Z" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "opens_at must be before closes_at",
+    });
+  });
+
+  it("rejects non-string date type", async () => {
+    adminWith(() => chainMock({ data: { id: "fund-001" }, error: null }));
+    const PATCH = await importRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/fund-001",
+      "PATCH",
+      { closes_at: 12345 }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "closes_at must be a valid ISO 8601 datetime or null",
+    });
+  });
 });
 
 // =====================================================================

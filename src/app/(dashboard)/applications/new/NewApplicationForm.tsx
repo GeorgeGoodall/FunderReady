@@ -231,8 +231,8 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
             organisation_id: organisationId ?? null,
             url: pendingNewFundData.url,
             notes: pendingNewFundData.notes,
-            opens_at: detectedOpensAt ? new Date(detectedOpensAt).toISOString() : null,
-            closes_at: detectedClosesAt ? new Date(detectedClosesAt).toISOString() : null,
+            opens_at: detectedOpensAt ?? null,
+            closes_at: detectedClosesAt ?? null,
           }),
         });
         if (!fundRes.ok) {

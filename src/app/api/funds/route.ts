@@ -102,6 +102,13 @@ export async function POST(request: Request) {
 
   const { name, organisation_id, url, notes, opens_at, closes_at } = parsed.data;
 
+  if (opens_at && closes_at && new Date(opens_at) > new Date(closes_at)) {
+    return NextResponse.json(
+      { error: "opens_at must be before closes_at" },
+      { status: 400 }
+    );
+  }
+
   // Validate organisation exists if provided
   if (organisation_id) {
     const serviceClient = createServiceClient();

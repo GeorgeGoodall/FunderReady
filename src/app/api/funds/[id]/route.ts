@@ -162,6 +162,15 @@ export async function PATCH(
     );
   }
 
+  const opensAt = parsed.data.opens_at ?? null;
+  const closesAt = parsed.data.closes_at ?? null;
+  if (opensAt && closesAt && new Date(opensAt) > new Date(closesAt)) {
+    return NextResponse.json(
+      { error: "opens_at must be before closes_at" },
+      { status: 400 }
+    );
+  }
+
   const { data: fund, error } = await supabase
     .from("funds")
     .update({

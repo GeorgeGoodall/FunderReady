@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/require-admin";
 
 const ALLOWED_FIELDS = [
@@ -10,6 +11,13 @@ const ALLOWED_FIELDS = [
   "opens_at",
   "closes_at",
 ] as const;
+
+const DateFieldSchema = z
+  .string()
+  .datetime()
+  .nullable()
+  .optional()
+  .transform((v) => v ?? null);
 
 export async function PATCH(
   request: Request,
@@ -37,7 +45,6 @@ export async function PATCH(
 
   const STRING_FIELDS = ["name", "url", "notes", "organisation_id"];
   const BOOLEAN_FIELDS = ["published"];
-  const NULLABLE_STRING_FIELDS = ["opens_at", "closes_at"];
   for (const field of STRING_FIELDS) {
     if (field in updates && typeof updates[field] !== "string") {
       return NextResponse.json(
@@ -54,24 +61,32 @@ export async function PATCH(
       );
     }
   }
-  for (const field of NULLABLE_STRING_FIELDS) {
+
+  // Validate date fields with Zod (ISO 8601 datetime or null)
+  for (const field of ["opens_at", "closes_at"] as const) {
     if (field in updates) {
-      const val = updates[field];
-      if (val === "" || val === null) {
-        updates[field] = null;
-      } else if (typeof val === "string") {
-        if (isNaN(Date.parse(val))) {
-          return NextResponse.json(
-            { error: `${field} must be a valid date` },
-            { status: 400 }
-          );
-        }
-      } else {
+      // Treat empty string as null (from cleared date inputs)
+      if (updates[field] === "") updates[field] = null;
+      const result = DateFieldSchema.safeParse(updates[field]);
+      if (!result.success) {
         return NextResponse.json(
-          { error: `${field} must be a string or null` },
+          { error: `${field} must be a valid ISO 8601 datetime or null` },
           { status: 400 }
         );
       }
+      updates[field] = result.data;
+    }
+  }
+
+  // Validate opens_at <= closes_at if both are set
+  const opensAt = updates.opens_at as string | null | undefined;
+  const closesAt = updates.closes_at as string | null | undefined;
+  if (typeof opensAt === "string" && typeof closesAt === "string") {
+    if (new Date(opensAt) > new Date(closesAt)) {
+      return NextResponse.json(
+        { error: "opens_at must be before closes_at" },
+        { status: 400 }
+      );
     }
   }
 
