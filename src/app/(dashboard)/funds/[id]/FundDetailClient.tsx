@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Json } from "@/types/database";
+import { generateMarkdown, getExportFilename, type ExportCriterion } from "@/lib/markdown-export";
+import { getDocxExportFilename } from "@/lib/docx-export";
 
 type Organisation = {
   id: string;
@@ -97,7 +99,116 @@ function OlderSets({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-function QuestionsSetCard({ qs }: { qs: QuestionsSetRow }) {
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+function TemplateExportDropdown({
+  fundName,
+  fundId,
+  organisation,
+  questionsSetId,
+  questions,
+  criteria,
+}: {
+  fundName: string;
+  fundId: string;
+  organisation: { name: string } | null;
+  questionsSetId: string;
+  questions: Question[];
+  criteria: ExportCriterion[];
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const getParams = () => ({
+    application: { id: "template", title: null as string | null },
+    fund: { id: fundId, name: fundName, organisation },
+    criteria,
+    questions,
+    answerMap: {} as Record<string, string>,
+    optionsMap: {} as Record<string, string[]>,
+    disabledMap: {} as Record<string, boolean>,
+    questionsSetId,
+  });
+
+  const handleExport = async (format: "markdown" | "docx") => {
+    setOpen(false);
+    const params = getParams();
+
+    if (format === "markdown") {
+      const md = generateMarkdown(params);
+      const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+      triggerDownload(blob, getExportFilename(fundName, "Template", "template"));
+    } else {
+      const { generateDocxBuffer } = await import("@/lib/docx-export");
+      const buffer = await generateDocxBuffer(params);
+      const blob = new Blob([new Uint8Array(buffer)], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      });
+      triggerDownload(blob, getDocxExportFilename(fundName, "Template", "template"));
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open); }}
+        className="rounded border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+      >
+        Export ▾
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+          <button
+            type="button"
+            className="block w-full px-3 py-1.5 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleExport("markdown"); }}
+          >
+            Markdown (.md)
+          </button>
+          <button
+            type="button"
+            className="block w-full px-3 py-1.5 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleExport("docx"); }}
+          >
+            Word (.docx)
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuestionsSetCard({
+  qs,
+  fundName,
+  fundId,
+  organisation,
+  criteria,
+}: {
+  qs: QuestionsSetRow;
+  fundName: string;
+  fundId: string;
+  organisation: { name: string } | null;
+  criteria: ExportCriterion[];
+}) {
   const questions = parseQuestions(qs.questions_json);
   return (
     <details className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
@@ -111,9 +222,19 @@ function QuestionsSetCard({ qs }: { qs: QuestionsSetRow }) {
             )}
           </span>
         </div>
-        <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
-          {formatDate(qs.created_at)}
-        </span>
+        <div className="flex shrink-0 items-center gap-3">
+          <TemplateExportDropdown
+            fundName={fundName}
+            fundId={fundId}
+            organisation={organisation}
+            questionsSetId={qs.id}
+            questions={questions}
+            criteria={criteria}
+          />
+          <span className="text-xs text-zinc-400 dark:text-zinc-500">
+            {formatDate(qs.created_at)}
+          </span>
+        </div>
       </summary>
       <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
         <ol className="list-decimal space-y-2 pl-5 text-sm">
@@ -204,6 +325,11 @@ export function FundDetailClient({
   applicationCount: number;
   reviewCount: number;
 }) {
+  // Use the latest criteria set for template exports
+  const exportCriteria: ExportCriterion[] = criteriaSets.length > 0
+    ? parseCriteria(criteriaSets[0].criteria_json) as ExportCriterion[]
+    : [];
+
   return (
     <div className="mx-auto max-w-3xl">
       {/* Back link */}
@@ -317,14 +443,14 @@ export function FundDetailClient({
         ) : (
           <div className="mt-3 space-y-3">
             {questionsSets.slice(0, 1).map((qs) => (
-              <QuestionsSetCard key={qs.id} qs={qs} />
+              <QuestionsSetCard key={qs.id} qs={qs} fundName={fund.name} fundId={fund.id} organisation={organisation} criteria={exportCriteria} />
             ))}
             {questionsSets.length > 1 && (
               <OlderSets
                 label={`${questionsSets.length - 1} older questions ${questionsSets.length === 2 ? "set" : "sets"}`}
               >
                 {questionsSets.slice(1).map((qs) => (
-                  <QuestionsSetCard key={qs.id} qs={qs} />
+                  <QuestionsSetCard key={qs.id} qs={qs} fundName={fund.name} fundId={fund.id} organisation={organisation} criteria={exportCriteria} />
                 ))}
               </OlderSets>
             )}
