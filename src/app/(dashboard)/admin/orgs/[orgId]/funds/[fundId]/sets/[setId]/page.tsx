@@ -1,6 +1,6 @@
 import { createServiceClient, createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
+import { BreadcrumbLabels } from "@/components/Breadcrumbs";
 import { AdminActionBar } from "../../../../../../components/AdminActionBar";
 import { AdminAmendForm } from "../../../../../../components/AdminAmendForm";
 import { SetContentDisplay } from "../../../../../../components/SetContentDisplay";
@@ -112,28 +112,10 @@ export default async function SetDetailPage({
     setType === "criteria" ? "criteria-sets" : "questions-sets";
 
   return (
-    <div className="space-y-8">
-      {/* Breadcrumb */}
-      <nav className="text-sm text-zinc-500">
-        <Link href="/admin" className="hover:underline">
-          Organisations
-        </Link>
-        <span className="mx-1">/</span>
-        <Link href={`/admin/orgs/${orgId}`} className="hover:underline">
-          {org.name}
-        </Link>
-        <span className="mx-1">/</span>
-        <Link
-          href={`/admin/orgs/${orgId}/funds/${fundId}`}
-          className="hover:underline"
-        >
-          {fund.name}
-        </Link>
-        <span className="mx-1">/</span>
-        <span className="text-zinc-900 dark:text-zinc-100">{setName}</span>
-      </nav>
-
-      {/* Set Header */}
+    <>
+      <BreadcrumbLabels labels={{ [orgId]: org.name, [fundId]: fund.name, [setId]: setName }} />
+      <div className="space-y-8">
+        {/* Set Header */}
       <div>
         <div className="flex items-center gap-2">
           <h2 className="text-xl font-semibold">{setName}</h2>
@@ -177,6 +159,7 @@ export default async function SetDetailPage({
           <SetContentDisplay type={setType} data={parsedData} />
         </section>
       </AdminAmendForm>
-    </div>
+      </div>
+    </>
   );
 }

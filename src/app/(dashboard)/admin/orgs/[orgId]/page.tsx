@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { BreadcrumbLabels } from "@/components/Breadcrumbs";
 import { getFundsForOrg } from "../../lib/admin-queries";
 import { formatDate, truncate } from "../../lib/format";
 import { AdminActionBar } from "../../components/AdminActionBar";
@@ -31,17 +32,10 @@ export default async function OrgDetailPage({
   const publishedFunds = funds.filter((f) => f.published);
 
   return (
-    <div className="space-y-8">
-      {/* Breadcrumb */}
-      <nav className="text-sm text-zinc-500">
-        <Link href="/admin" className="hover:underline">
-          Organisations
-        </Link>
-        <span className="mx-1">/</span>
-        <span className="text-zinc-900 dark:text-zinc-100">{org.name}</span>
-      </nav>
-
-      {/* Org Header */}
+    <>
+      <BreadcrumbLabels labels={{ [orgId]: org.name }} />
+      <div className="space-y-8">
+        {/* Org Header */}
       <div>
         <div className="flex items-center gap-2">
           <h2 className="text-xl font-semibold">{org.name}</h2>
@@ -171,6 +165,7 @@ export default async function OrgDetailPage({
           </div>
         )}
       </section>
-    </div>
+      </div>
+    </>
   );
 }
