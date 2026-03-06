@@ -243,18 +243,18 @@ export async function generateDocxBuffer(params: GenerateMarkdownParams): Promis
     const disabledStr = isDisabled ? " [DISABLED]" : "";
 
     // Question heading with bookmark
-    const bmId = String(++bookmarkIdCounter);
+    const bmId = ++bookmarkIdCounter;
     const bmName = `funderready_answer_${q.id}`;
 
     children.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_3,
         children: [
-          new BookmarkStart({ id: bmId, name: bmName }),
+          new BookmarkStart(bmName, bmId),
           new TextRun({
             text: `${questionIndex}. ${q.question}${requiredStr}${disabledStr}`,
           }),
-          new BookmarkEnd({ id: bmId }),
+          new BookmarkEnd(bmId),
         ],
       }),
     );
