@@ -833,6 +833,260 @@ describe("GET /api/funds/my", () => {
 });
 
 // =========================================================================
+// PATCH /api/funds/[id] (update dates)
+// =========================================================================
+
+describe("PATCH /api/funds/[id]", () => {
+  async function importRoute() {
+    const mod = await import("../../api/funds/[id]/route");
+    return mod.PATCH;
+  }
+
+  it("returns 401 when not authenticated", async () => {
+    unauthenticatedUser();
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opens_at: "2026-03-01T00:00:00Z" }),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 400 for invalid JSON body", async () => {
+    authenticatedUser();
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", { method: "PATCH", body: "not json" }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid JSON" });
+  });
+
+  it("returns 400 when opens_at is not a valid datetime", async () => {
+    authenticatedUser();
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opens_at: "not-a-date" }),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 when fund not found or not owned by user", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(
+      tableDispatch({
+        funds: { data: null, error: { message: "not found" } },
+      })
+    );
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opens_at: "2026-03-01T00:00:00Z" }),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Fund not found or not yours" });
+  });
+
+  it("returns 200 with updated fund dates on success", async () => {
+    authenticatedUser();
+    const updatedFund = {
+      id: FUND_ID,
+      opens_at: "2026-03-01T00:00:00Z",
+      closes_at: "2026-04-30T00:00:00Z",
+    };
+    mockFrom.mockImplementation(
+      tableDispatch({
+        funds: { data: updatedFund, error: null },
+      })
+    );
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          opens_at: "2026-03-01T00:00:00Z",
+          closes_at: "2026-04-30T00:00:00Z",
+        }),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.fund).toMatchObject({
+      id: FUND_ID,
+      opens_at: "2026-03-01T00:00:00Z",
+      closes_at: "2026-04-30T00:00:00Z",
+    });
+  });
+
+  it("accepts null values to clear dates", async () => {
+    authenticatedUser();
+    const updatedFund = {
+      id: FUND_ID,
+      opens_at: null,
+      closes_at: null,
+    };
+    mockFrom.mockImplementation(
+      tableDispatch({
+        funds: { data: updatedFund, error: null },
+      })
+    );
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          opens_at: null,
+          closes_at: null,
+        }),
+      }),
+      routeParams(FUND_ID)
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.fund.opens_at).toBeNull();
+    expect(body.fund.closes_at).toBeNull();
+  });
+});
+
+// =========================================================================
+// POST /api/funds — date fields
+// =========================================================================
+
+describe("POST /api/funds — date fields", () => {
+  async function importRoute() {
+    const mod = await import("../../api/funds/route");
+    return mod.POST;
+  }
+
+  it("creates fund with opens_at and closes_at", async () => {
+    authenticatedUser();
+    const createdFund = {
+      id: FUND_ID,
+      name: "Dated Fund",
+      organisation_id: null,
+      organisations: null,
+      url: null,
+      notes: null,
+      opens_at: "2026-03-01T00:00:00Z",
+      closes_at: "2026-04-30T00:00:00Z",
+      created_at: "2026-02-01T10:00:00Z",
+    };
+    mockFrom.mockImplementation(
+      tableDispatch({
+        funds: { data: createdFund, error: null },
+      })
+    );
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost/api/funds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Dated Fund",
+          opens_at: "2026-03-01T00:00:00Z",
+          closes_at: "2026-04-30T00:00:00Z",
+        }),
+      })
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.fund).toMatchObject({
+      opens_at: "2026-03-01T00:00:00Z",
+      closes_at: "2026-04-30T00:00:00Z",
+    });
+  });
+
+  it("creates fund without dates (defaults to null)", async () => {
+    authenticatedUser();
+    const createdFund = {
+      id: FUND_ID,
+      name: "No Date Fund",
+      organisation_id: null,
+      organisations: null,
+      url: null,
+      notes: null,
+      opens_at: null,
+      closes_at: null,
+      created_at: "2026-02-01T10:00:00Z",
+    };
+    mockFrom.mockImplementation(
+      tableDispatch({
+        funds: { data: createdFund, error: null },
+      })
+    );
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost/api/funds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "No Date Fund" }),
+      })
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.fund.opens_at).toBeNull();
+    expect(body.fund.closes_at).toBeNull();
+  });
+});
+
+// =========================================================================
+// GET /api/funds — date fields in response
+// =========================================================================
+
+describe("GET /api/funds — date fields", () => {
+  async function importRoute() {
+    const mod = await import("../../api/funds/route");
+    return mod.GET;
+  }
+
+  it("returns opens_at and closes_at in search results", async () => {
+    authenticatedUser();
+    const fundWithDates = {
+      ...sampleFund,
+      opens_at: "2026-03-01T00:00:00Z",
+      closes_at: "2026-04-30T00:00:00Z",
+    };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "funds") {
+        return chainMock({ data: [fundWithDates], error: null });
+      }
+      if (table === "organisations") {
+        return chainMock({ data: [], error: null });
+      }
+      return chainMock({ data: null, error: null });
+    });
+    const GET = await importRoute();
+    const res = await GET(
+      new Request("http://localhost/api/funds?q=community")
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.funds[0]).toMatchObject({
+      opens_at: "2026-03-01T00:00:00Z",
+      closes_at: "2026-04-30T00:00:00Z",
+    });
+  });
+});
+
+// =========================================================================
 // POST /api/funds/[id]/criteria-sets
 // =========================================================================
 
