@@ -98,7 +98,8 @@ export function DashboardSidebar({
   return (
     <>
       {/* Desktop sidebar — always visible */}
-      <aside className="hidden md:block w-60 shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 min-h-[calc(100vh-57px)]">
+      {/* 57px = DashboardNav height (py-3 + content) */}
+      <aside className="hidden md:block w-60 shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 min-h-[calc(100vh-var(--nav-height,57px))]">
         {navContent}
       </aside>
 

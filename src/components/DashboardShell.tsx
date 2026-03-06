@@ -12,7 +12,7 @@ export function DashboardShell({
   children,
 }: {
   displayName: string;
-  tier: string;
+  tier: "free" | "pro";
   isAdmin: boolean;
   children: React.ReactNode;
 }) {

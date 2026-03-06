@@ -23,7 +23,7 @@ export default async function DashboardLayout({
   return (
     <DashboardShell
       displayName={profile?.display_name ?? user.email ?? "User"}
-      tier={profile?.subscription_tier ?? "free"}
+      tier={(profile?.subscription_tier as "free" | "pro") ?? "free"}
       isAdmin={profile?.is_admin ?? false}
     >
       {children}

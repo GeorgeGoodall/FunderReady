@@ -1,5 +1,5 @@
-import { createServiceClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { BreadcrumbLabels } from "@/components/Breadcrumbs";
 import { getFundsForOrg } from "../../lib/admin-queries";
@@ -15,7 +15,18 @@ export default async function OrgDetailPage({
   params: Promise<{ orgId: string }>;
 }) {
   const { orgId } = await params;
+
+  // Auth guard — defense in depth (layout also checks)
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
   const serviceClient = createServiceClient();
+  const { data: profile } = await serviceClient
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+  if (!profile?.is_admin) redirect("/dashboard");
 
   const { data: org } = await serviceClient
     .from("organisations")

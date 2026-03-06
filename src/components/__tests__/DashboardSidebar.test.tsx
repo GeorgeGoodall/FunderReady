@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { DashboardSidebar } from "../DashboardSidebar";
 
@@ -32,5 +32,28 @@ describe("DashboardSidebar", () => {
     render(<DashboardSidebar isAdmin={false} isOpen={false} onClose={() => {}} />);
     const appLink = screen.getByRole("link", { name: /Applications/ });
     expect(appLink.className).toContain("bg-zinc-100");
+  });
+
+  it("renders mobile overlay when isOpen is true", () => {
+    render(<DashboardSidebar isAdmin={false} isOpen={true} onClose={() => {}} />);
+    const backdrop = document.querySelector(".fixed.inset-0");
+    expect(backdrop).not.toBeNull();
+  });
+
+  it("calls onClose when backdrop is clicked", () => {
+    const onClose = vi.fn();
+    render(<DashboardSidebar isAdmin={false} isOpen={true} onClose={onClose} />);
+    const backdrop = document.querySelector(".fixed.inset-0.z-40");
+    fireEvent.click(backdrop!);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onClose when a nav link is clicked", () => {
+    const onClose = vi.fn();
+    render(<DashboardSidebar isAdmin={false} isOpen={true} onClose={onClose} />);
+    // Click the first link in the mobile overlay
+    const links = screen.getAllByRole("link", { name: /Applications/ });
+    fireEvent.click(links[0]);
+    expect(onClose).toHaveBeenCalled();
   });
 });

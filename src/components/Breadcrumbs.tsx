@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -18,6 +18,12 @@ const BreadcrumbContext = createContext<BreadcrumbContextValue>({
 
 export function BreadcrumbProvider({ children }: { children: ReactNode }) {
   const [labels, setLabels] = useState<Record<string, string>>({});
+  const pathname = usePathname();
+
+  // Clear stale labels on navigation
+  useEffect(() => {
+    setLabels({});
+  }, [pathname]);
 
   const registerLabels = useCallback((newLabels: Record<string, string>) => {
     setLabels((prev) => ({ ...prev, ...newLabels }));
@@ -34,10 +40,10 @@ export function BreadcrumbProvider({ children }: { children: ReactNode }) {
 
 export function BreadcrumbLabels({ labels }: { labels: Record<string, string> }) {
   const { registerLabels } = useContext(BreadcrumbContext);
+  const serialized = useMemo(() => JSON.stringify(labels), [labels]);
   useEffect(() => {
-    registerLabels(labels);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registerLabels, ...Object.keys(labels), ...Object.values(labels)]);
+    registerLabels(JSON.parse(serialized));
+  }, [registerLabels, serialized]);
   return null;
 }
 
