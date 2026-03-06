@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import type { Json } from "@/types/database";
 
 type Organisation = {
@@ -30,7 +31,7 @@ type Criterion = {
   id: string;
   criterion: string;
   weight?: string;
-  sub_questions?: string[];
+  sub_questions?: Array<string | { text: string; required: boolean }>;
 };
 
 type Question = {
@@ -70,6 +71,115 @@ function parseQuestions(json: Json): Question[] {
   }
   if (Array.isArray(json)) return json as Question[];
   return [];
+}
+
+function OlderSets({ label, children }: { label: string; children: React.ReactNode }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div>
+      <button
+        onClick={() => setShow((v) => !v)}
+        className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+      >
+        <svg
+          className={`h-3.5 w-3.5 transition-transform ${show ? "rotate-90" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={2}
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+        </svg>
+        {label}
+      </button>
+      {show && <div className="mt-3 space-y-3">{children}</div>}
+    </div>
+  );
+}
+
+function QuestionsSetCard({ qs }: { qs: QuestionsSetRow }) {
+  const questions = parseQuestions(qs.questions_json);
+  return (
+    <details className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <summary className="flex cursor-pointer items-center justify-between gap-2 p-4">
+        <div className="min-w-0">
+          <span className="font-medium">{qs.label || "Untitled"}</span>
+          <span className="ml-2 text-sm text-zinc-500 dark:text-zinc-400">
+            {questions.length} {questions.length === 1 ? "question" : "questions"}
+            {qs.overall_word_limit != null && (
+              <> &middot; {qs.overall_word_limit} word limit</>
+            )}
+          </span>
+        </div>
+        <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
+          {formatDate(qs.created_at)}
+        </span>
+      </summary>
+      <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
+        <ol className="list-decimal space-y-2 pl-5 text-sm">
+          {questions.map((q) => (
+            <li key={q.id}>
+              <span>{q.question}</span>
+              <span className="ml-1 text-xs text-zinc-400 dark:text-zinc-500">
+                {q.field_type && `(${q.field_type.replace("_", " ")})`}
+                {q.word_count_min != null &&
+                  q.word_count_max != null &&
+                  ` ${q.word_count_min}–${q.word_count_max} words`}
+                {q.word_count_min != null &&
+                  q.word_count_max == null &&
+                  ` min ${q.word_count_min} words`}
+                {q.word_count_min == null &&
+                  q.word_count_max != null &&
+                  ` max ${q.word_count_max} words`}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </details>
+  );
+}
+
+function CriteriaSetCard({ cs }: { cs: CriteriaSetRow }) {
+  const criteria = parseCriteria(cs.criteria_json);
+  return (
+    <details className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <summary className="flex cursor-pointer items-center justify-between gap-2 p-4">
+        <div className="min-w-0">
+          <span className="font-medium">{cs.name || cs.label || "Untitled"}</span>
+          <span className="ml-2 text-sm text-zinc-500 dark:text-zinc-400">
+            {criteria.length} {criteria.length === 1 ? "criterion" : "criteria"}
+          </span>
+        </div>
+        <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
+          {formatDate(cs.created_at)}
+        </span>
+      </summary>
+      <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
+        <ul className="space-y-3 text-sm">
+          {criteria.map((c) => (
+            <li key={c.id}>
+              <div className="flex items-start gap-2">
+                <span className="font-medium">{c.criterion}</span>
+                {c.weight && (
+                  <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                    {c.weight}
+                  </span>
+                )}
+              </div>
+              {c.sub_questions && c.sub_questions.length > 0 && (
+                <ul className="mt-1 list-disc pl-5 text-zinc-500 dark:text-zinc-400">
+                  {c.sub_questions.map((sq, i) => (
+                    <li key={i}>{typeof sq === "string" ? sq : sq.text}</li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
+  );
 }
 
 export function FundDetailClient({
@@ -206,54 +316,18 @@ export function FundDetailClient({
           </p>
         ) : (
           <div className="mt-3 space-y-3">
-            {questionsSets.map((qs) => {
-              const questions = parseQuestions(qs.questions_json);
-              return (
-                <details
-                  key={qs.id}
-                  className="group rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-                >
-                  <summary className="flex cursor-pointer items-center justify-between gap-2 p-4">
-                    <div className="min-w-0">
-                      <span className="font-medium">
-                        {qs.label || "Untitled"}
-                      </span>
-                      <span className="ml-2 text-sm text-zinc-500 dark:text-zinc-400">
-                        {questions.length}{" "}
-                        {questions.length === 1 ? "question" : "questions"}
-                        {qs.overall_word_limit != null && (
-                          <> &middot; {qs.overall_word_limit} word limit</>
-                        )}
-                      </span>
-                    </div>
-                    <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
-                      {formatDate(qs.created_at)}
-                    </span>
-                  </summary>
-                  <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
-                    <ol className="list-decimal space-y-2 pl-5 text-sm">
-                      {questions.map((q) => (
-                        <li key={q.id}>
-                          <span>{q.question}</span>
-                          <span className="ml-1 text-xs text-zinc-400 dark:text-zinc-500">
-                            {q.field_type && `(${q.field_type.replace("_", " ")})`}
-                            {q.word_count_min != null &&
-                              q.word_count_max != null &&
-                              ` ${q.word_count_min}–${q.word_count_max} words`}
-                            {q.word_count_min != null &&
-                              q.word_count_max == null &&
-                              ` min ${q.word_count_min} words`}
-                            {q.word_count_min == null &&
-                              q.word_count_max != null &&
-                              ` max ${q.word_count_max} words`}
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                </details>
-              );
-            })}
+            {questionsSets.slice(0, 1).map((qs) => (
+              <QuestionsSetCard key={qs.id} qs={qs} />
+            ))}
+            {questionsSets.length > 1 && (
+              <OlderSets
+                label={`${questionsSets.length - 1} older questions ${questionsSets.length === 2 ? "set" : "sets"}`}
+              >
+                {questionsSets.slice(1).map((qs) => (
+                  <QuestionsSetCard key={qs.id} qs={qs} />
+                ))}
+              </OlderSets>
+            )}
           </div>
         )}
       </section>
@@ -273,53 +347,18 @@ export function FundDetailClient({
           </p>
         ) : (
           <div className="mt-3 space-y-3">
-            {criteriaSets.map((cs) => {
-              const criteria = parseCriteria(cs.criteria_json);
-              return (
-                <details
-                  key={cs.id}
-                  className="group rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-                >
-                  <summary className="flex cursor-pointer items-center justify-between gap-2 p-4">
-                    <div className="min-w-0">
-                      <span className="font-medium">
-                        {cs.name || cs.label || "Untitled"}
-                      </span>
-                      <span className="ml-2 text-sm text-zinc-500 dark:text-zinc-400">
-                        {criteria.length}{" "}
-                        {criteria.length === 1 ? "criterion" : "criteria"}
-                      </span>
-                    </div>
-                    <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
-                      {formatDate(cs.created_at)}
-                    </span>
-                  </summary>
-                  <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
-                    <ul className="space-y-3 text-sm">
-                      {criteria.map((c) => (
-                        <li key={c.id}>
-                          <div className="flex items-start gap-2">
-                            <span className="font-medium">{c.criterion}</span>
-                            {c.weight && (
-                              <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                                {c.weight}
-                              </span>
-                            )}
-                          </div>
-                          {c.sub_questions && c.sub_questions.length > 0 && (
-                            <ul className="mt-1 list-disc pl-5 text-zinc-500 dark:text-zinc-400">
-                              {c.sub_questions.map((sq, i) => (
-                                <li key={i}>{sq}</li>
-                              ))}
-                            </ul>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </details>
-              );
-            })}
+            {criteriaSets.slice(0, 1).map((cs) => (
+              <CriteriaSetCard key={cs.id} cs={cs} />
+            ))}
+            {criteriaSets.length > 1 && (
+              <OlderSets
+                label={`${criteriaSets.length - 1} older criteria ${criteriaSets.length === 2 ? "set" : "sets"}`}
+              >
+                {criteriaSets.slice(1).map((cs) => (
+                  <CriteriaSetCard key={cs.id} cs={cs} />
+                ))}
+              </OlderSets>
+            )}
           </div>
         )}
       </section>

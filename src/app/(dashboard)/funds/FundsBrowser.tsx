@@ -62,6 +62,7 @@ export function FundsBrowser({
   const [myFunds, setMyFunds] = useState<MyFund[]>(initialMyFunds);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleSearch = useCallback(async (query: string) => {
     if (!query.trim() || query.trim().length < 2) {
@@ -119,6 +120,7 @@ export function FundsBrowser({
 
   async function handleDelete(id: string) {
     setDeletingId(id);
+    setDeleteError(null);
     try {
       const res = await fetch(`/api/funds/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed");
@@ -126,7 +128,7 @@ export function FundsBrowser({
       setConfirmingId(null);
       router.refresh();
     } catch {
-      alert("Failed to remove fund. Please try again.");
+      setDeleteError("Failed to remove fund. Please try again.");
     } finally {
       setDeletingId(null);
     }
@@ -300,6 +302,11 @@ export function FundsBrowser({
       {/* My Funds tab */}
       {tab === "my" && (
         <div className="mt-6">
+          {deleteError && (
+            <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+              {deleteError}
+            </div>
+          )}
           {myFunds.length === 0 ? (
             <div className="mt-12 text-center">
               <p className="text-sm text-zinc-500 dark:text-zinc-400">

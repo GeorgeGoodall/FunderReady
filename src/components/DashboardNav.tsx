@@ -8,9 +8,11 @@ import { useEffect, useRef, useState } from "react";
 export function DashboardNav({
   displayName,
   tier,
+  onMenuToggle,
 }: {
   displayName: string;
   tier: string;
+  onMenuToggle?: () => void;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -43,19 +45,24 @@ export function DashboardNav({
 
   return (
     <nav className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        {/* Left: brand */}
-        <Link href="/dashboard" className="text-lg font-bold tracking-tight">
-          FunderReady
-        </Link>
-
-        {/* Nav links */}
-        <Link
-          href="/funds"
-          className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-        >
-          Funds
-        </Link>
+      <div className="mx-auto flex items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+        {/* Left: hamburger + brand */}
+        <div className="flex items-center">
+          {onMenuToggle && (
+            <button
+              onClick={onMenuToggle}
+              className="mr-2 rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 md:hidden dark:text-zinc-400 dark:hover:bg-zinc-800"
+              aria-label="Toggle menu"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+          )}
+          <Link href="/dashboard" className="text-lg font-bold tracking-tight">
+            FunderReady
+          </Link>
+        </div>
 
         {/* Right: CTA + divider + user dropdown */}
         <div className="flex items-center gap-3">
@@ -109,13 +116,6 @@ export function DashboardNav({
 
                 <div className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
 
-                <Link
-                  href="/billing"
-                  onClick={() => setOpen(false)}
-                  className="block px-3 py-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-                >
-                  Billing
-                </Link>
                 <button
                   onClick={handleSignOut}
                   className="w-full px-3 py-2 text-left text-sm text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"

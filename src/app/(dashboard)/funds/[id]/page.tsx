@@ -1,7 +1,8 @@
-import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { notFound, redirect } from "next/navigation";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { FundDetailClient } from "./FundDetailClient";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function FundDetailPage({
   params,
@@ -9,7 +10,15 @@ export default async function FundDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+
+  if (!UUID_RE.test(id)) notFound();
+
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
   const serviceClient = createServiceClient();
 
   // Fund + organisation (RLS scoped)
@@ -26,35 +35,36 @@ export default async function FundDetailPage({
     notFound();
   }
 
-  // All approved criteria sets
-  const { data: criteriaSets } = await supabase
-    .from("criteria_sets")
-    .select("id, label, name, description, criteria_json, created_at")
-    .eq("fund_id", id)
-    .eq("approved", true)
-    .eq("rejected", false)
-    .order("created_at", { ascending: false });
-
-  // All approved questions sets
-  const { data: questionsSets } = await supabase
-    .from("questions_sets")
-    .select("id, label, questions_json, overall_word_limit, created_at")
-    .eq("fund_id", id)
-    .eq("approved", true)
-    .eq("rejected", false)
-    .order("created_at", { ascending: false });
-
-  // Application count (service client to bypass RLS)
-  const { count: applicationCount } = await serviceClient
-    .from("applications")
-    .select("id", { count: "exact", head: true })
-    .eq("fund_id", id);
-
-  // Review count via application_reviews joined to applications
-  const { count: reviewCount } = await serviceClient
-    .from("application_reviews")
-    .select("id, applications!inner(fund_id)", { count: "exact", head: true })
-    .eq("applications.fund_id", id);
+  // Parallel fetch: criteria sets, questions sets, application count, review count
+  const [
+    { data: criteriaSets },
+    { data: questionsSets },
+    { count: applicationCount },
+    { count: reviewCount },
+  ] = await Promise.all([
+    supabase
+      .from("criteria_sets")
+      .select("id, label, name, description, criteria_json, created_at")
+      .eq("fund_id", id)
+      .eq("approved", true)
+      .eq("rejected", false)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("questions_sets")
+      .select("id, label, questions_json, overall_word_limit, created_at")
+      .eq("fund_id", id)
+      .eq("approved", true)
+      .eq("rejected", false)
+      .order("created_at", { ascending: false }),
+    serviceClient
+      .from("applications")
+      .select("id", { count: "exact", head: true })
+      .eq("fund_id", id),
+    serviceClient
+      .from("application_reviews")
+      .select("id, applications!inner(fund_id)", { count: "exact", head: true })
+      .eq("applications.fund_id", id),
+  ]);
 
   const organisation = fund.organisations as unknown as {
     id: string;

@@ -14,7 +14,6 @@ import type { CriteriaSet, QuestionsSet } from "@/lib/schemas/criteria";
 import type { UsageResult } from "@/lib/usage/check-usage";
 
 interface NewApplicationFormProps {
-  userId: string;
   tier: "free" | "pro";
   usage: UsageResult;
   isAdmin?: boolean;
@@ -41,7 +40,7 @@ const STEPS: { key: Step; label: string }[] = [
   { key: "confirm", label: "Create" },
 ];
 
-export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin, fundId }: NewApplicationFormProps) {
+export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicationFormProps) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("fund");
   const [error, setError] = useState("");
@@ -74,6 +73,34 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin, fund
   // fundId query param auto-select
   const [fundIdLoading, setFundIdLoading] = useState(!!fundId);
 
+  // Shared helper: apply fund data (criteria/questions sets) from API response
+  function applyFundData(data: Record<string, unknown>) {
+    const csData = data.criteriaSet as { id: string; name: string; description?: string; criteria_json: unknown } | undefined;
+    if (csData) {
+      const criteriaArray = csData.criteria_json;
+      setCriteriaSet({
+        name: csData.name,
+        description: csData.description ?? undefined,
+        criteria: Array.isArray(criteriaArray) ? criteriaArray : [],
+      });
+      setCriteriaSetId(csData.id);
+      setCriteriaPreLoaded(true);
+      setCriteriaEdited(false);
+    }
+
+    const qsData = data.questionsSet as { id: string; questions_json: unknown; overall_word_limit?: number } | undefined;
+    if (qsData) {
+      const questionsArray = qsData.questions_json;
+      setQuestionsSet({
+        questions: Array.isArray(questionsArray) ? questionsArray : [],
+        overall_word_limit: qsData.overall_word_limit ?? undefined,
+      });
+      setQuestionsSetId(qsData.id);
+      setQuestionsPreLoaded(true);
+      setQuestionsEdited(false);
+    }
+  }
+
   // Auto-select fund from query param
   useEffect(() => {
     if (!fundId) return;
@@ -98,36 +125,11 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin, fund
         };
         if (cancelled) return;
 
-        // Replicate handleFundSelected logic inline (hooks must precede early returns)
         setSelectedFund(fund);
         setError("");
 
         try {
-          // Fund details already fetched above — reuse `data`
-          const csData = data.criteriaSet;
-          if (csData) {
-            const criteriaArray = csData.criteria_json;
-            setCriteriaSet({
-              name: csData.name,
-              description: csData.description ?? undefined,
-              criteria: Array.isArray(criteriaArray) ? criteriaArray : [],
-            });
-            setCriteriaSetId(csData.id);
-            setCriteriaPreLoaded(true);
-            setCriteriaEdited(false);
-          }
-
-          const qsData = data.questionsSet;
-          if (qsData) {
-            const questionsArray = qsData.questions_json;
-            setQuestionsSet({
-              questions: Array.isArray(questionsArray) ? questionsArray : [],
-              overall_word_limit: qsData.overall_word_limit ?? undefined,
-            });
-            setQuestionsSetId(qsData.id);
-            setQuestionsPreLoaded(true);
-            setQuestionsEdited(false);
-          }
+          applyFundData(data);
         } catch {
           // Non-fatal
         }
@@ -142,7 +144,7 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin, fund
 
     loadFund();
     return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fundId]);
 
   if (!usage.allowed) {
     return <UpsellPrompt tier={tier} used={usage.used} limit={usage.limit + usage.bonus} resetDate={usage.resetDate.toISOString()} />;
@@ -165,33 +167,7 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin, fund
       const res = await fetch(`/api/funds/${fund.id}`);
       if (res.ok) {
         const data = await res.json();
-
-        // Only pre-load approved sets — funds with only user drafts (or no sets at
-        // all) should show the AI-parse input first, not jump straight to preview.
-        const csData = data.criteriaSet;
-        if (csData) {
-          const criteriaArray = csData.criteria_json;
-          setCriteriaSet({
-            name: csData.name,
-            description: csData.description ?? undefined,
-            criteria: Array.isArray(criteriaArray) ? criteriaArray : [],
-          });
-          setCriteriaSetId(csData.id);
-          setCriteriaPreLoaded(true);
-          setCriteriaEdited(false);
-        }
-
-        const qsData = data.questionsSet;
-        if (qsData) {
-          const questionsArray = qsData.questions_json;
-          setQuestionsSet({
-            questions: Array.isArray(questionsArray) ? questionsArray : [],
-            overall_word_limit: qsData.overall_word_limit ?? undefined,
-          });
-          setQuestionsSetId(qsData.id);
-          setQuestionsPreLoaded(true);
-          setQuestionsEdited(false);
-        }
+        applyFundData(data);
       }
     } catch {
       // Non-fatal

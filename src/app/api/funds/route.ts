@@ -22,14 +22,21 @@ export async function GET(request: Request) {
   const tsQuery = q
     .split(/\s+/)
     .filter(Boolean)
+    .map((w) => w.replace(/[!&|():<>\\]/g, ""))
+    .filter((w) => w.length > 0)
     .map((w) => `${w}:*`)
     .join(" & ");
+
+  if (!tsQuery) {
+    return NextResponse.json({ funds: [] });
+  }
 
   // Search funds by name
   const { data: fundsByName, error: nameError } = await supabase
     .from("funds")
     .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at")
     .textSearch("name", tsQuery)
+    .eq("published", true)
     .eq("rejected", false)
     .order("created_at", { ascending: false })
     .limit(10);
@@ -55,6 +62,7 @@ export async function GET(request: Request) {
       .from("funds")
       .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at")
       .in("organisation_id", orgIds)
+      .eq("published", true)
       .eq("rejected", false)
       .order("created_at", { ascending: false })
       .limit(10);
@@ -83,6 +91,19 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("subscription_tier")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.subscription_tier !== "pro") {
+    return NextResponse.json(
+      { error: "Pro subscription required" },
+      { status: 403 }
+    );
   }
 
   let body: unknown;

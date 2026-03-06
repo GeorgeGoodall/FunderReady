@@ -300,6 +300,9 @@ describe("POST /api/funds", () => {
     return mod.POST;
   }
 
+  const proProfile = { data: { subscription_tier: "pro" }, error: null };
+  const freeProfile = { data: { subscription_tier: "free" }, error: null };
+
   const validBody = {
     name: "New Community Fund",
     organisation_id: ORG_ID,
@@ -320,8 +323,30 @@ describe("POST /api/funds", () => {
     expect(await res.json()).toEqual({ error: "Unauthorized" });
   });
 
+  it("returns 403 when user is not pro", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(
+      tableDispatch({
+        profiles: freeProfile,
+      })
+    );
+    const POST = await importRoute();
+    const res = await POST(
+      new Request("http://localhost/api/funds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      })
+    );
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "Pro subscription required" });
+  });
+
   it("returns 400 for invalid JSON body", async () => {
     authenticatedUser();
+    mockFrom.mockImplementation(
+      tableDispatch({ profiles: proProfile })
+    );
     const POST = await importRoute();
     const res = await POST(
       new Request("http://localhost/api/funds", {
@@ -335,6 +360,9 @@ describe("POST /api/funds", () => {
 
   it("returns 400 when name is missing", async () => {
     authenticatedUser();
+    mockFrom.mockImplementation(
+      tableDispatch({ profiles: proProfile })
+    );
     const POST = await importRoute();
     const res = await POST(
       new Request("http://localhost/api/funds", {
@@ -348,6 +376,9 @@ describe("POST /api/funds", () => {
 
   it("returns 400 when name is empty string", async () => {
     authenticatedUser();
+    mockFrom.mockImplementation(
+      tableDispatch({ profiles: proProfile })
+    );
     const POST = await importRoute();
     const res = await POST(
       new Request("http://localhost/api/funds", {
@@ -361,6 +392,9 @@ describe("POST /api/funds", () => {
 
   it("returns 400 when organisation_id is not a valid UUID", async () => {
     authenticatedUser();
+    mockFrom.mockImplementation(
+      tableDispatch({ profiles: proProfile })
+    );
     const POST = await importRoute();
     const res = await POST(
       new Request("http://localhost/api/funds", {
@@ -374,6 +408,9 @@ describe("POST /api/funds", () => {
 
   it("returns 400 when url is not a valid URL", async () => {
     authenticatedUser();
+    mockFrom.mockImplementation(
+      tableDispatch({ profiles: proProfile })
+    );
     const POST = await importRoute();
     const res = await POST(
       new Request("http://localhost/api/funds", {
@@ -387,6 +424,9 @@ describe("POST /api/funds", () => {
 
   it("returns 400 when organisation does not exist", async () => {
     authenticatedUser();
+    mockFrom.mockImplementation(
+      tableDispatch({ profiles: proProfile })
+    );
     mockServiceFrom.mockImplementation(
       tableDispatch({
         organisations: { data: null, error: null },
@@ -413,6 +453,7 @@ describe("POST /api/funds", () => {
     );
     mockFrom.mockImplementation(
       tableDispatch({
+        profiles: proProfile,
         funds: { data: null, error: { message: "unique constraint violation" } },
       })
     );
@@ -446,6 +487,7 @@ describe("POST /api/funds", () => {
     );
     mockFrom.mockImplementation(
       tableDispatch({
+        profiles: proProfile,
         funds: { data: createdFund, error: null },
       })
     );
@@ -479,6 +521,7 @@ describe("POST /api/funds", () => {
     };
     mockFrom.mockImplementation(
       tableDispatch({
+        profiles: proProfile,
         funds: { data: createdFund, error: null },
       })
     );
@@ -976,6 +1019,8 @@ describe("POST /api/funds — date fields", () => {
     return mod.POST;
   }
 
+  const proProfile = { data: { subscription_tier: "pro" }, error: null };
+
   it("creates fund with opens_at and closes_at", async () => {
     authenticatedUser();
     const createdFund = {
@@ -991,6 +1036,7 @@ describe("POST /api/funds — date fields", () => {
     };
     mockFrom.mockImplementation(
       tableDispatch({
+        profiles: proProfile,
         funds: { data: createdFund, error: null },
       })
     );
@@ -1029,6 +1075,7 @@ describe("POST /api/funds — date fields", () => {
     };
     mockFrom.mockImplementation(
       tableDispatch({
+        profiles: proProfile,
         funds: { data: createdFund, error: null },
       })
     );

@@ -33,7 +33,7 @@ export default async function NewApplicationPage({
         Select a fund to start filling out your application form.
       </p>
       <div className="mt-6">
-        <NewApplicationForm userId={user.id} tier={tier} usage={usage} isAdmin={isAdmin} fundId={fundId} />
+        <NewApplicationForm tier={tier} usage={usage} isAdmin={isAdmin} fundId={fundId} />
       </div>
     </div>
   );
