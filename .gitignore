@@ -46,3 +46,5 @@ REVIEW-FEEDBACK.md
 tmp-analysis/*
 
 logs/.worktrees/
+logs/*
+app/logs/*
