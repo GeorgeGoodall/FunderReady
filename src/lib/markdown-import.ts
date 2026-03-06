@@ -305,9 +305,12 @@ export function validateImportMetadata(
   const extraErrors: ImportError[] = [];
 
   if (result.metadata.application_id !== expectedApplicationId) {
+    const isTemplate = result.metadata.application_id === "template";
     extraErrors.push({
       type: "error",
-      message: `Application ID mismatch: file is for ${result.metadata.application_id}, but this application is ${expectedApplicationId}`,
+      message: isTemplate
+        ? "This file is a blank template. Please export from an application first, fill in your answers, then import."
+        : `Application ID mismatch: file is for ${result.metadata.application_id}, but this application is ${expectedApplicationId}`,
     });
   }
   if (result.metadata.questions_set_id !== expectedQuestionsSetId) {

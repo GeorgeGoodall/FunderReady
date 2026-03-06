@@ -62,7 +62,9 @@ async function extractMetadataFromZip(
   });
 
   for (const path of xmlFiles) {
-    const content = await zip.file(path)!.async("text");
+    const zipEntry = zip.file(path);
+    if (!zipEntry) continue;
+    const content = await zipEntry.async("text");
     if (content.includes(FUNDERREADY_XML_NAMESPACE)) {
       const parsed = parseCustomXml(content);
       if (!parsed) {
@@ -118,18 +120,8 @@ function findQuestionRegions(
     const rawQuestionText = headingMatch[1];
     const normText = normaliseText(rawQuestionText);
 
-    // Try exact match first
-    let matched = questionByNormText.get(normText);
-
-    // If not found, try contains match (the question text appears in the heading)
-    if (!matched) {
-      for (const entry of Array.from(questionByNormText.entries())) {
-        if (normText.includes(entry[0]) || entry[0].includes(normText)) {
-          matched = entry[1];
-          break;
-        }
-      }
-    }
+    // Exact match only — round-trip export produces exact question text
+    const matched = questionByNormText.get(normText);
 
     if (matched) {
       headings.push({

@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { generateMarkdown, getExportFilename, type ExportCriterion } from "@/lib/markdown-export";
 import { parseMarkdown, validateImportMetadata, MAX_IMPORT_FILE_SIZE, type ParseResult } from "@/lib/markdown-import";
+import { MAX_DOCX_IMPORT_SIZE } from "@/lib/docx-import";
 
 interface Question {
   id: string;
@@ -43,7 +44,7 @@ function triggerDownload(blob: Blob, filename: string) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 100);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function useImportExport(
@@ -121,9 +122,19 @@ export function useImportExport(
 
     const isDocx = file.name.toLowerCase().endsWith(".docx");
 
-    const maxSize = isDocx
-      ? 10 * 1024 * 1024 // MAX_DOCX_IMPORT_SIZE — avoid importing the constant to keep the dynamic import lazy
-      : MAX_IMPORT_FILE_SIZE;
+    // Validate MIME type when available
+    if (isDocx && file.type && file.type !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      setError("The selected file does not appear to be a valid Word document.");
+      e.target.value = "";
+      return;
+    }
+    if (!isDocx && file.type && file.type !== "text/markdown" && file.type !== "text/plain" && file.type !== "") {
+      setError("The selected file does not appear to be a valid Markdown file.");
+      e.target.value = "";
+      return;
+    }
+
+    const maxSize = isDocx ? MAX_DOCX_IMPORT_SIZE : MAX_IMPORT_FILE_SIZE;
 
     if (file.size > maxSize) {
       setError(`File is too large. Maximum size is ${isDocx ? "10" : "2"} MB.`);

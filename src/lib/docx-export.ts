@@ -45,8 +45,8 @@ export function getDocxExportFilename(
 /*  Internal helpers                                                   */
 /* ------------------------------------------------------------------ */
 
-const GREY_BG = { fill: "D9D9D9", type: ShadingType.SOLID, color: "D9D9D9" } as const;
-const BLUE_BG = { fill: "DAEEF3", type: ShadingType.SOLID, color: "DAEEF3" } as const;
+const GREY_BG = { fill: "D9D9D9", type: ShadingType.SOLID, color: "auto" } as const;
+const BLUE_BG = { fill: "DAEEF3", type: ShadingType.SOLID, color: "auto" } as const;
 
 function textParagraph(text: string, opts?: { bold?: boolean; size?: number; alignment?: (typeof AlignmentType)[keyof typeof AlignmentType] }): Paragraph {
   return new Paragraph({
