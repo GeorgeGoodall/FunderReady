@@ -3,6 +3,7 @@ import {
   trimPreviousReviewResults,
   computeAnswerChanges,
   annotateResolvedWeaknesses,
+  extractReusableAnalyses,
 } from "../application-review";
 import type { AnswerAnalysis } from "@/lib/pipeline/schemas";
 import type { CrossReference } from "@/lib/pipeline/schemas";
@@ -509,5 +510,84 @@ describe("annotateResolvedWeaknesses", () => {
     const count = annotateResolvedWeaknesses(analyses, crossRef);
     expect(count).toBe(0);
     expect(analyses[0].weaknesses[0]).toBe("Completely different weakness text");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractReusableAnalyses
+// ---------------------------------------------------------------------------
+
+describe("extractReusableAnalyses", () => {
+  const validAnalysis: AnswerAnalysis = {
+    question_id: "q1",
+    inline_comments: [],
+    criteria_relevance: [{ criterion_id: "c1", relevance: "directly_addresses" }],
+    strengths: ["Good"],
+    weaknesses: ["Bad"],
+    answer_score: "Strong",
+  };
+
+  it("returns analyses for unchanged answers with matching criteria set", () => {
+    const previousResults = {
+      answer_feedback: { q1: validAnalysis, q2: { ...validAnalysis, question_id: "q2" } },
+    };
+    const answerChanges = { q1: false, q2: true };
+    const result = extractReusableAnalyses(previousResults, answerChanges, true);
+
+    expect(result.q1).toBeDefined();
+    expect(result.q1!.question_id).toBe("q1");
+    expect(result.q2).toBeUndefined();
+  });
+
+  it("returns empty when criteria set does not match", () => {
+    const previousResults = {
+      answer_feedback: { q1: validAnalysis },
+    };
+    const answerChanges = { q1: false };
+    const result = extractReusableAnalyses(previousResults, answerChanges, false);
+
+    expect(Object.keys(result)).toHaveLength(0);
+  });
+
+  it("returns empty when no previous results", () => {
+    const result = extractReusableAnalyses(null, { q1: false }, true);
+    expect(Object.keys(result)).toHaveLength(0);
+  });
+
+  it("returns empty when answer_feedback is missing", () => {
+    const result = extractReusableAnalyses({}, { q1: false }, true);
+    expect(Object.keys(result)).toHaveLength(0);
+  });
+
+  it("skips answers not in answerChanges", () => {
+    const previousResults = {
+      answer_feedback: { q1: validAnalysis },
+    };
+    const result = extractReusableAnalyses(previousResults, {}, true);
+    expect(result.q1).toBeUndefined();
+  });
+
+  it("skips answers where answerChanges entry is true (changed)", () => {
+    const previousResults = {
+      answer_feedback: { q1: validAnalysis },
+    };
+    const result = extractReusableAnalyses(previousResults, { q1: true }, true);
+    expect(result.q1).toBeUndefined();
+  });
+
+  it("skips analyses that fail schema validation", () => {
+    const previousResults = {
+      answer_feedback: {
+        q1: { question_id: "q1", bad_field: true }, // missing required fields
+      },
+    };
+    const answerChanges = { q1: false };
+    const result = extractReusableAnalyses(previousResults, answerChanges, true);
+    expect(result.q1).toBeUndefined();
+  });
+
+  it("handles first-review scenario (null previousResults)", () => {
+    const result = extractReusableAnalyses(null, {}, true);
+    expect(result).toEqual({});
   });
 });

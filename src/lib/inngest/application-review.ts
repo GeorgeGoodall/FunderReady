@@ -236,6 +236,39 @@ export function computeAnswerChanges(
   return changes;
 }
 
+/**
+ * Extract reusable answer analyses from a previous review's results.
+ * An analysis is reusable when: criteria set matches, answer text unchanged,
+ * and the previous analysis passes schema validation.
+ */
+export function extractReusableAnalyses(
+  previousResults: Record<string, unknown> | null | undefined,
+  answerChanges: Record<string, boolean>,
+  criteriaSetMatch: boolean
+): Record<string, AnswerAnalysis> {
+  const reusable: Record<string, AnswerAnalysis> = {};
+
+  if (!criteriaSetMatch || !previousResults) return reusable;
+
+  const af = previousResults.answer_feedback;
+  if (!af || typeof af !== "object") return reusable;
+
+  const feedbackMap = af as Record<string, unknown>;
+
+  for (const [questionId, raw] of Object.entries(feedbackMap)) {
+    // Only reuse if answer is explicitly unchanged
+    if (answerChanges[questionId] !== false) continue;
+
+    // Validate against schema before accepting
+    const parsed = AnswerAnalysisSchema.safeParse(raw);
+    if (!parsed.success) continue;
+
+    reusable[questionId] = parsed.data;
+  }
+
+  return reusable;
+}
+
 // ---------------------------------------------------------------------------
 // Post-processing: annotate weaknesses resolved by other answers
 // ---------------------------------------------------------------------------
