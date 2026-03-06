@@ -1,9 +1,8 @@
 import Stripe from "stripe";
 import { createServiceClient } from "@/lib/supabase/server";
-import { PLANS } from "@/lib/stripe/plans";
+import { PLANS, type PlanTier } from "@/lib/stripe/plans";
 import { getUsagePeriod } from "@/lib/usage/period";
 
-// Map Stripe subscription statuses to DB CHECK constraint values: 'active' | 'past_due' | 'cancelled'
 function mapStripeStatus(status: string): "active" | "past_due" | "cancelled" {
   switch (status) {
     case "active":
@@ -29,18 +28,27 @@ function getPeriodEnd(subscription: Stripe.Subscription): string | null {
   return new Date(item.current_period_end * 1000).toISOString();
 }
 
+function tierFromPriceId(priceId: string): PlanTier {
+  if (priceId === PLANS.basic.stripePriceId) return "basic";
+  if (priceId === PLANS.pro.stripePriceId) return "pro";
+  console.warn(`[stripe] Unknown price ID: ${priceId}, defaulting to basic`);
+  return "basic";
+}
+
 async function syncUsageOnUpgrade(
   supabase: ReturnType<typeof createServiceClient>,
   userId: string,
+  tier: PlanTier,
   currentPeriodEnd: string | null
 ) {
-  const { periodKey: period } = getUsagePeriod("pro", currentPeriodEnd);
+  const { periodKey: period } = getUsagePeriod(tier, currentPeriodEnd);
+  const creditsLimit = PLANS[tier]?.creditsPerMonth ?? 0;
   await supabase.from("usage").upsert(
     {
       user_id: userId,
       period,
-      reviews_limit: PLANS.pro.reviewsPerMonth,
-      reviews_used: 0,
+      credits_limit: creditsLimit,
+      credits_used: 0,
       bonus_reviews: 0,
     },
     { onConflict: "user_id,period" }
@@ -54,7 +62,7 @@ async function syncUsageOnDowngrade(
   const period = new Date().toISOString().slice(0, 7);
   await supabase
     .from("usage")
-    .update({ reviews_limit: 0 })
+    .update({ credits_limit: 0 })
     .eq("user_id", userId)
     .eq("period", period);
 }
@@ -73,11 +81,14 @@ export async function handleCheckoutCompleted(
   const { stripe } = await import("@/lib/stripe/client");
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
+  const priceId = subscription.items?.data?.[0]?.price?.id;
+  const tier = priceId ? tierFromPriceId(priceId) : "basic";
+
   const supabase = createServiceClient();
   const { data: profile, error } = await supabase
     .from("profiles")
     .update({
-      subscription_tier: "pro",
+      subscription_tier: tier,
       subscription_status: "active",
       stripe_customer_id: customerId,
       stripe_subscription_id: subscriptionId,
@@ -92,7 +103,7 @@ export async function handleCheckoutCompleted(
     return;
   }
 
-  await syncUsageOnUpgrade(supabase, profile.id, getPeriodEnd(subscription));
+  await syncUsageOnUpgrade(supabase, profile.id, tier, getPeriodEnd(subscription));
 }
 
 export async function handleSubscriptionUpdated(
@@ -148,4 +159,35 @@ export async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
       subscription_status: "past_due",
     })
     .eq("stripe_customer_id", customerId);
+}
+
+export async function handleTopupCompleted(session: Stripe.Checkout.Session) {
+  const userId = session.metadata?.user_id;
+  const packType = session.metadata?.pack_type;
+  const credits = Number(session.metadata?.credits);
+
+  if (!userId || !packType || !credits || credits <= 0) {
+    console.error("[stripe] Invalid top-up metadata:", session.metadata);
+    return;
+  }
+
+  const supabase = createServiceClient();
+
+  const { error: profileError } = await supabase.rpc("increment_purchased_credits", {
+    p_user_id: userId,
+    p_credits: credits,
+  });
+
+  if (profileError) {
+    console.error("[stripe] Failed to increment purchased credits:", profileError);
+    return;
+  }
+
+  await supabase.from("credit_purchases").insert({
+    user_id: userId,
+    credits,
+    amount_pence: session.amount_total ?? 0,
+    pack_type: packType,
+    stripe_payment_intent_id: session.payment_intent as string,
+  });
 }
