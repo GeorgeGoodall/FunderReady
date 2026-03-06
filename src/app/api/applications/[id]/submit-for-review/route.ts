@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { inngest } from "@/lib/inngest/client";
 import { getUsagePeriod } from "@/lib/usage/period";
+import { estimateReviewCost } from "@/lib/usage/estimate-review-cost";
+import { PLANS } from "@/lib/stripe/plans";
 
 export async function POST(
   _request: Request,
@@ -44,9 +46,9 @@ export async function POST(
     .eq("id", user.id)
     .single();
 
-  const tier = profile?.subscription_tier ?? "free";
+  const tier = (profile?.subscription_tier ?? "free") as keyof typeof PLANS;
 
-  if (tier !== "pro") {
+  if (tier === "free") {
     return NextResponse.json(
       { error: "Active subscription required" },
       { status: 403 }
@@ -60,7 +62,7 @@ export async function POST(
     );
   }
 
-  const defaultLimit = 10;
+  const defaultLimit = PLANS[tier]?.creditsPerMonth ?? 0;
   const { periodKey: period } = getUsagePeriod(tier, profile?.current_period_end);
 
   // Check there are non-empty, non-disabled answers
@@ -69,19 +71,22 @@ export async function POST(
     .select("question_id, answer_text, is_disabled")
     .eq("application_id", id);
 
-  const nonEmptyCount = (answers ?? []).filter(
+  const enabledAnswers = (answers ?? []).filter(
     (a) => !a.is_disabled && a.answer_text.trim().length > 0
-  ).length;
-  if (nonEmptyCount === 0) {
+  );
+  if (enabledAnswers.length === 0) {
     return NextResponse.json(
       { error: "At least one answer must be filled in" },
       { status: 400 }
     );
   }
 
+  // Estimate credit cost
+  const estimate = estimateReviewCost(enabledAnswers.length);
+
   const reviewNumber = application.review_count + 1;
 
-  // Atomic: check-and-increment usage + create review + update application status
+  // Atomic: check credits + in-progress + create review
   const { data: rpcResult, error: rpcError } = await serviceClient.rpc(
     "submit_review",
     {
@@ -92,14 +97,21 @@ export async function POST(
       p_criteria_set_id: application.criteria_set_id,
       p_period: period,
       p_default_limit: defaultLimit,
+      p_estimated_credits_low: estimate.low,
     }
   );
 
   if (rpcError) {
-    if (rpcError.message?.includes("USAGE_LIMIT_EXCEEDED")) {
+    if (rpcError.message?.includes("INSUFFICIENT_CREDITS")) {
       return NextResponse.json(
-        { error: "Monthly review limit reached" },
-        { status: 403 }
+        { error: "Insufficient credits", estimate },
+        { status: 402 }
+      );
+    }
+    if (rpcError.message?.includes("REVIEW_IN_PROGRESS")) {
+      return NextResponse.json(
+        { error: "You already have a review in progress" },
+        { status: 409 }
       );
     }
     console.error("submit_review RPC error:", rpcError);
@@ -130,7 +142,7 @@ export async function POST(
   });
 
   return NextResponse.json(
-    { reviewId, reviewNumber },
+    { reviewId, reviewNumber, estimate },
     { status: 201 }
   );
 }
