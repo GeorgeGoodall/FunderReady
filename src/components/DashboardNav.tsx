@@ -49,6 +49,14 @@ export function DashboardNav({
           FunderReady
         </Link>
 
+        {/* Nav links */}
+        <Link
+          href="/funds"
+          className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+        >
+          Funds
+        </Link>
+
         {/* Right: CTA + divider + user dropdown */}
         <div className="flex items-center gap-3">
           <Link
@@ -101,13 +109,6 @@ export function DashboardNav({
 
                 <div className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
 
-                <Link
-                  href="/funds"
-                  onClick={() => setOpen(false)}
-                  className="block px-3 py-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-                >
-                  Manage Funds
-                </Link>
                 <Link
                   href="/billing"
                   onClick={() => setOpen(false)}
