@@ -112,6 +112,8 @@ export const FundSchema = z.object({
   organisation_id: z.string().uuid().optional().nullable(),
   url: z.string().url().optional(),
   notes: z.string().optional(),
+  opens_at: z.string().datetime().optional().nullable(),
+  closes_at: z.string().datetime().optional().nullable(),
 });
 
 export type Fund = z.infer<typeof FundSchema>;
