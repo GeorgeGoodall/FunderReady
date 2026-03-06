@@ -13,7 +13,7 @@ import {
   useTitleEditing,
   useFormAutoSave,
   useQuestionsSetSwap,
-  useMarkdownImportExport,
+  useImportExport,
 } from "./hooks";
 
 interface Question {
@@ -138,8 +138,8 @@ export function ApplicationFormClient({
 
   const {
     fileInputRef, importResult, setImportResult,
-    handleExport, handleFileSelect, applyImport,
-  } = useMarkdownImportExport(
+    handleExport, openFileDialog, handleFileSelect, applyImport,
+  } = useImportExport(
     application, fund, criteriaSet, questions,
     answerMap, optionsMap, disabledMap,
     setAnswerMap, setOptionsMap, setDisabledMap,
@@ -477,14 +477,14 @@ export function ApplicationFormClient({
           <>
             <button
               type="button"
-              onClick={handleExport}
+              onClick={() => handleExport("markdown")}
               className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               Export Markdown
             </button>
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => openFileDialog("markdown")}
               className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               Import Markdown
