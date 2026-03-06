@@ -385,29 +385,41 @@ export function ApplicationFormClient({
       )}
 
       {/* Questions form */}
-      {sections.map((section, si) => (
-        <div key={si} className="space-y-4">
-          {section.label && (
-            <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-200">
-              {section.label}
-            </h2>
-          )}
-          {section.questions.map((q) => (
-            <FormField
-              key={q.id}
-              question={q}
-              value={answerMap[q.id] ?? ""}
-              selectedOptions={optionsMap[q.id]}
-              lastReviewedText={reviewedTextMap[q.id]}
-              isDisabled={disabledMap[q.id] ?? false}
-              onChange={(v) => handleChange(q.id, v)}
-              onOptionsChange={(opts) => handleOptionsChange(q.id, opts)}
-              onDisabledChange={(disabled) => handleDisabledChange(q.id, disabled)}
-              onBlur={handleBlur}
-            />
-          ))}
-        </div>
-      ))}
+      {sections.reduce<{ elements: React.ReactNode[]; counter: number }>(
+        (acc, section, si) => {
+          const sectionQuestions = section.questions.map((q, qi) => {
+            const num = acc.counter + qi + 1;
+            return (
+              <FormField
+                key={q.id}
+                question={q}
+                questionNumber={num}
+                value={answerMap[q.id] ?? ""}
+                selectedOptions={optionsMap[q.id]}
+                lastReviewedText={reviewedTextMap[q.id]}
+                isDisabled={disabledMap[q.id] ?? false}
+                onChange={(v) => handleChange(q.id, v)}
+                onOptionsChange={(opts) => handleOptionsChange(q.id, opts)}
+                onDisabledChange={(disabled) => handleDisabledChange(q.id, disabled)}
+                onBlur={handleBlur}
+              />
+            );
+          });
+          acc.elements.push(
+            <div key={si} className="space-y-4">
+              {section.label && (
+                <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-200">
+                  {section.label}
+                </h2>
+              )}
+              {sectionQuestions}
+            </div>
+          );
+          acc.counter += section.questions.length;
+          return acc;
+        },
+        { elements: [], counter: 0 }
+      ).elements}
 
       {/* Overall word limit indicator */}
       {questionsSet?.overall_word_limit && (

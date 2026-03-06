@@ -17,6 +17,7 @@ interface Question {
 
 interface FormFieldProps {
   question: Question;
+  questionNumber?: number;
   value: string;
   selectedOptions?: string[];
   lastReviewedText?: string | null;
@@ -74,6 +75,7 @@ function CharCounter({ text, max }: { text: string; max: number }) {
 
 export function FormField({
   question,
+  questionNumber,
   value,
   selectedOptions,
   lastReviewedText,
@@ -95,7 +97,7 @@ export function FormField({
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
           <label className={`block text-sm font-semibold ${isDisabled ? "text-zinc-400 dark:text-zinc-500" : "text-zinc-900 dark:text-zinc-100"}`}>
-            {question.question}
+            {questionNumber != null && `${questionNumber}. `}{question.question}
             {question.required !== false && !isDisabled && (
               <span className="ml-1 text-red-500">*</span>
             )}
