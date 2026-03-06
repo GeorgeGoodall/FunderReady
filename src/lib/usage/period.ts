@@ -11,7 +11,7 @@ export function getUsagePeriod(
   tier: string,
   currentPeriodEnd: string | null | undefined
 ): { periodKey: string; resetDate: Date } {
-  if (tier === "pro" && currentPeriodEnd) {
+  if ((tier === "pro" || tier === "basic") && currentPeriodEnd) {
     const end = new Date(currentPeriodEnd);
     if (!isNaN(end.getTime())) {
       // Period start = end minus 1 month
