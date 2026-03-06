@@ -591,3 +591,75 @@ describe("extractReusableAnalyses", () => {
     expect(result).toEqual({});
   });
 });
+
+// ---------------------------------------------------------------------------
+// incremental review integration
+// ---------------------------------------------------------------------------
+
+describe("incremental review integration", () => {
+  const makeValidAnalysis = (qId: string): AnswerAnalysis => ({
+    question_id: qId,
+    inline_comments: [],
+    criteria_relevance: [{ criterion_id: "c1", relevance: "directly_addresses" }],
+    strengths: ["Good"],
+    weaknesses: [],
+    answer_score: "Strong",
+  });
+
+  it("reuses 14 of 15 analyses when only 1 answer changed", () => {
+    const previousResults: Record<string, unknown> = {
+      answer_feedback: Object.fromEntries(
+        Array.from({ length: 15 }, (_, i) => [`q${i + 1}`, makeValidAnalysis(`q${i + 1}`)])
+      ),
+    };
+    // Only q3 changed
+    const answerChanges: Record<string, boolean> = Object.fromEntries(
+      Array.from({ length: 15 }, (_, i) => [`q${i + 1}`, i === 2])
+    );
+
+    const reusable = extractReusableAnalyses(previousResults, answerChanges, true);
+
+    expect(Object.keys(reusable)).toHaveLength(14);
+    expect(reusable.q3).toBeUndefined(); // changed answer not reused
+    expect(reusable.q1).toBeDefined();
+    expect(reusable.q15).toBeDefined();
+  });
+
+  it("reuses nothing when criteria set changed", () => {
+    const previousResults: Record<string, unknown> = {
+      answer_feedback: Object.fromEntries(
+        Array.from({ length: 15 }, (_, i) => [`q${i + 1}`, makeValidAnalysis(`q${i + 1}`)])
+      ),
+    };
+    const answerChanges: Record<string, boolean> = Object.fromEntries(
+      Array.from({ length: 15 }, (_, i) => [`q${i + 1}`, false])
+    );
+
+    const reusable = extractReusableAnalyses(previousResults, answerChanges, false);
+
+    expect(Object.keys(reusable)).toHaveLength(0);
+  });
+
+  it("reuses nothing on first review", () => {
+    const reusable = extractReusableAnalyses(null, {}, true);
+    expect(Object.keys(reusable)).toHaveLength(0);
+  });
+
+  it("handles mix of valid and invalid previous analyses", () => {
+    const previousResults: Record<string, unknown> = {
+      answer_feedback: {
+        q1: makeValidAnalysis("q1"),
+        q2: { question_id: "q2", bad: true }, // invalid schema
+        q3: makeValidAnalysis("q3"),
+      },
+    };
+    const answerChanges = { q1: false, q2: false, q3: false };
+
+    const reusable = extractReusableAnalyses(previousResults, answerChanges, true);
+
+    expect(Object.keys(reusable)).toHaveLength(2);
+    expect(reusable.q1).toBeDefined();
+    expect(reusable.q2).toBeUndefined(); // failed validation
+    expect(reusable.q3).toBeDefined();
+  });
+});
