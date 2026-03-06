@@ -41,7 +41,7 @@ export function DashboardNav({
     .toUpperCase()
     .slice(0, 2);
 
-  const isPro = tier !== "free";
+  const hasSubscription = tier !== "free";
 
   return (
     <nav className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
@@ -100,7 +100,7 @@ export function DashboardNav({
               <div className="absolute right-0 z-20 mt-1.5 w-52 rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
                 {/* Tier row */}
                 <div className="px-3 py-2">
-                  {isPro ? (
+                  {hasSubscription ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium capitalize text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
                       <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
