@@ -8,6 +8,7 @@ import { CriteriaInput } from "@/components/CriteriaInput";
 import { CriteriaPreview } from "@/components/CriteriaPreview";
 import { QuestionsInput } from "@/components/QuestionsInput";
 import { QuestionsPreview } from "@/components/QuestionsPreview";
+import { FundDateBanner } from "@/components/FundDateBanner";
 import { UpsellPrompt } from "@/components/UpsellPrompt";
 import type { CriteriaSet, QuestionsSet } from "@/lib/schemas/criteria";
 import type { UsageResult } from "@/lib/usage/check-usage";
@@ -503,6 +504,10 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
       {/* Step: Confirm */}
       {step === "confirm" && (
         <div className="space-y-6">
+          <FundDateBanner
+            opensAt={selectedFund?.opens_at ?? detectedOpensAt}
+            closesAt={selectedFund?.closes_at ?? detectedClosesAt}
+          />
           <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
             <h3 className="font-semibold">Application Summary</h3>
             <dl className="mt-4 space-y-3 text-sm">
