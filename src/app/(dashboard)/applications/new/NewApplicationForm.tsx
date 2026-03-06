@@ -25,6 +25,8 @@ interface FundInfo {
   organisation: { id: string; name: string } | null;
   url: string | null;
   notes: string | null;
+  opens_at: string | null;
+  closes_at: string | null;
   created_at: string;
 }
 
@@ -46,6 +48,10 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
   const [selectedFund, setSelectedFund] = useState<FundInfo | null>(null);
   const [pendingNewFundData, setPendingNewFundData] = useState<NewFundData | null>(null);
   const [creatingFund, setCreatingFund] = useState(false);
+
+  // AI-detected dates (from criteria parse)
+  const [detectedOpensAt, setDetectedOpensAt] = useState<string | null>(null);
+  const [detectedClosesAt, setDetectedClosesAt] = useState<string | null>(null);
 
   // Criteria state
   const [criteriaSet, setCriteriaSet] = useState<CriteriaSet | null>(null);
@@ -114,6 +120,31 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
     setPendingNewFundData(data);
     setCreatingFund(false);
     setStep("criteria");
+  };
+
+  const patchFundDates = async (fundId: string, opensAt: string | null, closesAt: string | null) => {
+    try {
+      await fetch(`/api/funds/${fundId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opens_at: opensAt, closes_at: closesAt }),
+      });
+    } catch {
+      // Non-fatal — dates are supplementary
+    }
+  };
+
+  const handleCriteriaParsed = (criteriaSet: CriteriaSet, dates?: { opens_at?: string; closes_at?: string }) => {
+    setCriteriaSet(criteriaSet);
+    if (dates?.opens_at) setDetectedOpensAt(dates.opens_at);
+    if (dates?.closes_at) setDetectedClosesAt(dates.closes_at);
+
+    // Patch dates onto existing fund if it has none
+    if (selectedFund && !selectedFund.opens_at && !selectedFund.closes_at) {
+      if (dates?.opens_at || dates?.closes_at) {
+        patchFundDates(selectedFund.id, dates.opens_at ?? null, dates.closes_at ?? null);
+      }
+    }
   };
 
   const handleCriteriaChange = (updated: CriteriaSet) => {
@@ -199,6 +230,8 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
             organisation_id: organisationId ?? null,
             url: pendingNewFundData.url,
             notes: pendingNewFundData.notes,
+            opens_at: pendingNewFundData.opensAt ? new Date(pendingNewFundData.opensAt).toISOString() : detectedOpensAt ?? null,
+            closes_at: pendingNewFundData.closesAt ? new Date(pendingNewFundData.closesAt).toISOString() : detectedClosesAt ?? null,
           }),
         });
         if (!fundRes.ok) {
@@ -348,8 +381,22 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
             </div>
           )}
 
+          {(detectedOpensAt || detectedClosesAt) && (
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-900/30 dark:bg-blue-900/10">
+              <p className="text-sm text-blue-800 dark:text-blue-300">
+                {detectedClosesAt && (
+                  <>Deadline detected: <strong>{new Date(detectedClosesAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</strong></>
+                )}
+                {detectedOpensAt && detectedClosesAt && " | "}
+                {detectedOpensAt && (
+                  <>Opens: <strong>{new Date(detectedOpensAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</strong></>
+                )}
+              </p>
+            </div>
+          )}
+
           {!criteriaSet ? (
-            <CriteriaInput onParsed={setCriteriaSet} isAdmin={isAdmin} />
+            <CriteriaInput onParsed={handleCriteriaParsed} isAdmin={isAdmin} />
           ) : (
             <>
               <CriteriaPreview criteriaSet={criteriaSet} onChange={handleCriteriaChange} />
@@ -475,6 +522,22 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
                     : "None"}
                 </dd>
               </div>
+              {(selectedFund?.closes_at || detectedClosesAt) && (
+                <div className="flex justify-between">
+                  <dt className="text-zinc-500">Deadline</dt>
+                  <dd className="font-medium">
+                    {new Date(selectedFund?.closes_at ?? detectedClosesAt!).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+                  </dd>
+                </div>
+              )}
+              {(selectedFund?.opens_at || detectedOpensAt) && (
+                <div className="flex justify-between">
+                  <dt className="text-zinc-500">Opens</dt>
+                  <dd className="font-medium">
+                    {new Date(selectedFund?.opens_at ?? detectedOpensAt!).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+                  </dd>
+                </div>
+              )}
             </dl>
 
             <div className="mt-4">
