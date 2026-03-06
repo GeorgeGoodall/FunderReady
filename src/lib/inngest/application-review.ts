@@ -875,6 +875,31 @@ export const applicationReviewRequested = inngest.createFunction(
         throw new Error(`Failed to save review results: ${resultsError.message}`);
       }
 
+      // Deduct credits based on actual cost
+      const { calculateCreditsFromCost } = await import("@/lib/usage/calculate-credits");
+      const { getUsagePeriod } = await import("@/lib/usage/period");
+      const creditsToCharge = calculateCreditsFromCost(totalCostUsd);
+
+      if (creditsToCharge > 0) {
+        const { data: userProfile } = await supabase
+          .from("profiles")
+          .select("subscription_tier, current_period_end")
+          .eq("id", userId)
+          .single();
+
+        const { periodKey } = getUsagePeriod(
+          userProfile?.subscription_tier ?? "pro",
+          userProfile?.current_period_end
+        );
+
+        await supabase.rpc("deduct_credits", {
+          p_user_id: userId,
+          p_review_id: reviewId,
+          p_credits: creditsToCharge,
+          p_period: periodKey,
+        });
+      }
+
       // Stamp last_reviewed_text on enabled answers only (skip disabled)
       await Promise.all(
         enabledAnswers.map((answer) =>
