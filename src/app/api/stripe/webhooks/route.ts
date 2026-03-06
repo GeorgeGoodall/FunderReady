@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe/client";
 import {
   handleCheckoutCompleted,
+  handleTopupCompleted,
   handleSubscriptionUpdated,
   handleSubscriptionDeleted,
   handleInvoicePaymentFailed,
@@ -35,11 +36,16 @@ export async function POST(request: Request) {
 
   try {
     switch (event.type) {
-      case "checkout.session.completed":
-        await handleCheckoutCompleted(
-          event.data.object as import("stripe").default.Checkout.Session
-        );
+      case "checkout.session.completed": {
+        const session =
+          event.data.object as import("stripe").default.Checkout.Session;
+        if (session.mode === "payment") {
+          await handleTopupCompleted(session);
+        } else {
+          await handleCheckoutCompleted(session);
+        }
         break;
+      }
       case "customer.subscription.updated":
         await handleSubscriptionUpdated(
           event.data.object as import("stripe").default.Subscription
