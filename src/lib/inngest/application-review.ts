@@ -416,7 +416,7 @@ export const applicationReviewRequested = inngest.createFunction(
       // Load previous completed review (for feedback evolution)
       const { data: prevReview } = await supabase
         .from("application_reviews")
-        .select("review_number, results")
+        .select("review_number, results, criteria_set_id")
         .eq("application_id", applicationId)
         .eq("status", "completed")
         .neq("id", reviewId)
@@ -480,6 +480,20 @@ export const applicationReviewRequested = inngest.createFunction(
         };
       }
 
+      // Determine if previous review used the same criteria set
+      const criteriaSetMatch = prevReview
+        ? prevReview.criteria_set_id === app.criteria_set_id
+        : false;
+
+      // Extract full reusable analyses (only when criteria set matches)
+      const reusableAnalyses = prevReview?.results && typeof prevReview.results === "object"
+        ? extractReusableAnalyses(
+            prevReview.results as Record<string, unknown>,
+            answerChanges,
+            criteriaSetMatch
+          )
+        : {} as Record<string, AnswerAnalysis>;
+
       return {
         title: app.title,
         criteria: criteriaSet.criteria_json as unknown as Criterion[],
@@ -489,10 +503,11 @@ export const applicationReviewRequested = inngest.createFunction(
         disabledQuestions,
         previousReview: previousReviewContext,
         answerChanges,
+        reusableAnalyses,
       };
     });
 
-    const { criteria, questions, enabledAnswers, disabledQuestions, overallWordLimit, previousReview, answerChanges } = appData;
+    const { criteria, questions, enabledAnswers, disabledQuestions, overallWordLimit, previousReview, answerChanges, reusableAnalyses } = appData;
 
     // Build answer contexts from enabled answers only
     const answerContexts: AnswerContext[] = [];
