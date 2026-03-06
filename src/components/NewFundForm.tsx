@@ -9,8 +9,6 @@ export interface NewFundData {
   newOrg?: { name: string; url?: string; description?: string };
   url?: string;
   notes?: string;
-  opensAt?: string;
-  closesAt?: string;
 }
 
 interface NewFundFormProps {
@@ -23,8 +21,6 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
   const [name, setName] = useState(suggestedName);
   const [url, setUrl] = useState("");
   const [notes, setNotes] = useState("");
-  const [opensAt, setOpensAt] = useState("");
-  const [closesAt, setClosesAt] = useState("");
 
   // Org state: either a selected existing org or a new org name
   const [selectedOrg, setSelectedOrg] = useState<OrgOption | null>(null);
@@ -47,8 +43,6 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
       name: name.trim(),
       url: url.trim() || undefined,
       notes: notes.trim() || undefined,
-      opensAt: opensAt || undefined,
-      closesAt: closesAt || undefined,
     };
 
     if (selectedOrg) {
@@ -121,31 +115,6 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
             placeholder="https://..."
             className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
           />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Opens (optional)
-            </label>
-            <input
-              type="date"
-              value={opensAt}
-              onChange={(e) => setOpensAt(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Deadline (optional)
-            </label>
-            <input
-              type="date"
-              value={closesAt}
-              onChange={(e) => setClosesAt(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
-            />
-          </div>
         </div>
 
         <div>
