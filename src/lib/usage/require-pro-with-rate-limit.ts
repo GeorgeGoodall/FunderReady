@@ -29,9 +29,9 @@ export async function requireProWithRateLimit(): Promise<
     .eq("id", user.id)
     .single();
 
-  if (profile?.subscription_tier !== "pro") {
+  if (!profile || profile.subscription_tier === "free") {
     return NextResponse.json(
-      { error: "Pro subscription required" },
+      { error: "Subscription required" },
       { status: 403 }
     );
   }

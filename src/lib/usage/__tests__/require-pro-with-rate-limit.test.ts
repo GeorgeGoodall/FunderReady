@@ -83,7 +83,7 @@ describe("requireProWithRateLimit", () => {
     }
   });
 
-  it("returns userId on success", async () => {
+  it("returns userId on success for pro tier", async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     mockFrom.mockReturnValue(
       chainMock({ data: { subscription_tier: "pro" }, error: null })
@@ -100,6 +100,26 @@ describe("requireProWithRateLimit", () => {
     expect(isGuardError(result)).toBe(false);
     if (!isGuardError(result)) {
       expect(result.userId).toBe("user-1");
+    }
+  });
+
+  it("returns userId on success for basic tier", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-2" } } });
+    mockFrom.mockReturnValue(
+      chainMock({ data: { subscription_tier: "basic" }, error: null })
+    );
+    mockCheckAndIncrementAiUsage.mockResolvedValue({
+      allowed: true,
+      count: 1,
+      limit: 30,
+    });
+
+    const { requireProWithRateLimit, isGuardError } = await importGuard();
+    const result = await requireProWithRateLimit();
+
+    expect(isGuardError(result)).toBe(false);
+    if (!isGuardError(result)) {
+      expect(result.userId).toBe("user-2");
     }
   });
 });
