@@ -139,6 +139,7 @@ export type Database = {
         Row: {
           application_id: string
           created_at: string
+          credits_charged: number
           criteria_set_id: string | null
           error_message: string | null
           id: string
@@ -157,6 +158,7 @@ export type Database = {
         Insert: {
           application_id: string
           created_at?: string
+          credits_charged?: number
           criteria_set_id?: string | null
           error_message?: string | null
           id?: string
@@ -175,6 +177,7 @@ export type Database = {
         Update: {
           application_id?: string
           created_at?: string
+          credits_charged?: number
           criteria_set_id?: string | null
           error_message?: string | null
           id?: string
@@ -275,6 +278,44 @@ export type Database = {
           },
           {
             foreignKeyName: "applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_purchases: {
+        Row: {
+          amount_pence: number
+          created_at: string
+          credits: number
+          id: string
+          pack_type: string
+          stripe_payment_intent_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount_pence: number
+          created_at?: string
+          credits: number
+          id?: string
+          pack_type: string
+          stripe_payment_intent_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount_pence?: number
+          created_at?: string
+          credits?: number
+          id?: string
+          pack_type?: string
+          stripe_payment_intent_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_purchases_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -459,6 +500,7 @@ export type Database = {
           display_name: string | null
           id: string
           is_admin: boolean
+          purchased_credits: number
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_status: string
@@ -471,6 +513,7 @@ export type Database = {
           display_name?: string | null
           id: string
           is_admin?: boolean
+          purchased_credits?: number
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_status?: string
@@ -483,6 +526,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_admin?: boolean
+          purchased_credits?: number
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_status?: string
@@ -752,26 +796,26 @@ export type Database = {
       usage: {
         Row: {
           bonus_reviews: number
+          credits_limit: number
+          credits_used: number
           id: string
           period: string
-          reviews_limit: number
-          reviews_used: number
           user_id: string
         }
         Insert: {
           bonus_reviews?: number
+          credits_limit?: number
+          credits_used?: number
           id?: string
           period: string
-          reviews_limit?: number
-          reviews_used?: number
           user_id: string
         }
         Update: {
           bonus_reviews?: number
+          credits_limit?: number
+          credits_used?: number
           id?: string
           period?: string
-          reviews_limit?: number
-          reviews_used?: number
           user_id?: string
         }
         Relationships: [
@@ -835,26 +879,59 @@ export type Database = {
           total_output_tokens: number
         }[]
       }
+      deduct_credits: {
+        Args: {
+          p_credits: number
+          p_period: string
+          p_review_id: string
+          p_user_id: string
+        }
+        Returns: {
+          period_deducted: number
+          purchased_deducted: number
+        }[]
+      }
       increment_ai_daily_usage: {
         Args: { p_limit: number; p_user_id: string }
         Returns: number
       }
-      rollback_usage: { Args: { p_user_id: string }; Returns: undefined }
-      submit_review: {
-        Args: {
-          p_application_id: string
-          p_criteria_set_id: string
-          p_default_limit?: number
-          p_period: string
-          p_questions_set_id: string
-          p_review_number: number
-          p_user_id: string
-        }
-        Returns: {
-          review_id: string
-          review_number: number
-        }[]
+      increment_purchased_credits: {
+        Args: { p_credits: number; p_user_id: string }
+        Returns: undefined
       }
+      rollback_usage: { Args: { p_user_id: string }; Returns: undefined }
+      submit_review:
+        | {
+            Args: {
+              p_application_id: string
+              p_criteria_set_id: string
+              p_default_limit?: number
+              p_estimated_credits_low?: number
+              p_period: string
+              p_questions_set_id: string
+              p_review_number: number
+              p_user_id: string
+            }
+            Returns: {
+              review_id: string
+              review_number: number
+            }[]
+          }
+        | {
+            Args: {
+              p_application_id: string
+              p_criteria_set_id: string
+              p_default_limit?: number
+              p_period: string
+              p_questions_set_id: string
+              p_review_number: number
+              p_user_id: string
+            }
+            Returns: {
+              review_id: string
+              review_number: number
+            }[]
+          }
     }
     Enums: {
       [_ in never]: never
