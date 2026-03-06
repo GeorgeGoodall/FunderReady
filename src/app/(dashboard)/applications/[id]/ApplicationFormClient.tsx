@@ -96,6 +96,9 @@ export function ApplicationFormClient({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [usageInfo, setUsageInfo] = useState<{ remaining: number; limit: number; bonus: number } | null>(null);
+  const [loadingUsage, setLoadingUsage] = useState(false);
 
   // Parse questions from the questions set
   const questions: Question[] = Array.isArray(questionsSet?.questions_json)
@@ -143,8 +146,29 @@ export function ApplicationFormClient({
     dirtyRef, saveAnswers, setError
   );
 
-  const handleSubmitForReview = async () => {
+  const handleSubmitClick = async () => {
     await saveAnswers();
+    setError("");
+    setLoadingUsage(true);
+
+    try {
+      const res = await fetch("/api/usage");
+      if (!res.ok) {
+        setError("Failed to check usage. Please try again.");
+        return;
+      }
+      const data = await res.json();
+      setUsageInfo({ remaining: data.remaining, limit: data.limit, bonus: data.bonus });
+      setShowSubmitConfirm(true);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoadingUsage(false);
+    }
+  };
+
+  const handleConfirmSubmit = async () => {
+    setShowSubmitConfirm(false);
     setSubmitting(true);
     setError("");
 
@@ -493,15 +517,17 @@ export function ApplicationFormClient({
           {(isDraft || isReviewed) && (
             <button
               type="button"
-              onClick={handleSubmitForReview}
-              disabled={submitting}
+              onClick={handleSubmitClick}
+              disabled={submitting || loadingUsage}
               className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting
                 ? "Submitting..."
-                : isReviewed
-                  ? "Request New Review"
-                  : "Submit for Review"}
+                : loadingUsage
+                  ? "Checking..."
+                  : isReviewed
+                    ? "Request New Review"
+                    : "Submit for Review"}
             </button>
           )}
         </div>
@@ -548,6 +574,52 @@ export function ApplicationFormClient({
           onConfirm={() => applyImport(importResult)}
           onCancel={() => setImportResult(null)}
         />
+      )}
+
+      {/* Submit for review confirmation modal */}
+      {showSubmitConfirm && usageInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+            <h2 className="text-lg font-semibold">Submit for review?</h2>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              This will use 1 of your remaining reviews.
+            </p>
+            <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-zinc-600 dark:text-zinc-400">Reviews remaining</span>
+                <span className={`text-sm font-semibold ${usageInfo.remaining <= 2 ? "text-amber-600 dark:text-amber-400" : "text-zinc-900 dark:text-zinc-100"}`}>
+                  {usageInfo.remaining} / {usageInfo.limit + usageInfo.bonus}
+                </span>
+              </div>
+              {usageInfo.remaining <= 2 && (
+                <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                  {usageInfo.remaining === 1
+                    ? "This is your last review for this billing period."
+                    : usageInfo.remaining === 0
+                      ? "You have no reviews remaining this period."
+                      : "You are running low on reviews this period."}
+                </p>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowSubmitConfirm(false)}
+                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSubmit}
+                disabled={usageInfo.remaining === 0}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Confirm &amp; Submit
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Swap questions set confirmation modal */}
