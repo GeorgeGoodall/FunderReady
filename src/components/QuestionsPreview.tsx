@@ -38,8 +38,32 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
 
 const FIELD_TYPES = ["text_long", "text_short", "dropdown", "radio", "checkbox", "email", "url", "phone", "number"] as const;
 
+export function validateQuestionsSet(qs: QuestionsSet): string[] {
+  const errors: string[] = [];
+  if (qs.overall_word_limit !== undefined && qs.overall_word_limit < 1) {
+    errors.push("Overall word limit must be greater than 0");
+  }
+  qs.questions.forEach((q, i) => {
+    const label = `Q${i + 1}`;
+    if (q.word_count_min !== undefined && q.word_count_min < 1) {
+      errors.push(`${label}: Min words must be greater than 0`);
+    }
+    if (q.word_count_max !== undefined && q.word_count_max < 1) {
+      errors.push(`${label}: Max words must be greater than 0`);
+    }
+    if (q.char_count_max !== undefined && q.char_count_max < 1) {
+      errors.push(`${label}: Max chars must be greater than 0`);
+    }
+    if (q.word_count_min !== undefined && q.word_count_max !== undefined && q.word_count_min > q.word_count_max) {
+      errors.push(`${label}: Min words cannot exceed max words`);
+    }
+  });
+  return errors;
+}
+
 export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewProps) {
   const sensors = useSensors(useSensor(PointerSensor));
+  const validationErrors = validateQuestionsSet(questionsSet);
 
   const updateQuestion = (index: number, updates: Partial<Question>) => {
     const questions = [...questionsSet.questions];
@@ -89,9 +113,17 @@ export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewPro
             })
           }
           placeholder="e.g. 5000"
-          className="w-28 rounded border border-zinc-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+          className={`w-28 rounded border px-2 py-1 text-sm focus:outline-none focus:ring-1 dark:bg-zinc-800 dark:text-zinc-100 ${
+            questionsSet.overall_word_limit !== undefined && questionsSet.overall_word_limit < 1
+              ? "border-red-400 focus:border-red-500 focus:ring-red-500 dark:border-red-600"
+              : "border-zinc-300 focus:border-blue-500 focus:ring-blue-500 dark:border-zinc-700"
+          }`}
         />
-        <span className="text-xs text-zinc-500">Leave blank if none</span>
+        {questionsSet.overall_word_limit !== undefined && questionsSet.overall_word_limit < 1 ? (
+          <span className="text-xs text-red-600 dark:text-red-400">Must be greater than 0</span>
+        ) : (
+          <span className="text-xs text-zinc-500">Leave blank if none</span>
+        )}
       </div>
 
       <div className="flex items-center justify-between">
@@ -128,6 +160,17 @@ export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewPro
           </div>
         </SortableContext>
       </DndContext>
+
+      {validationErrors.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/30 dark:bg-amber-900/10">
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Please fix the following:</p>
+          <ul className="mt-1 list-disc pl-5 text-sm text-amber-700 dark:text-amber-400">
+            {validationErrors.map((err) => (
+              <li key={err}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -157,15 +200,30 @@ function SortableQuestionCard({
 
   const fieldType = question.field_type ?? "text_long";
   const hasOptions = fieldType === "dropdown" || fieldType === "radio" || fieldType === "checkbox";
+  const isSelectionType = hasOptions;
+  const isSingleValueType = fieldType === "email" || fieldType === "url" || fieldType === "phone" || fieldType === "number";
+  const showWordCount = !isSelectionType && !isSingleValueType;
+  const showCharCount = !isSelectionType;
   const [newOption, setNewOption] = useState("");
 
   const handleFieldTypeChange = (newType: string) => {
     const updates: Partial<Question> = { field_type: newType as Question["field_type"] };
-    if (newType !== "dropdown" && newType !== "radio" && newType !== "checkbox") {
+    const newIsSelection = newType === "dropdown" || newType === "radio" || newType === "checkbox";
+    const newIsSingleValue = newType === "email" || newType === "url" || newType === "phone" || newType === "number";
+    if (!newIsSelection) {
       updates.options = undefined;
     }
-    if ((newType === "dropdown" || newType === "radio" || newType === "checkbox") && !question.options?.length) {
+    if (newIsSelection && !question.options?.length) {
       updates.options = [];
+    }
+    // Clear word counts when switching to a type that doesn't use them
+    if (newIsSelection || newIsSingleValue) {
+      updates.word_count_min = undefined;
+      updates.word_count_max = undefined;
+    }
+    // Clear char count when switching to selection type
+    if (newIsSelection) {
+      updates.char_count_max = undefined;
     }
     onUpdate(updates);
   };
@@ -226,47 +284,70 @@ function SortableQuestionCard({
               ))}
             </select>
 
-            <span className="mx-1 text-zinc-300 dark:text-zinc-700">|</span>
+            {showWordCount && (
+              <>
+                <span className="mx-1 text-zinc-300 dark:text-zinc-700">|</span>
 
-            <label className="text-xs text-zinc-500">Words:</label>
-            <input
-              type="number"
-              value={question.word_count_min ?? ""}
-              onChange={(e) =>
-                onUpdate({
-                  word_count_min: e.target.value ? parseInt(e.target.value, 10) : undefined,
-                })
-              }
-              placeholder="Min"
-              className="w-20 rounded border border-zinc-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            />
-            <span className="text-xs text-zinc-400">to</span>
-            <input
-              type="number"
-              value={question.word_count_max ?? ""}
-              onChange={(e) =>
-                onUpdate({
-                  word_count_max: e.target.value ? parseInt(e.target.value, 10) : undefined,
-                })
-              }
-              placeholder="Max"
-              className="w-20 rounded border border-zinc-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            />
+                <label className="text-xs text-zinc-500">Words:</label>
+                <input
+                  type="number"
+                  value={question.word_count_min ?? ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      word_count_min: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                    })
+                  }
+                  placeholder="Min"
+                  title={question.word_count_min !== undefined && question.word_count_min < 1 ? "Must be greater than 0" : ""}
+                  className={`w-20 rounded border px-2 py-1 text-xs focus:outline-none focus:ring-1 dark:bg-zinc-800 dark:text-zinc-100 ${
+                    question.word_count_min !== undefined && question.word_count_min < 1
+                      ? "border-red-400 focus:border-red-500 focus:ring-red-500 dark:border-red-600"
+                      : "border-zinc-300 focus:border-blue-500 focus:ring-blue-500 dark:border-zinc-700"
+                  }`}
+                />
+                <span className="text-xs text-zinc-400">to</span>
+                <input
+                  type="number"
+                  value={question.word_count_max ?? ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      word_count_max: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                    })
+                  }
+                  placeholder="Max"
+                  title={question.word_count_max !== undefined && question.word_count_max < 1 ? "Must be greater than 0" : ""}
+                  className={`w-20 rounded border px-2 py-1 text-xs focus:outline-none focus:ring-1 dark:bg-zinc-800 dark:text-zinc-100 ${
+                    question.word_count_max !== undefined && question.word_count_max < 1
+                      ? "border-red-400 focus:border-red-500 focus:ring-red-500 dark:border-red-600"
+                      : "border-zinc-300 focus:border-blue-500 focus:ring-blue-500 dark:border-zinc-700"
+                  }`}
+                />
+              </>
+            )}
 
-            <span className="mx-1 text-zinc-300 dark:text-zinc-700">|</span>
+            {showCharCount && (
+              <>
+                <span className="mx-1 text-zinc-300 dark:text-zinc-700">|</span>
 
-            <label className="text-xs text-zinc-500">Chars:</label>
-            <input
-              type="number"
-              value={question.char_count_max ?? ""}
-              onChange={(e) =>
-                onUpdate({
-                  char_count_max: e.target.value ? parseInt(e.target.value, 10) : undefined,
-                })
-              }
-              placeholder="Max"
-              className="w-20 rounded border border-zinc-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            />
+                <label className="text-xs text-zinc-500">Chars:</label>
+                <input
+                  type="number"
+                  value={question.char_count_max ?? ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      char_count_max: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                    })
+                  }
+                  placeholder="Max"
+                  title={question.char_count_max !== undefined && question.char_count_max < 1 ? "Must be greater than 0" : ""}
+                  className={`w-20 rounded border px-2 py-1 text-xs focus:outline-none focus:ring-1 dark:bg-zinc-800 dark:text-zinc-100 ${
+                    question.char_count_max !== undefined && question.char_count_max < 1
+                      ? "border-red-400 focus:border-red-500 focus:ring-red-500 dark:border-red-600"
+                      : "border-zinc-300 focus:border-blue-500 focus:ring-blue-500 dark:border-zinc-700"
+                  }`}
+                />
+              </>
+            )}
 
             <span className="mx-1 text-zinc-300 dark:text-zinc-700">|</span>
 

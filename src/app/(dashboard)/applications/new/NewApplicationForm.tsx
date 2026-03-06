@@ -7,7 +7,7 @@ import { NewFundForm, type NewFundData } from "@/components/NewFundForm";
 import { CriteriaInput } from "@/components/CriteriaInput";
 import { CriteriaPreview } from "@/components/CriteriaPreview";
 import { QuestionsInput } from "@/components/QuestionsInput";
-import { QuestionsPreview } from "@/components/QuestionsPreview";
+import { QuestionsPreview, validateQuestionsSet } from "@/components/QuestionsPreview";
 import { FundDateBanner } from "@/components/FundDateBanner";
 import { UpsellPrompt } from "@/components/UpsellPrompt";
 import type { CriteriaSet, QuestionsSet } from "@/lib/schemas/criteria";
@@ -505,7 +505,7 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
                 <button
                   type="button"
                   onClick={() => setStep("confirm")}
-                  disabled={questionsSet.questions.some((q) => !q.question.trim())}
+                  disabled={questionsSet.questions.some((q) => !q.question.trim()) || validateQuestionsSet(questionsSet).length > 0}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Continue
