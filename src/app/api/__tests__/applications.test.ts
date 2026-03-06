@@ -774,7 +774,7 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     expect((await res.json()).error).toContain("subscription");
   });
 
-  it("returns 403 if monthly review limit reached (RPC)", async () => {
+  it("returns 402 if insufficient credits (RPC)", async () => {
     authenticatedUser();
     mockFrom.mockImplementation(
       tableDispatch({
@@ -789,12 +789,12 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     );
     mockServiceRpc.mockResolvedValue({
       data: null,
-      error: { message: "USAGE_LIMIT_EXCEEDED" },
+      error: { message: "INSUFFICIENT_CREDITS" },
     });
     const POST = await importRoute();
     const res = await POST(new Request("http://localhost"), routeParams(APP_ID));
-    expect(res.status).toBe(403);
-    expect((await res.json()).error).toContain("limit reached");
+    expect(res.status).toBe(402);
+    expect((await res.json()).error).toContain("Insufficient credits");
   });
 
   it("returns 400 if all answers are empty", async () => {

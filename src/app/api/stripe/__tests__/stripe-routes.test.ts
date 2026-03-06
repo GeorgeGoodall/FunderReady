@@ -103,16 +103,54 @@ describe("POST /api/stripe/checkout", () => {
     return mod.POST;
   }
 
-  it("returns 503 — subscriptions disabled during beta", async () => {
+  it("returns 401 when unauthenticated", async () => {
+    unauthenticatedUser();
     const POST = await importRoute();
     const req = new Request("http://localhost/api/stripe/checkout", {
       method: "POST",
+      body: JSON.stringify({ tier: "pro" }),
+      headers: { "Content-Type": "application/json" },
     });
     const res = await POST(req);
-    expect(res.status).toBe(503);
-    expect(await res.json()).toEqual({
-      error: "Subscriptions are not yet available",
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 400 for invalid tier", async () => {
+    authenticatedUser();
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/stripe/checkout", {
+      method: "POST",
+      body: JSON.stringify({ tier: "free" }),
+      headers: { "Content-Type": "application/json" },
     });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid plan" });
+  });
+
+  it("creates checkout session for authenticated user with existing customer", async () => {
+    authenticatedUser();
+    mockFrom.mockReturnValue(
+      chainMock({ data: { stripe_customer_id: "cus_existing" }, error: null })
+    );
+    mockStripeCheckoutCreate.mockResolvedValue({ url: "https://checkout.stripe.com/test" });
+
+    const POST = await importRoute();
+    const req = new Request("http://localhost/api/stripe/checkout", {
+      method: "POST",
+      body: JSON.stringify({ tier: "pro" }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ url: "https://checkout.stripe.com/test" });
+    expect(mockStripeCheckoutCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: "cus_existing",
+        mode: "subscription",
+      })
+    );
   });
 });
 

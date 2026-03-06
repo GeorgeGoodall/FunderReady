@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
   // Check pack availability for tier
   const packConfig = TOPUP_PACKS[pack];
-  if (!packConfig.availableTo.includes(tier as "basic" | "pro")) {
+  if (!(packConfig.availableTo as readonly string[]).includes(tier)) {
     return NextResponse.json(
       { error: "This pack is not available on your plan" },
       { status: 403 }
