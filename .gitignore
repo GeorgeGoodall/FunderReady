@@ -45,4 +45,4 @@ REVIEW-FEEDBACK.md
 .audit/*
 tmp-analysis/*
 
-logs/
+logs/.worktrees/
