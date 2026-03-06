@@ -40,6 +40,20 @@ export const CriteriaSetSchema = z.object({
 export type CriteriaSet = z.infer<typeof CriteriaSetSchema>;
 
 // ---------------------------------------------------------------------------
+// ParseCriteriaResponse — criteria set + optional fund dates (AI side-output)
+// ---------------------------------------------------------------------------
+
+export const ParseCriteriaResponseSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  criteria: z.array(CriterionSchema).min(1).max(20),
+  opens_at: z.string().datetime().optional(),
+  closes_at: z.string().datetime().optional(),
+});
+
+export type ParseCriteriaResponse = z.infer<typeof ParseCriteriaResponseSchema>;
+
+// ---------------------------------------------------------------------------
 // Question — a single application question with optional word limits
 // ---------------------------------------------------------------------------
 
@@ -112,6 +126,8 @@ export const FundSchema = z.object({
   organisation_id: z.string().uuid().optional().nullable(),
   url: z.string().url().optional(),
   notes: z.string().optional(),
+  opens_at: z.string().datetime().optional().nullable(),
+  closes_at: z.string().datetime().optional().nullable(),
 });
 
 export type Fund = z.infer<typeof FundSchema>;

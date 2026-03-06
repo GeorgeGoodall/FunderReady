@@ -9,6 +9,8 @@ interface Fund {
   organisation: { id: string; name: string } | null;
   url: string | null;
   notes: string | null;
+  opens_at: string | null;
+  closes_at: string | null;
   created_at: string;
 }
 

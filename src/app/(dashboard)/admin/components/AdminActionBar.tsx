@@ -6,7 +6,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 interface EditField {
   name: string;
   label: string;
-  type: "text" | "textarea" | "checkbox";
+  type: "text" | "textarea" | "checkbox" | "date";
 }
 
 interface AdminActionBarProps {
@@ -100,6 +100,10 @@ export function AdminActionBar({
       const value = editValues[field.name];
       if (field.type === "checkbox") {
         body[field.name] = !!value;
+      } else if (field.type === "date") {
+        // Date inputs give YYYY-MM-DD — convert to ISO or null to clear
+        const strVal = typeof value === "string" ? value.trim() : "";
+        body[field.name] = strVal ? new Date(strVal).toISOString() : null;
       } else {
         body[field.name] = typeof value === "string" ? value : "";
       }
@@ -195,6 +199,15 @@ export function AdminActionBar({
                       handleEditFieldChange(field.name, e.target.value)
                     }
                     rows={3}
+                    className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                ) : field.type === "date" ? (
+                  <input
+                    type="date"
+                    value={(editValues[field.name] as string) ?? ""}
+                    onChange={(e) =>
+                      handleEditFieldChange(field.name, e.target.value)
+                    }
                     className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                   />
                 ) : (

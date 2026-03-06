@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/require-admin";
 
 const ALLOWED_FIELDS = [
@@ -7,7 +8,16 @@ const ALLOWED_FIELDS = [
   "notes",
   "published",
   "organisation_id",
+  "opens_at",
+  "closes_at",
 ] as const;
+
+const DateFieldSchema = z
+  .string()
+  .datetime()
+  .nullable()
+  .optional()
+  .transform((v) => v ?? null);
 
 export async function PATCH(
   request: Request,
@@ -47,6 +57,34 @@ export async function PATCH(
     if (field in updates && typeof updates[field] !== "boolean") {
       return NextResponse.json(
         { error: `${field} must be a boolean` },
+        { status: 400 }
+      );
+    }
+  }
+
+  // Validate date fields with Zod (ISO 8601 datetime or null)
+  for (const field of ["opens_at", "closes_at"] as const) {
+    if (field in updates) {
+      // Treat empty string as null (from cleared date inputs)
+      if (updates[field] === "") updates[field] = null;
+      const result = DateFieldSchema.safeParse(updates[field]);
+      if (!result.success) {
+        return NextResponse.json(
+          { error: `${field} must be a valid ISO 8601 datetime or null` },
+          { status: 400 }
+        );
+      }
+      updates[field] = result.data;
+    }
+  }
+
+  // Validate opens_at <= closes_at if both are set
+  const opensAt = updates.opens_at as string | null | undefined;
+  const closesAt = updates.closes_at as string | null | undefined;
+  if (typeof opensAt === "string" && typeof closesAt === "string") {
+    if (new Date(opensAt) > new Date(closesAt)) {
+      return NextResponse.json(
+        { error: "opens_at must be before closes_at" },
         { status: 400 }
       );
     }

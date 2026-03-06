@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   // Search funds by name
   const { data: fundsByName, error: nameError } = await supabase
     .from("funds")
-    .select("id, name, organisation_id, organisations(id, name), url, notes, created_at")
+    .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at")
     .textSearch("name", tsQuery)
     .eq("rejected", false)
     .order("created_at", { ascending: false })
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
     const orgIds = matchingOrgs.map((o) => o.id);
     const { data: orgFunds } = await supabase
       .from("funds")
-      .select("id, name, organisation_id, organisations(id, name), url, notes, created_at")
+      .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at")
       .in("organisation_id", orgIds)
       .eq("rejected", false)
       .order("created_at", { ascending: false })
@@ -100,7 +100,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const { name, organisation_id, url, notes } = parsed.data;
+  const { name, organisation_id, url, notes, opens_at, closes_at } = parsed.data;
+
+  if (opens_at && closes_at && new Date(opens_at) > new Date(closes_at)) {
+    return NextResponse.json(
+      { error: "opens_at must be before closes_at" },
+      { status: 400 }
+    );
+  }
 
   // Validate organisation exists if provided
   if (organisation_id) {
@@ -123,9 +130,11 @@ export async function POST(request: Request) {
       organisation_id: organisation_id ?? null,
       url: url ?? null,
       notes: notes ?? null,
+      opens_at: opens_at ?? null,
+      closes_at: closes_at ?? null,
       created_by: user.id,
     })
-    .select("id, name, organisation_id, organisations(id, name), url, notes, created_at")
+    .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at")
     .single();
 
   if (error) {

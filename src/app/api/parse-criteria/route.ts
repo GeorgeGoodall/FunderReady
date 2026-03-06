@@ -23,8 +23,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const criteria = await parseCriteriaWithAI(parsed.data.rawText, guard.userId);
-    return NextResponse.json({ criteria });
+    const result = await parseCriteriaWithAI(parsed.data.rawText, guard.userId);
+    const { opens_at, closes_at, ...criteria } = result;
+    return NextResponse.json({ criteria, opens_at, closes_at });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     const isValidation = errMsg.includes("validation") || errMsg.includes("failed");

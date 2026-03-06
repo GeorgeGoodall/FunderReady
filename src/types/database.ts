@@ -341,12 +341,14 @@ export type Database = {
       }
       funds: {
         Row: {
+          closes_at: string | null
           created_at: string
           created_by: string
           creator_hidden: boolean
           id: string
           name: string
           notes: string | null
+          opens_at: string | null
           organisation_id: string
           published: boolean
           rejected: boolean
@@ -355,12 +357,14 @@ export type Database = {
           url: string | null
         }
         Insert: {
+          closes_at?: string | null
           created_at?: string
           created_by: string
           creator_hidden?: boolean
           id?: string
           name: string
           notes?: string | null
+          opens_at?: string | null
           organisation_id: string
           published?: boolean
           rejected?: boolean
@@ -369,12 +373,14 @@ export type Database = {
           url?: string | null
         }
         Update: {
+          closes_at?: string | null
           created_at?: string
           created_by?: string
           creator_hidden?: boolean
           id?: string
           name?: string
           notes?: string | null
+          opens_at?: string | null
           organisation_id?: string
           published?: boolean
           rejected?: boolean

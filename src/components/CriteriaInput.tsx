@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import type { CriteriaSet } from "@/lib/schemas/criteria";
 
 interface CriteriaInputProps {
-  onParsed: (criteriaSet: CriteriaSet) => void;
+  onParsed: (criteriaSet: CriteriaSet, dates?: { opens_at?: string; closes_at?: string }) => void;
   isAdmin?: boolean;
 }
 
@@ -95,7 +95,7 @@ export function CriteriaInput({ onParsed, isAdmin }: CriteriaInputProps) {
         return;
       }
 
-      onParsed(data.criteria);
+      onParsed(data.criteria, { opens_at: data.opens_at, closes_at: data.closes_at });
     } catch {
       setError("Network error. Please try again.");
     } finally {

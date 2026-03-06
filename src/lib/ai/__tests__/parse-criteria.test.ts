@@ -10,7 +10,7 @@ vi.mock("../log-usage", () => ({
 
 import { callClaude } from "../anthropic";
 import { parseCriteriaWithAI } from "../parse-criteria";
-import { CriteriaSetSchema } from "@/lib/schemas/criteria";
+import { ParseCriteriaResponseSchema } from "@/lib/schemas/criteria";
 
 const mockCallClaude = vi.mocked(callClaude);
 
@@ -48,7 +48,7 @@ describe("parseCriteriaWithAI", () => {
     expect(mockCallClaude).toHaveBeenCalledWith(
       expect.objectContaining({
         prompt: expect.stringContaining("1. Clear need (25%)"),
-        schema: CriteriaSetSchema,
+        schema: ParseCriteriaResponseSchema,
         model: "claude-sonnet-4-6",
         maxTokens: 8192,
       })
@@ -132,5 +132,33 @@ describe("parseCriteriaWithAI", () => {
 
     const result = await parseCriteriaWithAI("test input");
     expect(result.name).toBe("Test");
+  });
+
+  it("returns dates when AI includes them", async () => {
+    const mockResult = {
+      name: "Test Fund",
+      criteria: [{ id: "c1", criterion: "Clear need", sub_questions: [] }],
+      opens_at: "2026-03-01T00:00:00Z",
+      closes_at: "2026-04-30T00:00:00Z",
+    };
+    mockCallClaude.mockResolvedValue(mockResult);
+
+    const result = await parseCriteriaWithAI("Applications open 1 March, deadline 30 April 2026");
+
+    expect(result.opens_at).toBe("2026-03-01T00:00:00Z");
+    expect(result.closes_at).toBe("2026-04-30T00:00:00Z");
+  });
+
+  it("returns undefined dates when AI does not find them", async () => {
+    const mockResult = {
+      name: "Test Fund",
+      criteria: [{ id: "c1", criterion: "Clear need", sub_questions: [] }],
+    };
+    mockCallClaude.mockResolvedValue(mockResult);
+
+    const result = await parseCriteriaWithAI("1. Clear need");
+
+    expect(result.opens_at).toBeUndefined();
+    expect(result.closes_at).toBeUndefined();
   });
 });

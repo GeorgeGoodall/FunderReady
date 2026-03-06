@@ -36,13 +36,18 @@ export default async function ApplicationPage({
   // Fetch related data
   const { data: rawFund } = await supabase
     .from("funds")
-    .select("id, name, organisation_id, organisations(id, name)")
+    .select("id, name, organisation_id, organisations(id, name), opens_at, closes_at")
     .eq("id", application.fund_id)
     .eq("rejected", false)
     .single();
 
   const fund = rawFund
-    ? { ...rawFund, organisation: (rawFund.organisations as unknown as { id: string; name: string } | null) ?? null }
+    ? {
+        ...rawFund,
+        organisation: (rawFund.organisations as unknown as { id: string; name: string } | null) ?? null,
+        opens_at: rawFund.opens_at as string | null,
+        closes_at: rawFund.closes_at as string | null,
+      }
     : null;
 
   const { data: questionsSet } = await supabase

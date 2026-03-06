@@ -8,6 +8,7 @@ import { CriteriaInput } from "@/components/CriteriaInput";
 import { CriteriaPreview } from "@/components/CriteriaPreview";
 import { QuestionsInput } from "@/components/QuestionsInput";
 import { QuestionsPreview } from "@/components/QuestionsPreview";
+import { FundDateBanner } from "@/components/FundDateBanner";
 import { UpsellPrompt } from "@/components/UpsellPrompt";
 import type { CriteriaSet, QuestionsSet } from "@/lib/schemas/criteria";
 import type { UsageResult } from "@/lib/usage/check-usage";
@@ -25,6 +26,8 @@ interface FundInfo {
   organisation: { id: string; name: string } | null;
   url: string | null;
   notes: string | null;
+  opens_at: string | null;
+  closes_at: string | null;
   created_at: string;
 }
 
@@ -46,6 +49,10 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
   const [selectedFund, setSelectedFund] = useState<FundInfo | null>(null);
   const [pendingNewFundData, setPendingNewFundData] = useState<NewFundData | null>(null);
   const [creatingFund, setCreatingFund] = useState(false);
+
+  // AI-detected dates (from criteria parse)
+  const [detectedOpensAt, setDetectedOpensAt] = useState<string | null>(null);
+  const [detectedClosesAt, setDetectedClosesAt] = useState<string | null>(null);
 
   // Criteria state
   const [criteriaSet, setCriteriaSet] = useState<CriteriaSet | null>(null);
@@ -114,6 +121,31 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
     setPendingNewFundData(data);
     setCreatingFund(false);
     setStep("criteria");
+  };
+
+  const patchFundDates = async (fundId: string, opensAt: string | null, closesAt: string | null) => {
+    try {
+      await fetch(`/api/funds/${fundId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opens_at: opensAt, closes_at: closesAt }),
+      });
+    } catch {
+      // Non-fatal — dates are supplementary
+    }
+  };
+
+  const handleCriteriaParsed = (criteriaSet: CriteriaSet, dates?: { opens_at?: string; closes_at?: string }) => {
+    setCriteriaSet(criteriaSet);
+    if (dates?.opens_at) setDetectedOpensAt(dates.opens_at);
+    if (dates?.closes_at) setDetectedClosesAt(dates.closes_at);
+
+    // Patch dates onto existing fund if it has none
+    if (selectedFund && !selectedFund.opens_at && !selectedFund.closes_at) {
+      if (dates?.opens_at || dates?.closes_at) {
+        patchFundDates(selectedFund.id, dates.opens_at ?? null, dates.closes_at ?? null);
+      }
+    }
   };
 
   const handleCriteriaChange = (updated: CriteriaSet) => {
@@ -199,6 +231,8 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
             organisation_id: organisationId ?? null,
             url: pendingNewFundData.url,
             notes: pendingNewFundData.notes,
+            opens_at: detectedOpensAt ?? null,
+            closes_at: detectedClosesAt ?? null,
           }),
         });
         if (!fundRes.ok) {
@@ -349,10 +383,39 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
           )}
 
           {!criteriaSet ? (
-            <CriteriaInput onParsed={setCriteriaSet} isAdmin={isAdmin} />
+            <CriteriaInput onParsed={handleCriteriaParsed} isAdmin={isAdmin} />
           ) : (
             <>
               <CriteriaPreview criteriaSet={criteriaSet} onChange={handleCriteriaChange} />
+              <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
+                  Submission dates (optional)
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                      Opens
+                    </label>
+                    <input
+                      type="date"
+                      value={detectedOpensAt ? detectedOpensAt.slice(0, 10) : ""}
+                      onChange={(e) => setDetectedOpensAt(e.target.value ? new Date(e.target.value).toISOString() : null)}
+                      className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                      Deadline
+                    </label>
+                    <input
+                      type="date"
+                      value={detectedClosesAt ? detectedClosesAt.slice(0, 10) : ""}
+                      onChange={(e) => setDetectedClosesAt(e.target.value ? new Date(e.target.value).toISOString() : null)}
+                      className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+                    />
+                  </div>
+                </div>
+              </div>
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -456,6 +519,10 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
       {/* Step: Confirm */}
       {step === "confirm" && (
         <div className="space-y-6">
+          <FundDateBanner
+            opensAt={selectedFund?.opens_at ?? detectedOpensAt}
+            closesAt={selectedFund?.closes_at ?? detectedClosesAt}
+          />
           <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
             <h3 className="font-semibold">Application Summary</h3>
             <dl className="mt-4 space-y-3 text-sm">
@@ -475,6 +542,22 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
                     : "None"}
                 </dd>
               </div>
+              {(selectedFund?.closes_at || detectedClosesAt) && (
+                <div className="flex justify-between">
+                  <dt className="text-zinc-500">Deadline</dt>
+                  <dd className="font-medium">
+                    {new Date(selectedFund?.closes_at ?? detectedClosesAt!).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+                  </dd>
+                </div>
+              )}
+              {(selectedFund?.opens_at || detectedOpensAt) && (
+                <div className="flex justify-between">
+                  <dt className="text-zinc-500">Opens</dt>
+                  <dd className="font-medium">
+                    {new Date(selectedFund?.opens_at ?? detectedOpensAt!).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+                  </dd>
+                </div>
+              )}
             </dl>
 
             <div className="mt-4">
