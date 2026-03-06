@@ -97,7 +97,12 @@ export function ApplicationFormClient({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
-  const [usageInfo, setUsageInfo] = useState<{ remaining: number; limit: number; bonus: number } | null>(null);
+  const [estimateState, setEstimateState] = useState<{
+    low: number;
+    high: number;
+    remaining: number;
+    canAfford: boolean;
+  } | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
 
   // Parse questions from the questions set
@@ -152,16 +157,24 @@ export function ApplicationFormClient({
     setLoadingUsage(true);
 
     try {
-      const res = await fetch("/api/usage");
+      const res = await fetch(`/api/applications/${application.id}/estimate`);
       if (!res.ok) {
-        setError("Failed to check usage. Please try again.");
+        // Fallback: submit directly if estimate fails
+        setLoadingUsage(false);
+        await handleConfirmSubmit();
         return;
       }
       const data = await res.json();
-      setUsageInfo({ remaining: data.remaining, limit: data.limit, bonus: data.bonus });
+      setEstimateState({
+        low: data.estimate.low,
+        high: data.estimate.high,
+        remaining: data.credits.remaining,
+        canAfford: data.canAfford,
+      });
       setShowSubmitConfirm(true);
     } catch {
-      setError("Network error. Please try again.");
+      // Fallback: submit directly if estimate fails
+      await handleConfirmSubmit();
     } finally {
       setLoadingUsage(false);
     }
@@ -178,6 +191,18 @@ export function ApplicationFormClient({
       });
 
       const data = await res.json();
+
+      if (res.status === 402) {
+        setEstimateState({
+          low: data.estimate?.low ?? 0,
+          high: data.estimate?.high ?? 0,
+          remaining: 0,
+          canAfford: false,
+        });
+        setShowSubmitConfirm(true);
+        return;
+      }
+
       if (!res.ok) {
         setError(data.error ?? "Failed to submit for review");
         return;
@@ -560,47 +585,63 @@ export function ApplicationFormClient({
       )}
 
       {/* Submit for review confirmation modal */}
-      {showSubmitConfirm && usageInfo && (
+      {showSubmitConfirm && estimateState && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
-            <h2 className="text-lg font-semibold">Submit for review?</h2>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              This will use 1 of your remaining reviews.
-            </p>
-            <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-zinc-600 dark:text-zinc-400">Reviews remaining</span>
-                <span className={`text-sm font-semibold ${usageInfo.remaining <= 2 ? "text-amber-600 dark:text-amber-400" : "text-zinc-900 dark:text-zinc-100"}`}>
-                  {usageInfo.remaining} / {usageInfo.limit + usageInfo.bonus}
-                </span>
-              </div>
-              {usageInfo.remaining <= 2 && (
-                <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
-                  {usageInfo.remaining === 1
-                    ? "This is your last review for this billing period."
-                    : usageInfo.remaining === 0
-                      ? "You have no reviews remaining this period."
-                      : "You are running low on reviews this period."}
-                </p>
-              )}
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowSubmitConfirm(false)}
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmSubmit}
-                disabled={usageInfo.remaining === 0}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Confirm &amp; Submit
-              </button>
-            </div>
+            {estimateState.canAfford ? (
+              <>
+                <h2 className="text-lg font-semibold">Submit for review?</h2>
+                <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    This review will cost approximately{" "}
+                    <strong>{estimateState.low}&ndash;{estimateState.high} credits</strong>.
+                    You have <strong>{estimateState.remaining} credits</strong> remaining.
+                  </p>
+                </div>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowSubmitConfirm(false)}
+                    className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowSubmitConfirm(false); handleConfirmSubmit(); }}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                  >
+                    Confirm &amp; Submit
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-lg font-semibold">Insufficient credits</h2>
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    This review needs approximately{" "}
+                    <strong>{estimateState.low}&ndash;{estimateState.high} credits</strong>,
+                    but you only have <strong>{estimateState.remaining} credits</strong> remaining.
+                  </p>
+                </div>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowSubmitConfirm(false)}
+                    className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    Cancel
+                  </button>
+                  <a
+                    href="/billing"
+                    className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700"
+                  >
+                    Buy Credits
+                  </a>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
