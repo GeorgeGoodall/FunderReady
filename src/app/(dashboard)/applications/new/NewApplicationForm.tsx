@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FundDetection } from "@/components/FundDetection";
 import { NewFundForm, type NewFundData } from "@/components/NewFundForm";
@@ -18,6 +18,7 @@ interface NewApplicationFormProps {
   tier: "free" | "pro";
   usage: UsageResult;
   isAdmin?: boolean;
+  fundId?: string;
 }
 
 interface FundInfo {
@@ -40,7 +41,7 @@ const STEPS: { key: Step; label: string }[] = [
   { key: "confirm", label: "Create" },
 ];
 
-export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: NewApplicationFormProps) {
+export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin, fundId }: NewApplicationFormProps) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("fund");
   const [error, setError] = useState("");
@@ -70,8 +71,90 @@ export function NewApplicationForm({ userId: _userId, tier, usage, isAdmin }: Ne
   const [submitting, setSubmitting] = useState(false);
   const [title, setTitle] = useState("");
 
+  // fundId query param auto-select
+  const [fundIdLoading, setFundIdLoading] = useState(!!fundId);
+
+  // Auto-select fund from query param
+  useEffect(() => {
+    if (!fundId) return;
+    let cancelled = false;
+
+    async function loadFund() {
+      try {
+        const res = await fetch(`/api/funds/${fundId}`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        const fund: FundInfo = {
+          id: data.fund.id,
+          name: data.fund.name,
+          organisation: data.fund.organisations
+            ? { id: data.fund.organisations.id, name: data.fund.organisations.name }
+            : null,
+          url: data.fund.url,
+          notes: data.fund.notes,
+          opens_at: data.fund.opens_at ?? null,
+          closes_at: data.fund.closes_at ?? null,
+          created_at: data.fund.created_at,
+        };
+        if (cancelled) return;
+
+        // Replicate handleFundSelected logic inline (hooks must precede early returns)
+        setSelectedFund(fund);
+        setError("");
+
+        try {
+          // Fund details already fetched above — reuse `data`
+          const csData = data.criteriaSet;
+          if (csData) {
+            const criteriaArray = csData.criteria_json;
+            setCriteriaSet({
+              name: csData.name,
+              description: csData.description ?? undefined,
+              criteria: Array.isArray(criteriaArray) ? criteriaArray : [],
+            });
+            setCriteriaSetId(csData.id);
+            setCriteriaPreLoaded(true);
+            setCriteriaEdited(false);
+          }
+
+          const qsData = data.questionsSet;
+          if (qsData) {
+            const questionsArray = qsData.questions_json;
+            setQuestionsSet({
+              questions: Array.isArray(questionsArray) ? questionsArray : [],
+              overall_word_limit: qsData.overall_word_limit ?? undefined,
+            });
+            setQuestionsSetId(qsData.id);
+            setQuestionsPreLoaded(true);
+            setQuestionsEdited(false);
+          }
+        } catch {
+          // Non-fatal
+        }
+
+        setStep("criteria");
+      } catch {
+        // Fall back to normal flow
+      } finally {
+        if (!cancelled) setFundIdLoading(false);
+      }
+    }
+
+    loadFund();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!usage.allowed) {
     return <UpsellPrompt tier={tier} used={usage.used} limit={usage.limit + usage.bonus} resetDate={usage.resetDate.toISOString()} />;
+  }
+
+  if (fundIdLoading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-zinc-500">
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600" />
+        Loading fund...
+      </div>
+    );
   }
 
   const handleFundSelected = async (fund: FundInfo) => {

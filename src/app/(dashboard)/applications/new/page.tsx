@@ -3,7 +3,12 @@ import { redirect } from "next/navigation";
 import { checkUsage } from "@/lib/usage/check-usage";
 import { NewApplicationForm } from "./NewApplicationForm";
 
-export default async function NewApplicationPage() {
+export default async function NewApplicationPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ fundId?: string }>;
+}) {
+  const { fundId } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -28,7 +33,7 @@ export default async function NewApplicationPage() {
         Select a fund to start filling out your application form.
       </p>
       <div className="mt-6">
-        <NewApplicationForm userId={user.id} tier={tier} usage={usage} isAdmin={isAdmin} />
+        <NewApplicationForm userId={user.id} tier={tier} usage={usage} isAdmin={isAdmin} fundId={fundId} />
       </div>
     </div>
   );
