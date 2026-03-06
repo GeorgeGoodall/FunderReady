@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormField } from "@/components/FormField";
@@ -474,29 +474,12 @@ export function ApplicationFormClient({
           </Link>
         )}
         {(isDraft || isReviewed) && fund && (
-          <>
-            <button
-              type="button"
-              onClick={() => handleExport("markdown")}
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              Export Markdown
-            </button>
-            <button
-              type="button"
-              onClick={() => openFileDialog("markdown")}
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              Import Markdown
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".md,text/markdown"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-          </>
+          <ExportImportDropdowns
+            onExport={handleExport}
+            onImport={openFileDialog}
+            fileInputRef={fileInputRef}
+            onFileSelect={handleFileSelect}
+          />
         )}
         {application.review_count > 1 && (
           <Link
@@ -666,6 +649,128 @@ export function ApplicationFormClient({
         </div>
       )}
     </div>
+  );
+}
+
+interface ExportImportDropdownsProps {
+  onExport: (format: "markdown" | "docx") => void;
+  onImport: (format: "markdown" | "docx") => void;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
+function ExportImportDropdowns({
+  onExport,
+  onImport,
+  fileInputRef,
+  onFileSelect,
+}: ExportImportDropdownsProps) {
+  const [exportOpen, setExportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const importRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+      if (importRef.current && !importRef.current.contains(e.target as Node)) {
+        setImportOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const buttonClass =
+    "rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800";
+  const menuClass =
+    "absolute left-0 top-full z-10 mt-1 w-44 rounded-lg border bg-white py-1 shadow-lg dark:bg-zinc-900 dark:border-zinc-700";
+  const menuItemClass =
+    "block w-full px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800";
+
+  return (
+    <>
+      <div className="relative" ref={exportRef}>
+        <button
+          type="button"
+          onClick={() => {
+            setExportOpen((v) => !v);
+            setImportOpen(false);
+          }}
+          className={buttonClass}
+        >
+          Export &#9662;
+        </button>
+        {exportOpen && (
+          <div className={menuClass}>
+            <button
+              type="button"
+              className={menuItemClass}
+              onClick={() => {
+                onExport("markdown");
+                setExportOpen(false);
+              }}
+            >
+              Markdown (.md)
+            </button>
+            <button
+              type="button"
+              className={menuItemClass}
+              onClick={() => {
+                onExport("docx");
+                setExportOpen(false);
+              }}
+            >
+              Word (.docx)
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="relative" ref={importRef}>
+        <button
+          type="button"
+          onClick={() => {
+            setImportOpen((v) => !v);
+            setExportOpen(false);
+          }}
+          className={buttonClass}
+        >
+          Import &#9662;
+        </button>
+        {importOpen && (
+          <div className={menuClass}>
+            <button
+              type="button"
+              className={menuItemClass}
+              onClick={() => {
+                onImport("markdown");
+                setImportOpen(false);
+              }}
+            >
+              Markdown (.md)
+            </button>
+            <button
+              type="button"
+              className={menuItemClass}
+              onClick={() => {
+                onImport("docx");
+                setImportOpen(false);
+              }}
+            >
+              Word (.docx)
+            </button>
+          </div>
+        )}
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        onChange={onFileSelect}
+        className="hidden"
+      />
+    </>
   );
 }
 
