@@ -44,5 +44,5 @@ next-env.d.ts
 REVIEW-FEEDBACK.md
 .audit/*
 tmp-analysis/*
-docs/plans/*
+
 logs/
