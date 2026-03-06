@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { BreadcrumbLabels } from "@/components/Breadcrumbs";
 import { ApplicationReviewClient } from "./ApplicationReviewClient";
 import type { TabId } from "./types";
 
@@ -113,28 +114,31 @@ export default async function ApplicationReviewPage({
   const defaultTab: TabId = validTabs.includes(tabParam as TabId) ? (tabParam as TabId) : "summary";
 
   return (
-    <ApplicationReviewClient
-      application={application}
-      fund={fund}
-      questions={questions}
-      criteria={criteria}
-      answers={(answers ?? []).map((a) => ({
-        question_id: a.question_id,
-        answer_text: a.answer_text,
-        last_reviewed_text: a.last_reviewed_text,
-      }))}
-      review={review ? {
-        id: review.id,
-        review_number: review.review_number,
-        status: review.status,
-        progress: review.progress as Record<string, unknown> | null,
-        results: review.results as Record<string, unknown> | null,
-        error_message: review.error_message,
-        created_at: review.created_at,
-      } : null}
-      isHistorical={isHistorical}
-      defaultTab={defaultTab}
-      initialFeedback={initialFeedback}
-    />
+    <>
+      <BreadcrumbLabels labels={{ [id]: application.title || "Untitled" }} />
+      <ApplicationReviewClient
+        application={application}
+        fund={fund}
+        questions={questions}
+        criteria={criteria}
+        answers={(answers ?? []).map((a) => ({
+          question_id: a.question_id,
+          answer_text: a.answer_text,
+          last_reviewed_text: a.last_reviewed_text,
+        }))}
+        review={review ? {
+          id: review.id,
+          review_number: review.review_number,
+          status: review.status,
+          progress: review.progress as Record<string, unknown> | null,
+          results: review.results as Record<string, unknown> | null,
+          error_message: review.error_message,
+          created_at: review.created_at,
+        } : null}
+        isHistorical={isHistorical}
+        defaultTab={defaultTab}
+        initialFeedback={initialFeedback}
+      />
+    </>
   );
 }

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { BreadcrumbLabels } from "@/components/Breadcrumbs";
 import { NewQuestionsSetClient } from "./NewQuestionsSetClient";
 
 export const dynamic = "force-dynamic";
@@ -51,13 +52,16 @@ export default async function NewQuestionsSetPage({
   }
 
   return (
-    <NewQuestionsSetClient
-      fundId={fund.id}
-      fundName={fund.name}
-      sourceQuestions={sourceQuestions}
-      sourceOverallWordLimit={sourceOverallWordLimit}
-      applicationId={applicationId}
-      returnTo={returnTo}
-    />
+    <>
+      <BreadcrumbLabels labels={{ [fundId]: fund.name }} />
+      <NewQuestionsSetClient
+        fundId={fund.id}
+        fundName={fund.name}
+        sourceQuestions={sourceQuestions}
+        sourceOverallWordLimit={sourceOverallWordLimit}
+        applicationId={applicationId}
+        returnTo={returnTo}
+      />
+    </>
   );
 }

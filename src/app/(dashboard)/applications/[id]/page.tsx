@@ -1,5 +1,6 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { BreadcrumbLabels } from "@/components/Breadcrumbs";
 import { ApplicationFormClient } from "./ApplicationFormClient";
 
 export const dynamic = "force-dynamic";
@@ -82,13 +83,16 @@ export default async function ApplicationPage({
   }));
 
   return (
-    <ApplicationFormClient
-      application={application}
-      answers={answers ?? []}
-      fund={fund}
-      questionsSet={questionsSet}
-      availableQuestionsSets={availableQuestionsSets}
-      criteriaSet={criteriaSet}
-    />
+    <>
+      <BreadcrumbLabels labels={{ [id]: application.title || "Untitled" }} />
+      <ApplicationFormClient
+        application={application}
+        answers={answers ?? []}
+        fund={fund}
+        questionsSet={questionsSet}
+        availableQuestionsSets={availableQuestionsSets}
+        criteriaSet={criteriaSet}
+      />
+    </>
   );
 }
