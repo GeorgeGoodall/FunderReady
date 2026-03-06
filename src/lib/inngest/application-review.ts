@@ -236,6 +236,39 @@ export function computeAnswerChanges(
   return changes;
 }
 
+/**
+ * Extract reusable answer analyses from a previous review's results.
+ * An analysis is reusable when: criteria set matches, answer text unchanged,
+ * and the previous analysis passes schema validation.
+ */
+export function extractReusableAnalyses(
+  previousResults: Record<string, unknown> | null | undefined,
+  answerChanges: Record<string, boolean>,
+  criteriaSetMatch: boolean
+): Record<string, AnswerAnalysis> {
+  const reusable: Record<string, AnswerAnalysis> = {};
+
+  if (!criteriaSetMatch || !previousResults) return reusable;
+
+  const af = previousResults.answer_feedback;
+  if (!af || typeof af !== "object") return reusable;
+
+  const feedbackMap = af as Record<string, unknown>;
+
+  for (const [questionId, raw] of Object.entries(feedbackMap)) {
+    // Only reuse if answer is explicitly unchanged
+    if (answerChanges[questionId] !== false) continue;
+
+    // Validate against schema before accepting
+    const parsed = AnswerAnalysisSchema.safeParse(raw);
+    if (!parsed.success) continue;
+
+    reusable[questionId] = parsed.data;
+  }
+
+  return reusable;
+}
+
 // ---------------------------------------------------------------------------
 // Post-processing: annotate weaknesses resolved by other answers
 // ---------------------------------------------------------------------------
@@ -383,7 +416,7 @@ export const applicationReviewRequested = inngest.createFunction(
       // Load previous completed review (for feedback evolution)
       const { data: prevReview } = await supabase
         .from("application_reviews")
-        .select("review_number, results")
+        .select("review_number, results, criteria_set_id")
         .eq("application_id", applicationId)
         .eq("status", "completed")
         .neq("id", reviewId)
@@ -447,6 +480,20 @@ export const applicationReviewRequested = inngest.createFunction(
         };
       }
 
+      // Determine if previous review used the same criteria set
+      const criteriaSetMatch = prevReview
+        ? prevReview.criteria_set_id === app.criteria_set_id
+        : false;
+
+      // Extract full reusable analyses (only when criteria set matches)
+      const reusableAnalyses = prevReview?.results && typeof prevReview.results === "object"
+        ? extractReusableAnalyses(
+            prevReview.results as Record<string, unknown>,
+            answerChanges,
+            criteriaSetMatch
+          )
+        : {} as Record<string, AnswerAnalysis>;
+
       return {
         title: app.title,
         criteria: criteriaSet.criteria_json as unknown as Criterion[],
@@ -456,10 +503,11 @@ export const applicationReviewRequested = inngest.createFunction(
         disabledQuestions,
         previousReview: previousReviewContext,
         answerChanges,
+        reusableAnalyses,
       };
     });
 
-    const { criteria, questions, enabledAnswers, disabledQuestions, overallWordLimit, previousReview, answerChanges } = appData;
+    const { criteria, questions, enabledAnswers, disabledQuestions, overallWordLimit, previousReview, answerChanges, reusableAnalyses } = appData;
 
     // Build answer contexts from enabled answers only
     const answerContexts: AnswerContext[] = [];
@@ -503,6 +551,20 @@ export const applicationReviewRequested = inngest.createFunction(
       "answer-analyses",
       async () => {
         const stepUsage: LogAiUsageParams[] = [];
+
+        // Split into fresh (need Claude) and reusable (pull from previous review)
+        const freshContexts: AnswerContext[] = [];
+        const reusedAnalyses: AnswerAnalysis[] = [];
+
+        for (const ctx of answerContexts) {
+          const cached = reusableAnalyses[ctx.question_id];
+          if (cached) {
+            reusedAnalyses.push(cached);
+          } else {
+            freshContexts.push(ctx);
+          }
+        }
+
         const systemPrompt = buildAnswerAnalysisSystemPrompt(criteria);
 
         const analyseAnswer = (ctx: AnswerContext) => {
@@ -551,8 +613,10 @@ export const applicationReviewRequested = inngest.createFunction(
           return results;
         }
 
-        // First pass
-        let settled = await runBatched(answerContexts);
+        // First pass (only fresh answers need Claude calls)
+        let settled = freshContexts.length > 0
+          ? await runBatched(freshContexts)
+          : [];
 
         // Retry only failures (up to 2 additional attempts)
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -564,7 +628,7 @@ export const applicationReviewRequested = inngest.createFunction(
           // Exponential backoff before retrying (2s, then 8s)
           await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt + 1) * 1000));
 
-          const retryContexts = failedIndices.map((i) => answerContexts[i]);
+          const retryContexts = failedIndices.map((i) => freshContexts[i]);
           const retryResults = await runBatched(retryContexts);
 
           // Merge retry results back into settled
@@ -574,10 +638,13 @@ export const applicationReviewRequested = inngest.createFunction(
         }
 
         // Collect results — throw on any remaining failures
-        const analyses = settled.map((result) => {
+        const freshAnalyses = settled.map((result) => {
           if (result.status === "fulfilled") return result.value;
           throw result.reason;
         });
+
+        // Merge: reused analyses + fresh analyses
+        const analyses = [...reusedAnalyses, ...freshAnalyses];
 
         return { analyses, usage: stepUsage };
       }
