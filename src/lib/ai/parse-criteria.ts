@@ -1,4 +1,4 @@
-import { CriteriaSetSchema, type CriteriaSet } from "@/lib/schemas/criteria";
+import { ParseCriteriaResponseSchema, type ParseCriteriaResponse } from "@/lib/schemas/criteria";
 import type { ZodSchema } from "zod";
 import { callClaude, type ClaudeUsageData } from "./anthropic";
 import { logAiUsage } from "./log-usage";
@@ -16,15 +16,16 @@ Rules:
 - Default to required: true if the intent is ambiguous
 - Include weight only if a percentage or score weighting is mentioned
 - If the text is vague, infer reasonable criteria from context
-- Do NOT invent criteria that aren't supported by the text`;
+- Do NOT invent criteria that aren't supported by the text
+- If the text mentions application opening dates, closing dates, or deadlines, extract them as ISO 8601 datetime strings (e.g. "2026-04-30T00:00:00Z"). Only include dates you are confident about.`;
 
 const MODEL = "claude-sonnet-4-6";
 
-export async function parseCriteriaWithAI(rawText: string, userId?: string): Promise<CriteriaSet> {
+export async function parseCriteriaWithAI(rawText: string, userId?: string): Promise<ParseCriteriaResponse> {
   return callClaude({
     prompt: `Extract structured evaluation criteria from this funder guidance:\n\n${rawText}`,
     systemPrompt: SYSTEM_PROMPT,
-    schema: CriteriaSetSchema as ZodSchema<CriteriaSet>,
+    schema: ParseCriteriaResponseSchema as ZodSchema<ParseCriteriaResponse>,
     model: MODEL,
     maxTokens: 8192,
     onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
