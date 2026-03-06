@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { DashboardNav } from "@/components/DashboardNav";
+import { DashboardShell } from "@/components/DashboardShell";
 
 export default async function DashboardLayout({
   children,
@@ -16,19 +16,17 @@ export default async function DashboardLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, subscription_tier")
+    .select("display_name, subscription_tier, is_admin")
     .eq("id", user.id)
     .single();
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <DashboardNav
-        displayName={profile?.display_name ?? user.email ?? "User"}
-        tier={profile?.subscription_tier ?? "free"}
-      />
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        {children}
-      </main>
-    </div>
+    <DashboardShell
+      displayName={profile?.display_name ?? user.email ?? "User"}
+      tier={(profile?.subscription_tier as "free" | "pro") ?? "free"}
+      isAdmin={profile?.is_admin ?? false}
+    >
+      {children}
+    </DashboardShell>
   );
 }

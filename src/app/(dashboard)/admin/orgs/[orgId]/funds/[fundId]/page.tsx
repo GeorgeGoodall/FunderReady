@@ -1,6 +1,7 @@
 import { createServiceClient, createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { BreadcrumbLabels } from "@/components/Breadcrumbs";
 import { AdminActionBar } from "../../../../components/AdminActionBar";
 import { HistoricalSets } from "../../../../components/HistoricalSets";
 import { formatDate } from "../../../../lib/format";
@@ -251,17 +252,10 @@ export default async function FundDetailPage({
   ]);
 
   return (
-    <div className="space-y-8">
-      {/* Breadcrumb */}
-      <nav className="text-sm text-zinc-500">
-        <Link href="/admin" className="hover:underline">Organisations</Link>
-        <span className="mx-1">/</span>
-        <Link href={`/admin/orgs/${orgId}`} className="hover:underline">{org.name}</Link>
-        <span className="mx-1">/</span>
-        <span className="text-zinc-900 dark:text-zinc-100">{fund.name}</span>
-      </nav>
-
-      {/* Fund Header */}
+    <>
+      <BreadcrumbLabels labels={{ [orgId]: org.name, [fundId]: fund.name }} />
+      <div className="space-y-8">
+        {/* Fund Header */}
       <div>
         <div className="flex items-center gap-2">
           <h2 className="text-xl font-semibold">{fund.name}</h2>
@@ -327,6 +321,7 @@ export default async function FundDetailPage({
         orgId={orgId}
         fundId={fundId}
       />
-    </div>
+      </div>
+    </>
   );
 }

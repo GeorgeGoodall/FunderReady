@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { BreadcrumbLabels } from "@/components/Breadcrumbs";
 import { HistoryClient } from "./HistoryClient";
 
 export const dynamic = "force-dynamic";
@@ -57,14 +58,17 @@ export default async function ApplicationHistoryPage({
   });
 
   return (
-    <HistoryClient
-      application={{
-        id: application.id,
-        title: application.title,
-        review_count: application.review_count,
-      }}
-      fund={fund ?? null}
-      reviews={reviews}
-    />
+    <>
+      <BreadcrumbLabels labels={{ [id]: application.title || "Untitled" }} />
+      <HistoryClient
+        application={{
+          id: application.id,
+          title: application.title,
+          review_count: application.review_count,
+        }}
+        fund={fund ?? null}
+        reviews={reviews}
+      />
+    </>
   );
 }

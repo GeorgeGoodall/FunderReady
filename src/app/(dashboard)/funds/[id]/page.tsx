@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { BreadcrumbLabels } from "@/components/Breadcrumbs";
 import { FundDetailClient } from "./FundDetailClient";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -73,20 +74,23 @@ export default async function FundDetailPage({
   } | null;
 
   return (
-    <FundDetailClient
-      fund={{
-        id: fund.id,
-        name: fund.name,
-        url: fund.url,
-        notes: fund.notes,
-        published: fund.published,
-        created_at: fund.created_at,
-      }}
-      organisation={organisation}
-      criteriaSets={criteriaSets ?? []}
-      questionsSets={questionsSets ?? []}
-      applicationCount={applicationCount ?? 0}
-      reviewCount={reviewCount ?? 0}
-    />
+    <>
+      <BreadcrumbLabels labels={{ [id]: fund.name }} />
+      <FundDetailClient
+        fund={{
+          id: fund.id,
+          name: fund.name,
+          url: fund.url,
+          notes: fund.notes,
+          published: fund.published,
+          created_at: fund.created_at,
+        }}
+        organisation={organisation}
+        criteriaSets={criteriaSets ?? []}
+        questionsSets={questionsSets ?? []}
+        applicationCount={applicationCount ?? 0}
+        reviewCount={reviewCount ?? 0}
+      />
+    </>
   );
 }

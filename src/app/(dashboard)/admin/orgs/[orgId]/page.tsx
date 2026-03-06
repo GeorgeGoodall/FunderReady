@@ -1,6 +1,7 @@
-import { createServiceClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { BreadcrumbLabels } from "@/components/Breadcrumbs";
 import { getFundsForOrg } from "../../lib/admin-queries";
 import { formatDate, truncate } from "../../lib/format";
 import { AdminActionBar } from "../../components/AdminActionBar";
@@ -14,7 +15,18 @@ export default async function OrgDetailPage({
   params: Promise<{ orgId: string }>;
 }) {
   const { orgId } = await params;
+
+  // Auth guard — defense in depth (layout also checks)
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
   const serviceClient = createServiceClient();
+  const { data: profile } = await serviceClient
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+  if (!profile?.is_admin) redirect("/dashboard");
 
   const { data: org } = await serviceClient
     .from("organisations")
@@ -31,17 +43,10 @@ export default async function OrgDetailPage({
   const publishedFunds = funds.filter((f) => f.published);
 
   return (
-    <div className="space-y-8">
-      {/* Breadcrumb */}
-      <nav className="text-sm text-zinc-500">
-        <Link href="/admin" className="hover:underline">
-          Organisations
-        </Link>
-        <span className="mx-1">/</span>
-        <span className="text-zinc-900 dark:text-zinc-100">{org.name}</span>
-      </nav>
-
-      {/* Org Header */}
+    <>
+      <BreadcrumbLabels labels={{ [orgId]: org.name }} />
+      <div className="space-y-8">
+        {/* Org Header */}
       <div>
         <div className="flex items-center gap-2">
           <h2 className="text-xl font-semibold">{org.name}</h2>
@@ -171,6 +176,7 @@ export default async function OrgDetailPage({
           </div>
         )}
       </section>
-    </div>
+      </div>
+    </>
   );
 }

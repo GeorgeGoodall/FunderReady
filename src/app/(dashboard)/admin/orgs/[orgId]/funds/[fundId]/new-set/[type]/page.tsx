@@ -1,6 +1,6 @@
 import { createServiceClient, createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
+import { BreadcrumbLabels } from "@/components/Breadcrumbs";
 import { AdminSetCreator } from "../../../../../../components/AdminSetCreator";
 
 export const dynamic = "force-dynamic";
@@ -46,24 +46,17 @@ export default async function NewSetPage({
   const label = type === "criteria" ? "Criteria Set" : "Questions Set";
 
   return (
-    <div className="space-y-8">
-      <nav className="text-sm text-zinc-500">
-        <Link href="/admin" className="hover:underline">Organisations</Link>
-        <span className="mx-1">/</span>
-        <Link href={`/admin/orgs/${orgId}`} className="hover:underline">{org.name}</Link>
-        <span className="mx-1">/</span>
-        <Link href={`/admin/orgs/${orgId}/funds/${fundId}`} className="hover:underline">{fund.name}</Link>
-        <span className="mx-1">/</span>
-        <span className="text-zinc-900 dark:text-zinc-100">New {label}</span>
-      </nav>
+    <>
+      <BreadcrumbLabels labels={{ [orgId]: org.name, [fundId]: fund.name, [type]: `New ${label}` }} />
+      <div className="space-y-8">
+        <h2 className="text-xl font-semibold">New {label}</h2>
 
-      <h2 className="text-xl font-semibold">New {label}</h2>
-
-      <AdminSetCreator
-        setType={type}
-        fundId={fundId}
-        orgId={orgId}
-      />
-    </div>
+        <AdminSetCreator
+          setType={type}
+          fundId={fundId}
+          orgId={orgId}
+        />
+      </div>
+    </>
   );
 }
