@@ -147,7 +147,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
   }, [fundId]);
 
   if (!usage.allowed) {
-    return <UpsellPrompt tier={tier} used={usage.used} limit={usage.limit + usage.bonus} resetDate={usage.resetDate.toISOString()} />;
+    return <UpsellPrompt tier={tier} remaining={usage.remaining} resetDate={usage.resetDate.toISOString()} />;
   }
 
   if (fundIdLoading) {

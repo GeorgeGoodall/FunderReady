@@ -39,11 +39,17 @@ vi.mock("@/lib/stripe/client", () => ({
 // Mock PLANS
 vi.mock("@/lib/stripe/plans", () => ({
   PLANS: {
-    free: { name: "Free", price: 0, reviewsPerMonth: 0 },
+    free: { name: "Free", price: 0, creditsPerMonth: 0 },
+    basic: {
+      name: "Basic",
+      priceMonthly: 1900,
+      creditsPerMonth: 30,
+      stripePriceId: "price_basic_123",
+    },
     pro: {
       name: "Pro",
       priceMonthly: 4900,
-      reviewsPerMonth: 10,
+      creditsPerMonth: 100,
       stripePriceId: "price_test_123",
     },
   },
@@ -342,7 +348,7 @@ describe("Webhook handlers", () => {
     it("updates profile to pro + active and syncs usage", async () => {
       const periodEnd = Math.floor(Date.now() / 1000) + 30 * 86400;
       mockStripeSubscriptionsRetrieve.mockResolvedValue({
-        items: { data: [{ current_period_end: periodEnd }] },
+        items: { data: [{ current_period_end: periodEnd, price: { id: "price_test_123" } }] },
       } as unknown as Stripe.Subscription);
 
       const profileChain = chainMock({
@@ -387,8 +393,8 @@ describe("Webhook handlers", () => {
       expect(usageChain.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           user_id: "user-checkout-1",
-          reviews_limit: 10,
-          reviews_used: 0,
+          credits_limit: 100,
+          credits_used: 0,
           bonus_reviews: 0,
         }),
         { onConflict: "user_id,period" }
@@ -625,7 +631,7 @@ describe("Webhook handlers", () => {
       );
 
       // Verify usage limit set to 0
-      expect(usageChain.update).toHaveBeenCalledWith({ reviews_limit: 0 });
+      expect(usageChain.update).toHaveBeenCalledWith({ credits_limit: 0 });
       expect(usageChain.eq).toHaveBeenCalledWith("user_id", "user-del-1");
     });
 

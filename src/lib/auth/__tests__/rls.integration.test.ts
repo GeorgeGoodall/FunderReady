@@ -64,8 +64,8 @@ describe.skipIf(!canRun)("RLS policies", () => {
     await admin.from("usage").insert({
       user_id: userAId,
       period: "2099-01",
-      reviews_used: 1,
-      reviews_limit: 3,
+      credits_used: 1,
+      credits_limit: 3,
     });
   });
 
