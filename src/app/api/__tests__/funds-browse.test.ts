@@ -135,6 +135,35 @@ describe("GET /api/funds/browse", () => {
     expect(body.funds[1].id).toBe("fund-2");
   });
 
+  it("filters by approved=true and shared=true", async () => {
+    authenticatedUser();
+    const eqMock = vi.fn().mockReturnThis();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chain: Record<string, any> = {};
+    chain.select = vi.fn(() => chain);
+    chain.eq = eqMock;
+    chain.order = vi.fn(() => chain);
+    chain.range = vi.fn(() => Promise.resolve({ data: [], error: null }));
+    chain.then = (resolve: (v: unknown) => unknown) =>
+      Promise.resolve({ data: [], error: null }).then(resolve);
+
+    let callCount = 0;
+    mockFrom.mockImplementation((table: string) => {
+      callCount++;
+      if (table === "profiles") {
+        return chainMock({ data: { subscription_tier: "pro" }, error: null });
+      }
+      return chain;
+    });
+
+    const GET = await importRoute();
+    await GET(new Request("http://localhost/api/funds/browse"));
+
+    const eqCalls = eqMock.mock.calls.map((c: unknown[]) => c.slice(0, 2));
+    expect(eqCalls).toContainEqual(["approved", true]);
+    expect(eqCalls).toContainEqual(["shared", true]);
+  });
+
   it("defaults to page 1 and limit 20 (200, empty)", async () => {
     authenticatedUser();
     mockFrom.mockImplementation(

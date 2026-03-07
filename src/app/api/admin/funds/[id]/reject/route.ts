@@ -12,6 +12,24 @@ export async function PATCH(
   const body = await request.json().catch(() => ({}));
   const reason = typeof body.reason === "string" ? body.reason : null;
 
+  // Verify fund exists and has been submitted for sharing
+  const { data: fund } = await auth.serviceClient
+    .from("funds")
+    .select("shared")
+    .eq("id", id)
+    .single();
+
+  if (!fund) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (!fund.shared) {
+    return NextResponse.json(
+      { error: "Fund has not been submitted for sharing" },
+      { status: 400 }
+    );
+  }
+
   const { data, error } = await auth.serviceClient
     .from("funds")
     .update({ rejected: true, rejection_reason: reason, approved: false })

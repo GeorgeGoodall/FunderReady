@@ -102,11 +102,6 @@ const rejectRoutes = [
     path: "../../api/admin/organisations/[id]/reject/route",
   },
   {
-    name: "funds",
-    table: "funds",
-    path: "../../api/admin/funds/[id]/reject/route",
-  },
-  {
     name: "criteria-sets",
     table: "criteria_sets",
     path: "../../api/admin/criteria-sets/[id]/reject/route",
@@ -202,91 +197,193 @@ for (const route of rejectRoutes) {
 }
 
 // =====================================================================
-// APPROVE ROUTES
+// FUNDS REJECT ROUTE (separate because it has a shared pre-check)
 // =====================================================================
 
-const approveRoutes = [
-  {
-    name: "funds",
-    table: "funds",
-    path: "../../api/admin/funds/[id]/approve/route",
-  },
-];
+describe("PATCH /api/admin/funds/[id]/reject", () => {
+  async function importRejectRoute() {
+    const mod = await import("../../api/admin/funds/[id]/reject/route");
+    return mod.PATCH;
+  }
 
-for (const route of approveRoutes) {
-  describe(`PATCH /api/admin/${route.name}/[id]/approve`, () => {
-    async function importRoute() {
-      const mod = await import(route.path);
-      return mod.PATCH;
-    }
+  const params = Promise.resolve({ id: "test-id-001" });
 
-    const params = Promise.resolve({ id: "test-id-001" });
-
-    it("returns 401 when not authenticated", async () => {
-      unauthenticatedUser();
-      const PATCH = await importRoute();
-      const req = new Request(
-        `http://localhost/api/admin/${route.name}/test-id-001/approve`,
-        { method: "PATCH" }
-      );
-      const res = await PATCH(req, { params });
-      expect(res.status).toBe(401);
-    });
-
-    it("returns 403 for non-admin users", async () => {
-      authenticatedUser();
-      mockServiceFrom.mockReturnValue(
-        chainMock({ data: { is_admin: false }, error: null })
-      );
-      const PATCH = await importRoute();
-      const req = new Request(
-        `http://localhost/api/admin/${route.name}/test-id-001/approve`,
-        { method: "PATCH" }
-      );
-      const res = await PATCH(req, { params });
-      expect(res.status).toBe(403);
-    });
-
-    it("returns 200 on successful approval", async () => {
-      adminWith(() => chainMock({ data: { id: "test-id-001" }, error: null }));
-      const PATCH = await importRoute();
-      const req = new Request(
-        `http://localhost/api/admin/${route.name}/test-id-001/approve`,
-        { method: "PATCH" }
-      );
-      const res = await PATCH(req, { params });
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ success: true });
-      expect(mockServiceFrom).toHaveBeenCalledWith(route.table);
-    });
-
-    it("returns 404 when entity not found (PGRST116)", async () => {
-      adminWith(() =>
-        chainMock({ data: null, error: { code: "PGRST116", message: "Not found" } })
-      );
-      const PATCH = await importRoute();
-      const req = new Request(
-        `http://localhost/api/admin/${route.name}/test-id-001/approve`,
-        { method: "PATCH" }
-      );
-      const res = await PATCH(req, { params });
-      expect(res.status).toBe(404);
-    });
-
-    it("returns 500 when database update fails", async () => {
-      adminWith(() =>
-        chainMock({ data: null, error: { message: "DB error" } })
-      );
-      const PATCH = await importRoute();
-      const req = new Request(
-        `http://localhost/api/admin/${route.name}/test-id-001/approve`,
-        { method: "PATCH" }
-      );
-      const res = await PATCH(req, { params });
-      expect(res.status).toBe(500);
-    });
+  it("returns 401 when not authenticated", async () => {
+    unauthenticatedUser();
+    const PATCH = await importRejectRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/test-id-001/reject",
+      "PATCH",
+      { reason: "Not relevant" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(401);
   });
-}
+
+  it("returns 403 for non-admin users", async () => {
+    authenticatedUser();
+    mockServiceFrom.mockReturnValue(
+      chainMock({ data: { is_admin: false }, error: null })
+    );
+    const PATCH = await importRejectRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/test-id-001/reject",
+      "PATCH",
+      { reason: "Not relevant" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 400 when fund is not shared", async () => {
+    adminWith(() => chainMock({ data: { shared: false }, error: null }));
+    const PATCH = await importRejectRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/test-id-001/reject",
+      "PATCH",
+      { reason: "Bad" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 200 on successful rejection with reason", async () => {
+    adminWithMultiple([
+      () => chainMock({ data: { shared: true }, error: null }),
+      () => chainMock({ data: { id: "test-id-001" }, error: null }),
+    ]);
+    const PATCH = await importRejectRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/test-id-001/reject",
+      "PATCH",
+      { reason: "Does not meet standards" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+  });
+
+  it("returns 200 on rejection without reason", async () => {
+    adminWithMultiple([
+      () => chainMock({ data: { shared: true }, error: null }),
+      () => chainMock({ data: { id: "test-id-001" }, error: null }),
+    ]);
+    const PATCH = await importRejectRoute();
+    const req = new Request(
+      "http://localhost/api/admin/funds/test-id-001/reject",
+      { method: "PATCH", body: "not-json" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+  });
+
+  it("returns 500 when database update fails", async () => {
+    adminWithMultiple([
+      () => chainMock({ data: { shared: true }, error: null }),
+      () => chainMock({ data: null, error: { message: "DB error" } }),
+    ]);
+    const PATCH = await importRejectRoute();
+    const req = jsonRequest(
+      "http://localhost/api/admin/funds/test-id-001/reject",
+      "PATCH",
+      { reason: "Bad" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Failed to reject" });
+  });
+});
+
+// =====================================================================
+// APPROVE ROUTES (funds has a shared pre-check)
+// =====================================================================
+
+describe("PATCH /api/admin/funds/[id]/approve", () => {
+  async function importRoute() {
+    const mod = await import("../../api/admin/funds/[id]/approve/route");
+    return mod.PATCH;
+  }
+
+  const params = Promise.resolve({ id: "test-id-001" });
+
+  it("returns 401 when not authenticated", async () => {
+    unauthenticatedUser();
+    const PATCH = await importRoute();
+    const req = new Request(
+      "http://localhost/api/admin/funds/test-id-001/approve",
+      { method: "PATCH" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 for non-admin users", async () => {
+    authenticatedUser();
+    mockServiceFrom.mockReturnValue(
+      chainMock({ data: { is_admin: false }, error: null })
+    );
+    const PATCH = await importRoute();
+    const req = new Request(
+      "http://localhost/api/admin/funds/test-id-001/approve",
+      { method: "PATCH" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 400 when fund is not shared", async () => {
+    adminWith(() => chainMock({ data: { shared: false }, error: null }));
+    const PATCH = await importRoute();
+    const req = new Request(
+      "http://localhost/api/admin/funds/test-id-001/approve",
+      { method: "PATCH" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 200 on successful approval", async () => {
+    adminWithMultiple([
+      () => chainMock({ data: { shared: true }, error: null }),
+      () => chainMock({ data: { id: "test-id-001" }, error: null }),
+    ]);
+    const PATCH = await importRoute();
+    const req = new Request(
+      "http://localhost/api/admin/funds/test-id-001/approve",
+      { method: "PATCH" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(mockServiceFrom).toHaveBeenCalledWith("funds");
+  });
+
+  it("returns 404 when fund not found", async () => {
+    adminWith(() => chainMock({ data: null, error: null }));
+    const PATCH = await importRoute();
+    const req = new Request(
+      "http://localhost/api/admin/funds/test-id-001/approve",
+      { method: "PATCH" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 500 when database update fails", async () => {
+    adminWithMultiple([
+      () => chainMock({ data: { shared: true }, error: null }),
+      () => chainMock({ data: null, error: { message: "DB error" } }),
+    ]);
+    const PATCH = await importRoute();
+    const req = new Request(
+      "http://localhost/api/admin/funds/test-id-001/approve",
+      { method: "PATCH" }
+    );
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(500);
+  });
+})
 
 // =====================================================================
 // REJECT/APPROVE 404 PATHS
@@ -1320,17 +1417,17 @@ describe("PATCH /api/admin/funds/[id] — validation", () => {
     expect(await res.json()).toEqual({ error: "name must not be empty" });
   });
 
-  it("returns 400 when published is wrong type", async () => {
+  it("returns 400 when shared is wrong type", async () => {
     adminWith(() => chainMock({ data: null, error: null }));
     const PATCH = await importRoute();
     const req = jsonRequest(
       "http://localhost/api/admin/funds/fund-001",
       "PATCH",
-      { published: "yes" }
+      { shared: "yes" }
     );
     const res = await PATCH(req, { params });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "published must be a boolean" });
+    expect(await res.json()).toEqual({ error: "shared must be a boolean" });
   });
 
   it("returns 400 when url has invalid protocol", async () => {

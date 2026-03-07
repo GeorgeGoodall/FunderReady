@@ -65,6 +65,7 @@ export function FundsBrowser({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const handleSearch = useCallback(async (query: string) => {
     if (!query.trim() || query.trim().length < 2) {
@@ -122,6 +123,7 @@ export function FundsBrowser({
 
   async function handleToggleShare(id: string, shared: boolean) {
     setSharingId(id);
+    setShareError(null);
     try {
       const res = await fetch(`/api/funds/${id}/share`, {
         method: "PATCH",
@@ -134,7 +136,7 @@ export function FundsBrowser({
       );
       router.refresh();
     } catch {
-      // Silently fail
+      setShareError("Failed to update sharing. Please try again.");
     } finally {
       setSharingId(null);
     }
@@ -324,6 +326,11 @@ export function FundsBrowser({
       {/* My Funds tab */}
       {tab === "my" && (
         <div className="mt-6">
+          {shareError && (
+            <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+              {shareError}
+            </div>
+          )}
           {deleteError && (
             <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
               {deleteError}

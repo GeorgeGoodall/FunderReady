@@ -331,9 +331,11 @@ export function FundDetailClient({
 }) {
   const [shared, setShared] = useState(fund.shared);
   const [sharingId, setSharingId] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   async function handleToggleShare(newShared: boolean) {
     setSharingId(true);
+    setShareError(null);
     try {
       const res = await fetch(`/api/funds/${fund.id}/share`, {
         method: "PATCH",
@@ -343,7 +345,7 @@ export function FundDetailClient({
       if (!res.ok) throw new Error("Failed");
       setShared(newShared);
     } catch {
-      // Silently fail
+      setShareError("Failed to update sharing. Please try again.");
     } finally {
       setSharingId(false);
     }
@@ -458,6 +460,10 @@ export function FundDetailClient({
             {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
           </span>
         </div>
+
+        {shareError && (
+          <p className="mt-3 text-sm text-red-600 dark:text-red-400">{shareError}</p>
+        )}
 
         {isCreator && (
           <div className="mt-4 flex gap-2">

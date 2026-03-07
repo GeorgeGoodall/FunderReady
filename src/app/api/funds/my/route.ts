@@ -17,7 +17,8 @@ export async function GET() {
     .eq("created_by", user.id)
     .eq("creator_hidden", false)
     .eq("rejected", false)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(100);
 
   if (error) {
     console.error("My funds fetch error:", error);

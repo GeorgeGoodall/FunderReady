@@ -31,13 +31,14 @@ export async function PATCH(
 
   const shared = (body as { shared: boolean }).shared;
 
-  // Fetch fund — must belong to this user
+  // Fetch fund — must belong to this user and not be hidden
   const { data: fund, error: fetchError } = await supabase
     .from("funds")
     .select("id, approved, shared, created_by")
     .eq("id", id)
     .eq("created_by", user.id)
     .eq("rejected", false)
+    .eq("creator_hidden", false)
     .single();
 
   if (fetchError || !fund) {

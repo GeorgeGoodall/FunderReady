@@ -111,4 +111,62 @@ describe("PATCH /api/funds/[id]/share", () => {
     );
     expect(res.status).toBe(200);
   });
+
+  it("returns 404 when fund is not found", async () => {
+    authenticatedUser();
+    mockFrom.mockReturnValue(
+      chainMock({ data: null, error: { message: "Not found", code: "PGRST116" } })
+    );
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost/api/funds/fund-99/share", {
+        method: "PATCH",
+        body: JSON.stringify({ shared: true }),
+        headers: { "Content-Type": "application/json" },
+      }),
+      { params: Promise.resolve({ id: "fund-99" }) }
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 200 (no-op) when fund is already in desired share state", async () => {
+    authenticatedUser();
+    mockFrom.mockReturnValue(
+      chainMock({ data: { id: "fund-1", approved: false, shared: true, created_by: "user-123" }, error: null })
+    );
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost/api/funds/fund-1/share", {
+        method: "PATCH",
+        body: JSON.stringify({ shared: true }),
+        headers: { "Content-Type": "application/json" },
+      }),
+      { params: Promise.resolve({ id: "fund-1" }) }
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+  });
+
+  it("returns 500 when update query fails", async () => {
+    authenticatedUser();
+    let callCount = 0;
+    mockFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return chainMock({ data: { id: "fund-1", approved: false, shared: false, created_by: "user-123" }, error: null });
+      }
+      return chainMock({ data: null, error: { message: "DB error" } });
+    });
+    const PATCH = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost/api/funds/fund-1/share", {
+        method: "PATCH",
+        body: JSON.stringify({ shared: true }),
+        headers: { "Content-Type": "application/json" },
+      }),
+      { params: Promise.resolve({ id: "fund-1" }) }
+    );
+    expect(res.status).toBe(500);
+  });
 });

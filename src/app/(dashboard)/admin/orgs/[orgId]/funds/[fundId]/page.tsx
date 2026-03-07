@@ -10,7 +10,13 @@ import type { Json } from "@/types/database";
 export const dynamic = "force-dynamic";
 
 function countJson(json: Json): number {
-  return Array.isArray(json) ? json.length : 0;
+  if (Array.isArray(json)) return json.length;
+  if (json && typeof json === "object") {
+    const obj = json as Record<string, unknown>;
+    if (Array.isArray(obj.criteria)) return obj.criteria.length;
+    if (Array.isArray(obj.questions)) return obj.questions.length;
+  }
+  return 0;
 }
 
 interface CriteriaSetRow {

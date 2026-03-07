@@ -124,7 +124,6 @@ export async function getFundsForOrg(orgId: string): Promise<FundWithCounts[]> {
     .from("funds")
     .select("id, name, url, notes, approved, shared, created_at, organisation_id")
     .eq("organisation_id", orgId)
-    .eq("shared", true)
     .eq("rejected", false)
     .order("name");
 

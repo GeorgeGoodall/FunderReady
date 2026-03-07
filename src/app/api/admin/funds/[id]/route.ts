@@ -6,7 +6,6 @@ const ALLOWED_FIELDS = [
   "name",
   "url",
   "notes",
-  "approved",
   "shared",
   "organisation_id",
   "opens_at",
@@ -45,7 +44,7 @@ export async function PATCH(
   }
 
   const STRING_FIELDS = ["name", "url", "notes", "organisation_id"];
-  const BOOLEAN_FIELDS = ["approved", "shared"];
+  const BOOLEAN_FIELDS = ["shared"];
   for (const field of STRING_FIELDS) {
     if (field in updates && typeof updates[field] !== "string") {
       return NextResponse.json(
