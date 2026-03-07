@@ -102,6 +102,7 @@ export function ApplicationFormClient({
     high: number;
     remaining: number;
     canAfford: boolean;
+    hasEstimate: boolean;
   } | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
 
@@ -170,6 +171,7 @@ export function ApplicationFormClient({
         high: data.estimate?.high ?? 0,
         remaining: data.credits.remaining,
         canAfford: data.canAfford,
+        hasEstimate: data.estimate !== null,
       });
       setShowSubmitConfirm(true);
     } catch {
@@ -198,6 +200,7 @@ export function ApplicationFormClient({
           high: data.estimate?.high ?? 0,
           remaining: 0,
           canAfford: false,
+          hasEstimate: data.estimate !== null,
         });
         setShowSubmitConfirm(true);
         return;
@@ -588,7 +591,7 @@ export function ApplicationFormClient({
       {showSubmitConfirm && estimateState && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
-            {estimateState.low === 0 && estimateState.high === 0 && estimateState.canAfford ? (
+            {!estimateState.hasEstimate && estimateState.canAfford ? (
               <>
                 <h2 className="text-lg font-semibold">Submit for review?</h2>
                 <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">

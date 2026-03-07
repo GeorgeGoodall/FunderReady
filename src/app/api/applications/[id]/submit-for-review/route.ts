@@ -110,6 +110,9 @@ export async function POST(
   const fallbackEstimate = estimateReviewCost(freshCount, enabledAnswers.length);
   const estimate = statsEstimate ?? fallbackEstimate;
 
+  // When no stats available, only require remaining > 0 (pass 1 as gate)
+  const gatingCredits = statsEstimate ? estimate.low : 1;
+
   const reviewNumber = application.review_count + 1;
 
   // Atomic: check credits + in-progress + create review
@@ -123,7 +126,7 @@ export async function POST(
       p_criteria_set_id: application.criteria_set_id,
       p_period: period,
       p_default_limit: defaultLimit,
-      p_estimated_credits_low: estimate.low,
+      p_estimated_credits_low: gatingCredits,
     }
   );
 
