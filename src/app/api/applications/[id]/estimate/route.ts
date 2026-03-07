@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { estimateReviewCost } from "@/lib/usage/estimate-review-cost";
+import { estimateReviewCostWithStats } from "@/lib/usage/estimate-review-cost";
 import { checkUsage } from "@/lib/usage/check-usage";
+import { getEstimationStats } from "@/lib/usage/estimation-stats";
 
 export async function GET(
   _request: Request,
@@ -57,16 +58,35 @@ export async function GET(
     return a.answer_text !== a.last_reviewed_text;
   }).length;
 
-  const estimate = estimateReviewCost(freshCount, enabledAnswers.length);
   const usage = await checkUsage(supabase, user.id);
 
+  // Try stats-based estimate first
+  const stats = await getEstimationStats();
+  const answerTexts = enabledAnswers.map((a) => a.answer_text);
+  const statsEstimate = estimateReviewCostWithStats(
+    freshCount, enabledAnswers.length, answerTexts, stats
+  );
+
+  if (statsEstimate) {
+    return NextResponse.json({
+      estimate: statsEstimate,
+      credits: {
+        remaining: usage.remaining,
+        period: Math.max(0, usage.limit - usage.used),
+        purchased: usage.purchased,
+      },
+      canAfford: usage.remaining >= statsEstimate.low,
+    });
+  }
+
+  // Not enough historical data — no estimate shown
   return NextResponse.json({
-    estimate,
+    estimate: null,
     credits: {
       remaining: usage.remaining,
       period: Math.max(0, usage.limit - usage.used),
       purchased: usage.purchased,
     },
-    canAfford: usage.remaining >= estimate.low,
+    canAfford: usage.remaining > 0,
   });
 }

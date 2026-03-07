@@ -166,8 +166,8 @@ export function ApplicationFormClient({
       }
       const data = await res.json();
       setEstimateState({
-        low: data.estimate.low,
-        high: data.estimate.high,
+        low: data.estimate?.low ?? 0,
+        high: data.estimate?.high ?? 0,
         remaining: data.credits.remaining,
         canAfford: data.canAfford,
       });
@@ -588,7 +588,31 @@ export function ApplicationFormClient({
       {showSubmitConfirm && estimateState && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
-            {estimateState.canAfford ? (
+            {estimateState.low === 0 && estimateState.high === 0 && estimateState.canAfford ? (
+              <>
+                <h2 className="text-lg font-semibold">Submit for review?</h2>
+                <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+                  You have <strong>{estimateState.remaining} credits</strong> remaining.
+                  Credits will be deducted based on actual usage after the review completes.
+                </p>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowSubmitConfirm(false)}
+                    className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowSubmitConfirm(false); handleConfirmSubmit(); }}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                  >
+                    Confirm &amp; Submit
+                  </button>
+                </div>
+              </>
+            ) : estimateState.canAfford ? (
               <>
                 <h2 className="text-lg font-semibold">Submit for review?</h2>
                 <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">

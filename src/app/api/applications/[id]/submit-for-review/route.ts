@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { inngest } from "@/lib/inngest/client";
 import { getUsagePeriod } from "@/lib/usage/period";
-import { estimateReviewCost } from "@/lib/usage/estimate-review-cost";
+import { estimateReviewCost, estimateReviewCostWithStats } from "@/lib/usage/estimate-review-cost";
+import { getEstimationStats } from "@/lib/usage/estimation-stats";
 import { PLANS } from "@/lib/stripe/plans";
 
 export async function POST(
@@ -100,8 +101,14 @@ export async function POST(
     return a.answer_text !== a.last_reviewed_text;
   }).length;
 
-  // Estimate credit cost (fresh answers need Claude calls, reused ones don't)
-  const estimate = estimateReviewCost(freshCount, enabledAnswers.length);
+  // Try stats-based estimate, fall back to hardcoded
+  const stats = await getEstimationStats();
+  const answerTexts = enabledAnswers.map((a) => a.answer_text);
+  const statsEstimate = estimateReviewCostWithStats(
+    freshCount, enabledAnswers.length, answerTexts, stats
+  );
+  const fallbackEstimate = estimateReviewCost(freshCount, enabledAnswers.length);
+  const estimate = statsEstimate ?? fallbackEstimate;
 
   const reviewNumber = application.review_count + 1;
 
