@@ -25,7 +25,7 @@ export function ReferenceTag({
     >
       {label}
       {fullText && (
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 whitespace-normal rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-normal text-zinc-700 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 w-64 max-w-xs">
+        <span className="pointer-events-none select-none group-hover:select-text absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 whitespace-normal rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-normal text-zinc-700 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 w-64 max-w-xs">
           {fullText}
         </span>
       )}
