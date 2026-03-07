@@ -39,7 +39,8 @@ export async function GET(request: Request) {
     .select(
       "id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at"
     )
-    .eq("published", true)
+    .eq("approved", true)
+    .eq("shared", true)
     .eq("rejected", false)
     .order("created_at", { ascending: false })
     .range(from, to);
