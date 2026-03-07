@@ -159,16 +159,20 @@ export async function POST(
     );
   }
 
-  // Fire Inngest event
-  await inngest.send({
-    name: "application/review-requested",
-    data: {
-      applicationId: id,
-      reviewId,
-      reviewNumber,
-      userId: user.id,
-    },
-  });
+  // Fire Inngest event — non-fatal if Inngest is unavailable (review already created)
+  try {
+    await inngest.send({
+      name: "application/review-requested",
+      data: {
+        applicationId: id,
+        reviewId,
+        reviewNumber,
+        userId: user.id,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to send Inngest event (review still created):", err);
+  }
 
   return NextResponse.json(
     { reviewId, reviewNumber, estimate },

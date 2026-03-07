@@ -53,6 +53,8 @@ export function ApplicationReviewClient({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
   const [feedbackMap, setFeedbackMap] = useState<Record<string, "up" | "down">>(initialFeedback);
+  const [cancellingReview, setCancellingReview] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const handleFeedbackChange = (itemPath: string, sentiment: "up" | "down" | null) => {
     setFeedbackMap((prev) => {
@@ -67,6 +69,27 @@ export function ApplicationReviewClient({
   };
 
   const isInProgress = !isHistorical && review && review.status !== "completed" && review.status !== "failed";
+
+  const handleCancelReview = async () => {
+    if (!showCancelConfirm) {
+      setShowCancelConfirm(true);
+      return;
+    }
+    setShowCancelConfirm(false);
+    setCancellingReview(true);
+    try {
+      const res = await fetch(`/api/applications/${application.id}/cancel-review`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        router.push(`/applications/${application.id}`);
+      }
+    } catch {
+      // ignore — button will re-enable
+    } finally {
+      setCancellingReview(false);
+    }
+  };
 
   // Poll for updates while in progress
   useEffect(() => {
@@ -177,6 +200,32 @@ export function ApplicationReviewClient({
                 </div>
               );
             })}
+          </div>
+
+          <div className="mt-6 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+            {review.status === "pending" ? (
+              <button
+                type="button"
+                onClick={handleCancelReview}
+                disabled={cancellingReview}
+                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              >
+                {cancellingReview
+                  ? "Cancelling..."
+                  : showCancelConfirm
+                    ? "Are you sure? Click to confirm"
+                    : "Cancel review"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                title="Reviews can't be cancelled once started"
+                className="cursor-not-allowed rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-400 opacity-50 dark:border-zinc-800 dark:text-zinc-600"
+              >
+                Cancel review
+              </button>
+            )}
           </div>
         </div>
       </div>
