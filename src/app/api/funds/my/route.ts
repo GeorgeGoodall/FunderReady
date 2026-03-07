@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data: funds, error } = await supabase
     .from("funds")
-    .select("id, name, organisation_id, organisations(id, name), url, notes, published, created_at")
+    .select("id, name, organisation_id, organisations(id, name), url, notes, approved, shared, created_at")
     .eq("created_by", user.id)
     .eq("creator_hidden", false)
     .eq("rejected", false)

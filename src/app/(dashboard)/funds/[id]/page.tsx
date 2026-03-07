@@ -26,7 +26,7 @@ export default async function FundDetailPage({
   const { data: fund, error: fundError } = await supabase
     .from("funds")
     .select(
-      "id, name, organisation_id, organisations(id, name, url), url, notes, published, created_at"
+      "id, name, organisation_id, organisations(id, name, url), url, notes, approved, shared, created_by, created_at"
     )
     .eq("id", id)
     .eq("rejected", false)
@@ -82,9 +82,12 @@ export default async function FundDetailPage({
           name: fund.name,
           url: fund.url,
           notes: fund.notes,
-          published: fund.published,
+          approved: fund.approved,
+          shared: fund.shared,
+          created_by: fund.created_by,
           created_at: fund.created_at,
         }}
+        currentUserId={user.id}
         organisation={organisation}
         criteriaSets={criteriaSets ?? []}
         questionsSets={questionsSets ?? []}
