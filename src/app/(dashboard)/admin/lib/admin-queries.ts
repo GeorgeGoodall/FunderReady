@@ -18,7 +18,8 @@ export interface FundWithCounts {
   name: string;
   url: string | null;
   notes: string | null;
-  published: boolean;
+  approved: boolean;
+  shared: boolean;
   created_at: string;
   organisation_id: string;
   pending_criteria: number;
@@ -44,7 +45,7 @@ export async function getOrgsWithCounts(): Promise<OrgWithCounts[]> {
   // Batch: get all non-rejected funds for these orgs
   const { data: allFunds, error: fundsError } = await serviceClient
     .from("funds")
-    .select("id, organisation_id, published")
+    .select("id, organisation_id, approved, shared")
     .in("organisation_id", orgIds)
     .eq("rejected", false);
 
@@ -103,7 +104,7 @@ export async function getOrgsWithCounts(): Promise<OrgWithCounts[]> {
 
   return orgs.map((org) => {
     const orgFunds = fundsByOrg.get(org.id) ?? [];
-    const pendingFundsCount = orgFunds.filter((f) => !f.published).length;
+    const pendingFundsCount = orgFunds.filter((f) => f.shared && !f.approved).length;
     const pendingSets = pendingSetsPerOrg.get(org.id) ?? 0;
 
     return {
@@ -121,8 +122,9 @@ export async function getFundsForOrg(orgId: string): Promise<FundWithCounts[]> {
 
   const { data: funds, error: fundsError } = await serviceClient
     .from("funds")
-    .select("id, name, url, notes, published, created_at, organisation_id")
+    .select("id, name, url, notes, approved, shared, created_at, organisation_id")
     .eq("organisation_id", orgId)
+    .eq("shared", true)
     .eq("rejected", false)
     .order("name");
 
