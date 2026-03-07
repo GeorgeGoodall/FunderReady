@@ -14,7 +14,7 @@ export async function PATCH(
 
   const { data, error } = await auth.serviceClient
     .from("funds")
-    .update({ rejected: true, rejection_reason: reason, published: false })
+    .update({ rejected: true, rejection_reason: reason, approved: false })
     .eq("id", id)
     .select("id")
     .single();

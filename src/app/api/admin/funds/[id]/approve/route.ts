@@ -9,9 +9,27 @@ export async function PATCH(
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
 
+  // Verify fund is shared (submitted for community review)
+  const { data: fund } = await auth.serviceClient
+    .from("funds")
+    .select("shared")
+    .eq("id", id)
+    .single();
+
+  if (!fund) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (!fund.shared) {
+    return NextResponse.json(
+      { error: "Fund has not been submitted for sharing" },
+      { status: 400 }
+    );
+  }
+
   const { data, error } = await auth.serviceClient
     .from("funds")
-    .update({ published: true, rejected: false, rejection_reason: null })
+    .update({ approved: true, rejected: false, rejection_reason: null })
     .eq("id", id)
     .select("id")
     .single();

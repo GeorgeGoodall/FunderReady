@@ -25,7 +25,8 @@ export async function POST(request: Request) {
   const record: Record<string, unknown> = {
     name,
     organisation_id: body.organisation_id,
-    published: true,
+    approved: true,
+    shared: true,
     created_by: auth.userId,
   };
   if (typeof body.url === "string") record.url = body.url;
