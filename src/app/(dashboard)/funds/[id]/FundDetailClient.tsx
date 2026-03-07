@@ -310,13 +310,16 @@ export function FundDetailClient({
   questionsSets,
   applicationCount,
   reviewCount,
+  currentUserId,
 }: {
   fund: {
     id: string;
     name: string;
     url: string | null;
     notes: string | null;
-    published: boolean;
+    approved: boolean;
+    shared: boolean;
+    created_by: string;
     created_at: string;
   };
   organisation: Organisation | null;
@@ -324,7 +327,30 @@ export function FundDetailClient({
   questionsSets: QuestionsSetRow[];
   applicationCount: number;
   reviewCount: number;
+  currentUserId: string;
 }) {
+  const [shared, setShared] = useState(fund.shared);
+  const [sharingId, setSharingId] = useState(false);
+
+  async function handleToggleShare(newShared: boolean) {
+    setSharingId(true);
+    try {
+      const res = await fetch(`/api/funds/${fund.id}/share`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shared: newShared }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      setShared(newShared);
+    } catch {
+      // Silently fail
+    } finally {
+      setSharingId(false);
+    }
+  }
+
+  const isCreator = currentUserId === fund.created_by;
+
   // Use the latest criteria set for template exports
   const exportCriteria: ExportCriterion[] = criteriaSets.length > 0
     ? parseCriteria(criteriaSets[0].criteria_json) as ExportCriterion[]
@@ -375,15 +401,22 @@ export function FundDetailClient({
               </p>
             )}
           </div>
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-              fund.published
-                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
-                : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
-            }`}
-          >
-            {fund.published ? "Published" : "Unpublished"}
-          </span>
+          {shared && (
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                fund.approved
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+              }`}
+              title={
+                fund.approved
+                  ? "This fund has been reviewed and is visible to all users"
+                  : "This fund is awaiting review and is only visible to you"
+              }
+            >
+              {fund.approved ? "Shared" : "Pending review"}
+            </span>
+          )}
         </div>
 
         {fund.url && (
@@ -425,6 +458,29 @@ export function FundDetailClient({
             {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
           </span>
         </div>
+
+        {isCreator && (
+          <div className="mt-4 flex gap-2">
+            {!shared && !fund.approved && (
+              <button
+                onClick={() => handleToggleShare(true)}
+                disabled={sharingId}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 disabled:opacity-50"
+              >
+                {sharingId ? "Sharing..." : "Share with community"}
+              </button>
+            )}
+            {shared && !fund.approved && (
+              <button
+                onClick={() => handleToggleShare(false)}
+                disabled={sharingId}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
+              >
+                {sharingId ? "Cancelling..." : "Cancel sharing"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Questions Sets */}
