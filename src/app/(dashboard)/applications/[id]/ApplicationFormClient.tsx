@@ -97,6 +97,8 @@ export function ApplicationFormClient({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [cancellingReview, setCancellingReview] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [estimateState, setEstimateState] = useState<{
     low: number;
     high: number;
@@ -219,6 +221,31 @@ export function ApplicationFormClient({
     }
   };
 
+  const handleCancelReview = async () => {
+    if (!showCancelConfirm) {
+      setShowCancelConfirm(true);
+      return;
+    }
+    setShowCancelConfirm(false);
+    setCancellingReview(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/applications/${application.id}/cancel-review`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to cancel review");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setCancellingReview(false);
+    }
+  };
+
   const isReviewing = application.status === "submitted_for_review" || application.status === "reviewing";
   const isDraft = application.status === "draft";
   const isReviewed = application.status === "reviewed";
@@ -305,17 +332,35 @@ export function ApplicationFormClient({
 
       {/* Review in progress notice */}
       {isReviewing && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/30 dark:bg-blue-900/10">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
           <p className="text-sm text-blue-800 dark:text-blue-300">
-            Your application is being reviewed. You&apos;ll be able to edit after the review completes.
+            {application.status === "submitted_for_review"
+              ? "Your review is queued and will start shortly."
+              : "Your application is being reviewed. You'll be able to edit after the review completes."}
           </p>
-          <button
-            type="button"
-            onClick={() => router.push(`/applications/${application.id}/review`)}
-            className="mt-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            View Review Progress
-          </button>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => router.push(`/applications/${application.id}/review`)}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              View Review Progress
+            </button>
+            {application.status === "submitted_for_review" && (
+              <button
+                type="button"
+                onClick={handleCancelReview}
+                disabled={cancellingReview}
+                className="rounded-lg border border-blue-300 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/40"
+              >
+                {cancellingReview
+                  ? "Cancelling..."
+                  : showCancelConfirm
+                    ? "Are you sure? Click to confirm"
+                    : "Cancel queued review"}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
