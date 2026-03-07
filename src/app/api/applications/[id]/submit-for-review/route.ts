@@ -68,7 +68,7 @@ export async function POST(
   // Check there are non-empty, non-disabled answers
   const { data: answers } = await supabase
     .from("application_answers")
-    .select("question_id, answer_text, is_disabled")
+    .select("question_id, answer_text, is_disabled, last_reviewed_text")
     .eq("application_id", id);
 
   const enabledAnswers = (answers ?? []).filter(
@@ -81,8 +81,27 @@ export async function POST(
     );
   }
 
-  // Estimate credit cost
-  const estimate = estimateReviewCost(enabledAnswers.length);
+  // Check if previous review used the same criteria set (for reuse estimation)
+  const { data: prevReview } = await supabase
+    .from("application_reviews")
+    .select("criteria_set_id")
+    .eq("application_id", id)
+    .eq("status", "completed")
+    .order("review_number", { ascending: false })
+    .limit(1)
+    .single();
+
+  const criteriaSetMatch = prevReview?.criteria_set_id === application.criteria_set_id;
+
+  // Count fresh answers (changed or never reviewed, or criteria set changed)
+  const freshCount = enabledAnswers.filter((a) => {
+    if (!criteriaSetMatch) return true;
+    if (a.last_reviewed_text === null || a.last_reviewed_text === undefined) return true;
+    return a.answer_text !== a.last_reviewed_text;
+  }).length;
+
+  // Estimate credit cost (fresh answers need Claude calls, reused ones don't)
+  const estimate = estimateReviewCost(freshCount, enabledAnswers.length);
 
   const reviewNumber = application.review_count + 1;
 

@@ -8,7 +8,7 @@ describe("estimateReviewCost", () => {
     expect(result.high).toBeGreaterThan(result.low);
   });
 
-  it("returns higher range for more answers", () => {
+  it("returns higher range for more fresh answers", () => {
     const small = estimateReviewCost(3);
     const large = estimateReviewCost(25);
     expect(large.low).toBeGreaterThan(small.low);
@@ -31,20 +31,29 @@ describe("estimateReviewCost", () => {
     expect(result.high).toBe(0);
   });
 
-  it("produces reasonable estimates for typical sizes", () => {
-    // Small (3-5 Qs): ~3-5 credits
-    const small = estimateReviewCost(5);
-    expect(small.low).toBeGreaterThanOrEqual(3);
-    expect(small.high).toBeLessThanOrEqual(10);
+  it("re-review with no changes costs much less than first review", () => {
+    const firstReview = estimateReviewCost(15, 15); // all fresh
+    const reReview = estimateReviewCost(1, 15); // only 1 changed
+    expect(reReview.high).toBeLessThan(firstReview.low);
+  });
 
-    // Medium (10-15 Qs): ~8-12 credits
-    const medium = estimateReviewCost(12);
-    expect(medium.low).toBeGreaterThanOrEqual(7);
-    expect(medium.high).toBeLessThanOrEqual(20);
+  it("re-review with all changes costs same as first review", () => {
+    const firstReview = estimateReviewCost(15);
+    const allChanged = estimateReviewCost(15, 15);
+    expect(allChanged.low).toBe(firstReview.low);
+    expect(allChanged.high).toBe(firstReview.high);
+  });
 
-    // Large (25-30 Qs): ~20-30 credits
-    const large = estimateReviewCost(28);
-    expect(large.low).toBeGreaterThanOrEqual(15);
-    expect(large.high).toBeLessThanOrEqual(35);
+  it("defaults totalEnabledCount to freshAnswerCount when not provided", () => {
+    const withoutTotal = estimateReviewCost(10);
+    const withTotal = estimateReviewCost(10, 10);
+    expect(withoutTotal.low).toBe(withTotal.low);
+    expect(withoutTotal.high).toBe(withTotal.high);
+  });
+
+  it("zero fresh answers still costs overhead for cross-ref and scoring", () => {
+    const result = estimateReviewCost(0, 10);
+    expect(result.low).toBeGreaterThanOrEqual(1);
+    expect(result.high).toBeGreaterThan(0);
   });
 });
