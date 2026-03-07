@@ -1485,22 +1485,25 @@ describe("POST /api/admin/amend-set", () => {
     expect(await res.json()).toEqual({ error: "original_id is required" });
   });
 
-  it("returns 400 when fund_id is missing", async () => {
-    adminWith(() => chainMock({ data: null, error: null }));
+  it("returns 404 when original set not found", async () => {
+    adminWith(() => chainMock({ data: null, error: { message: "Not found" } }));
     const POST = await importRoute();
     const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
       set_type: "criteria", original_id: "cs-001",
+      name: "Amended", criteria_json: [{ id: "c1", criterion: "Test", sub_questions: [] }],
     });
     const res = await POST(req);
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "fund_id is required" });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Original set not found" });
   });
 
   it("returns 400 when criteria name is missing", async () => {
-    adminWith(() => chainMock({ data: null, error: null }));
+    adminWithMultiple([
+      () => chainMock({ data: { fund_id: "f1" }, error: null }),
+    ]);
     const POST = await importRoute();
     const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
-      set_type: "criteria", original_id: "cs-001", fund_id: "f1",
+      set_type: "criteria", original_id: "cs-001",
       criteria_json: [{ id: "c1", criterion: "Test", sub_questions: [] }],
     });
     const res = await POST(req);
@@ -1509,10 +1512,12 @@ describe("POST /api/admin/amend-set", () => {
   });
 
   it("returns 400 when criteria_json is not an array", async () => {
-    adminWith(() => chainMock({ data: null, error: null }));
+    adminWithMultiple([
+      () => chainMock({ data: { fund_id: "f1" }, error: null }),
+    ]);
     const POST = await importRoute();
     const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
-      set_type: "criteria", original_id: "cs-001", fund_id: "f1",
+      set_type: "criteria", original_id: "cs-001",
       name: "Amended", criteria_json: "not-array",
     });
     const res = await POST(req);
@@ -1521,10 +1526,12 @@ describe("POST /api/admin/amend-set", () => {
   });
 
   it("returns 400 when questions_json is not an array", async () => {
-    adminWith(() => chainMock({ data: null, error: null }));
+    adminWithMultiple([
+      () => chainMock({ data: { fund_id: "f1" }, error: null }),
+    ]);
     const POST = await importRoute();
     const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
-      set_type: "questions", original_id: "qs-001", fund_id: "f1",
+      set_type: "questions", original_id: "qs-001",
       questions_json: "not-array",
     });
     const res = await POST(req);
@@ -1533,14 +1540,15 @@ describe("POST /api/admin/amend-set", () => {
   });
 
   it("returns 201 on successful criteria amend (create + reject)", async () => {
-    // adminWithMultiple: call 1 = profile check, call 2 = insert new set, call 3 = update (reject) original
+    // adminWithMultiple: call 1 = profile check, call 2 = fetch original set, call 3 = insert new set, call 4 = update (reject) original
     adminWithMultiple([
+      () => chainMock({ data: { fund_id: "f1" }, error: null }),
       () => chainMock({ data: { id: "cs-new", name: "Amended" }, error: null }),
       () => chainMock({ data: { id: "cs-001" }, error: null }),
     ]);
     const POST = await importRoute();
     const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
-      set_type: "criteria", original_id: "cs-001", fund_id: "f1",
+      set_type: "criteria", original_id: "cs-001",
       name: "Amended", criteria_json: [{ id: "c1", criterion: "Test", sub_questions: [] }],
     });
     const res = await POST(req);
@@ -1552,12 +1560,13 @@ describe("POST /api/admin/amend-set", () => {
 
   it("returns 201 on successful questions amend", async () => {
     adminWithMultiple([
+      () => chainMock({ data: { fund_id: "f1" }, error: null }),
       () => chainMock({ data: { id: "qs-new" }, error: null }),
       () => chainMock({ data: { id: "qs-001" }, error: null }),
     ]);
     const POST = await importRoute();
     const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
-      set_type: "questions", original_id: "qs-001", fund_id: "f1",
+      set_type: "questions", original_id: "qs-001",
       questions_json: [{ id: "q1", question: "Test?" }],
       overall_word_limit: 5000,
     });
@@ -1567,11 +1576,14 @@ describe("POST /api/admin/amend-set", () => {
   });
 
   it("returns 500 when create fails", async () => {
-    adminWith(() => chainMock({ data: null, error: { message: "DB error" } }));
+    adminWithMultiple([
+      () => chainMock({ data: { fund_id: "f1" }, error: null }),
+      () => chainMock({ data: null, error: { message: "DB error" } }),
+    ]);
     const POST = await importRoute();
     const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
-      set_type: "criteria", original_id: "cs-001", fund_id: "f1",
-      name: "Amended", criteria_json: [],
+      set_type: "criteria", original_id: "cs-001",
+      name: "Amended", criteria_json: [{ id: "c1", criterion: "Test", sub_questions: [] }],
     });
     const res = await POST(req);
     expect(res.status).toBe(500);
@@ -1580,13 +1592,14 @@ describe("POST /api/admin/amend-set", () => {
 
   it("returns 500 with id when reject fails after successful create", async () => {
     adminWithMultiple([
+      () => chainMock({ data: { fund_id: "f1" }, error: null }),
       () => chainMock({ data: { id: "cs-new" }, error: null }),
       () => chainMock({ data: null, error: { message: "DB error" } }),
     ]);
     const POST = await importRoute();
     const req = jsonRequest("http://localhost/api/admin/amend-set", "POST", {
-      set_type: "criteria", original_id: "cs-001", fund_id: "f1",
-      name: "Amended", criteria_json: [],
+      set_type: "criteria", original_id: "cs-001",
+      name: "Amended", criteria_json: [{ id: "c1", criterion: "Test", sub_questions: [] }],
     });
     const res = await POST(req);
     expect(res.status).toBe(500);

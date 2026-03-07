@@ -35,8 +35,14 @@ export async function GET(request: Request) {
   const tsQuery = q
     .split(/\s+/)
     .filter(Boolean)
+    .map((w) => w.replace(/[!&|():<>\\]/g, ""))
+    .filter((w) => w.length > 0)
     .map((w) => `${w}:*`)
     .join(" & ");
+
+  if (!tsQuery) {
+    return NextResponse.json({ organisations: [] });
+  }
 
   // Approved orgs + creator's own unapproved
   const { data: orgs, error } = await supabase

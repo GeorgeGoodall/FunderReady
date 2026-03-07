@@ -6,7 +6,7 @@ import { requireProWithRateLimit, isGuardError } from "@/lib/usage/require-pro-w
 
 const DetectFundRequestSchema = z.object({
   fileName: z.string().min(1),
-  bidTextPreview: z.string().optional(),
+  bidTextPreview: z.string().max(10000).optional(),
 });
 
 export async function POST(request: Request) {

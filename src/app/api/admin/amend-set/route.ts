@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { CriteriaSetSchema, QuestionsSetSchema } from "@/lib/schemas/criteria";
 
 /**
  * Atomic amend: creates a new set and rejects the original in one request.
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
 
-  const { set_type, original_id, fund_id } = body;
+  const { set_type, original_id } = body;
 
   if (set_type !== "criteria" && set_type !== "questions") {
     return NextResponse.json({ error: "set_type must be 'criteria' or 'questions'" }, { status: 400 });
@@ -20,15 +21,25 @@ export async function POST(request: Request) {
   if (!original_id || typeof original_id !== "string") {
     return NextResponse.json({ error: "original_id is required" }, { status: 400 });
   }
-  if (!fund_id || typeof fund_id !== "string") {
-    return NextResponse.json({ error: "fund_id is required" }, { status: 400 });
-  }
 
   const table = set_type === "criteria" ? "criteria_sets" : "questions_sets";
 
+  // Fetch the original set to get the authoritative fund_id (ignore client-supplied fund_id)
+  const { data: originalSet, error: fetchError } = await auth.serviceClient
+    .from(table)
+    .select("fund_id")
+    .eq("id", original_id)
+    .single();
+
+  if (fetchError || !originalSet) {
+    return NextResponse.json({ error: "Original set not found" }, { status: 404 });
+  }
+
+  const dbFundId = originalSet.fund_id;
+
   // Build the insert record
   const record: Record<string, unknown> = {
-    fund_id,
+    fund_id: dbFundId,
     approved: true,
     created_by: auth.userId,
   };
@@ -40,15 +51,40 @@ export async function POST(request: Request) {
     if (!Array.isArray(body.criteria_json)) {
       return NextResponse.json({ error: "criteria_json must be an array" }, { status: 400 });
     }
-    record.name = body.name;
-    record.criteria_json = body.criteria_json;
-    if (typeof body.description === "string") record.description = body.description;
+    // Validate criteria_json against CriteriaSetSchema
+    const criteriaValidation = CriteriaSetSchema.safeParse({
+      name: body.name,
+      description: body.description,
+      criteria: body.criteria_json,
+    });
+    if (!criteriaValidation.success) {
+      return NextResponse.json(
+        { error: criteriaValidation.error.errors[0]?.message ?? "Invalid criteria_json" },
+        { status: 400 }
+      );
+    }
+    record.name = criteriaValidation.data.name;
+    record.criteria_json = criteriaValidation.data.criteria;
+    if (criteriaValidation.data.description) record.description = criteriaValidation.data.description;
   } else {
     if (!Array.isArray(body.questions_json)) {
       return NextResponse.json({ error: "questions_json must be an array" }, { status: 400 });
     }
-    record.questions_json = body.questions_json;
-    if (typeof body.overall_word_limit === "number") record.overall_word_limit = body.overall_word_limit;
+    // Validate questions_json against QuestionsSetSchema
+    const questionsValidation = QuestionsSetSchema.safeParse({
+      questions: body.questions_json,
+      overall_word_limit: body.overall_word_limit,
+    });
+    if (!questionsValidation.success) {
+      return NextResponse.json(
+        { error: questionsValidation.error.errors[0]?.message ?? "Invalid questions_json" },
+        { status: 400 }
+      );
+    }
+    record.questions_json = questionsValidation.data.questions;
+    if (questionsValidation.data.overall_word_limit != null) {
+      record.overall_word_limit = questionsValidation.data.overall_word_limit;
+    }
   }
 
   // Step 1: Create the new set

@@ -19,7 +19,7 @@ export async function PATCH(
   // Verify ownership (RLS enforced)
   const { data: application } = await supabase
     .from("applications")
-    .select("id, status")
+    .select("id, status, questions_set_id")
     .eq("id", id)
     .single();
 
@@ -50,6 +50,23 @@ export async function PATCH(
   }
 
   const serviceClient = createServiceClient();
+
+  // Validate question_ids against the application's questions set
+  const { data: questionsSet } = await serviceClient
+    .from("questions_sets")
+    .select("questions_json")
+    .eq("id", application.questions_set_id)
+    .single();
+
+  if (questionsSet) {
+    const validIds = new Set<string>(
+      (questionsSet.questions_json as Array<{ id: string }>).map((q) => q.id)
+    );
+    const invalid = parsed.data.answers.find((a) => !validIds.has(a.question_id));
+    if (invalid) {
+      return NextResponse.json({ error: "Invalid question_id in answers" }, { status: 400 });
+    }
+  }
 
   // Upsert each answer (service client to bypass RLS for atomic update)
   const upsertRows = parsed.data.answers.map((a) => ({

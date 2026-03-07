@@ -27,6 +27,10 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid title" }, { status: 400 });
   }
 
+  if (title.trim().length === 0 || title.length > 500) {
+    return NextResponse.json({ error: "Title must be between 1 and 500 characters" }, { status: 400 });
+  }
+
   const { error } = await supabase
     .from("applications")
     .update({ title: title.trim() || null })
@@ -54,13 +58,18 @@ export async function DELETE(
   }
 
   // RLS enforces ownership — will only delete if user owns it
-  const { error } = await supabase
+  const { data: deleted, error } = await supabase
     .from("applications")
     .delete()
+    .select("id")
     .eq("id", id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (!deleted || deleted.length === 0) {
+    return NextResponse.json({ error: "Application not found" }, { status: 404 });
   }
 
   return NextResponse.json({ success: true });

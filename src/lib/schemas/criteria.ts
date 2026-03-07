@@ -182,7 +182,7 @@ export const SaveAnswersRequestSchema = z.object({
   answers: z.array(
     z.object({
       question_id: z.string().min(1),
-      answer_text: z.string(),
+      answer_text: z.string().max(50000),
       selected_options: z.array(z.string()).optional(),
       is_disabled: z.boolean().optional(),
     })
