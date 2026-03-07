@@ -21,18 +21,25 @@ export function ApplicationsList({ applications }: { applications: Application[]
   const router = useRouter();
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const confirmApp = applications.find((a) => a.id === confirmId);
 
   const handleDelete = async () => {
     if (!confirmId) return;
     setDeleting(true);
+    setDeleteError("");
     try {
-      await fetch(`/api/applications/${confirmId}`, { method: "DELETE" });
+      const res = await fetch(`/api/applications/${confirmId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setDeleteError((data as { error?: string }).error ?? "Failed to delete application");
+        return;
+      }
       setConfirmId(null);
       router.refresh();
     } catch {
-      // silently ignore — page will still show old data
+      setDeleteError("Network error. Please try again.");
     } finally {
       setDeleting(false);
     }
@@ -115,10 +122,15 @@ export function ApplicationsList({ applications }: { applications: Application[]
               </span>{" "}
               and all its answers and reviews. This cannot be undone.
             </p>
+            {deleteError && (
+              <div className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                {deleteError}
+              </div>
+            )}
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setConfirmId(null)}
+                onClick={() => { setConfirmId(null); setDeleteError(""); }}
                 disabled={deleting}
                 className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >

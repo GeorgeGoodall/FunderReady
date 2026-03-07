@@ -4,9 +4,11 @@ import { useState } from "react";
 
 export function BillingClient({ tier }: { tier: "free" | "basic" | "pro" }) {
   const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   async function handleSubscribe(selectedTier: "basic" | "pro") {
     setLoading(selectedTier);
+    setError("");
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -14,9 +16,11 @@ export function BillingClient({ tier }: { tier: "free" | "basic" | "pro" }) {
         body: JSON.stringify({ tier: selectedTier }),
       });
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      if (!res.ok || !data.url) {
+        setError(data.error ?? "Failed to start checkout. Please try again.");
+        return;
       }
+      window.location.href = data.url;
     } finally {
       setLoading(null);
     }
@@ -24,6 +28,7 @@ export function BillingClient({ tier }: { tier: "free" | "basic" | "pro" }) {
 
   async function handleTopup(pack: "standard" | "pro", quantity: number = 1) {
     setLoading(pack);
+    setError("");
     try {
       const res = await fetch("/api/stripe/topup", {
         method: "POST",
@@ -31,9 +36,11 @@ export function BillingClient({ tier }: { tier: "free" | "basic" | "pro" }) {
         body: JSON.stringify({ pack, quantity }),
       });
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      if (!res.ok || !data.url) {
+        setError(data.error ?? "Failed to start checkout. Please try again.");
+        return;
       }
+      window.location.href = data.url;
     } finally {
       setLoading(null);
     }
@@ -43,6 +50,11 @@ export function BillingClient({ tier }: { tier: "free" | "basic" | "pro" }) {
     return (
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Choose a Plan</h2>
+        {error && (
+          <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+            {error}
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
             <h3 className="text-lg font-semibold">Basic</h3>
@@ -77,6 +89,11 @@ export function BillingClient({ tier }: { tier: "free" | "basic" | "pro" }) {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Buy Credits</h2>
+      {error && (
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+          {error}
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
           <h3 className="font-semibold">Standard Pack</h3>

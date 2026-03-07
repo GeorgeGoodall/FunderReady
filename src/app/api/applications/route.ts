@@ -101,7 +101,11 @@ export async function POST(request: Request) {
 
     if (answersError) {
       console.error("application_answers insert error:", answersError);
-      // Non-fatal — application still created
+      await serviceClient.from("applications").delete().eq("id", application.id);
+      return NextResponse.json(
+        { error: "Failed to create application answers" },
+        { status: 500 }
+      );
     }
   }
 

@@ -25,6 +25,10 @@ export interface EstimationStats {
   fetchedAt: number;
 }
 
+/**
+ * Module-level cache — concurrent requests may both query the DB on cache miss
+ * (last write wins). This is intentional and benign.
+ */
 let cached: EstimationStats | null = null;
 let lastFetchedAt = 0;
 

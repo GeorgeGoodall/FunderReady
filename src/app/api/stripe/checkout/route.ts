@@ -13,7 +13,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
+  let body: { tier?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
   const tier = body.tier as "basic" | "pro";
 
   if (tier !== "basic" && tier !== "pro") {
@@ -38,16 +43,30 @@ export async function POST(request: Request) {
     });
     customerId = customer.id;
 
-    await supabase
+    const { error: updateError } = await supabase
       .from("profiles")
       .update({ stripe_customer_id: customerId })
       .eq("id", user.id);
+
+    if (updateError) {
+      // Roll back the newly-created Stripe customer to avoid orphaned records.
+      try {
+        await stripe.customers.del(customerId);
+      } catch (deleteErr) {
+        console.error("[stripe] Failed to roll back customer creation:", deleteErr);
+      }
+      console.error("[stripe] Failed to persist stripe_customer_id:", updateError);
+      return NextResponse.json({ error: "Failed to create customer" }, { status: 500 });
+    }
   }
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
     line_items: [{ price: plan.stripePriceId, quantity: 1 }],
+    metadata: {
+      supabase_user_id: user.id,
+    },
     success_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing?checkout=success`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing?checkout=cancelled`,
   });

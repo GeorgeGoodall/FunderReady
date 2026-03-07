@@ -49,6 +49,11 @@ export async function POST(
 
   const tier = (profile?.subscription_tier ?? "free") as keyof typeof PLANS;
 
+  const validTiers = Object.keys(PLANS) as Array<keyof typeof PLANS>;
+  if (!validTiers.includes(tier)) {
+    return NextResponse.json({ error: "Invalid subscription tier" }, { status: 403 });
+  }
+
   if (tier === "free") {
     return NextResponse.json(
       { error: "Active subscription required" },
@@ -110,8 +115,8 @@ export async function POST(
   const fallbackEstimate = estimateReviewCost(freshCount, enabledAnswers.length);
   const estimate = statsEstimate ?? fallbackEstimate;
 
-  // When no stats available, only require remaining > 0 (pass 1 as gate)
-  const gatingCredits = statsEstimate ? estimate.low : 1;
+  // When no stats available, use fallback estimate's low value (minimum 1)
+  const gatingCredits = estimate.low > 0 ? estimate.low : 1;
 
   const reviewNumber = application.review_count + 1;
 

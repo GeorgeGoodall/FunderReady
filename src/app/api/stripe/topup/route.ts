@@ -24,14 +24,23 @@ export async function POST(request: Request) {
   // Get user profile
   const { data: profile } = await supabase
     .from("profiles")
-    .select("subscription_tier, stripe_customer_id")
+    .select("subscription_tier, subscription_status, stripe_customer_id")
     .eq("id", user.id)
     .single();
 
   const tier = profile?.subscription_tier ?? "free";
+  const subscriptionStatus = profile?.subscription_status ?? null;
 
-  // Must have active subscription
+  // Must have a paid plan
   if (tier === "free") {
+    return NextResponse.json(
+      { error: "Active subscription required" },
+      { status: 403 }
+    );
+  }
+
+  // Must have an active subscription (not past_due or cancelled)
+  if (subscriptionStatus !== "active") {
     return NextResponse.json(
       { error: "Active subscription required" },
       { status: 403 }
@@ -60,6 +69,7 @@ export async function POST(request: Request) {
     metadata: {
       user_id: user.id,
       pack_type: pack,
+      quantity: String(quantity),
       credits: String(packConfig.credits * quantity),
     },
     success_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing?topup=success`,

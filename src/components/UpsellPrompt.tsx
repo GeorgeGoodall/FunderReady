@@ -1,5 +1,7 @@
 "use client";
 
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
 interface UpsellPromptProps {
   tier: "free" | "basic" | "pro";
   remaining: number;
@@ -29,7 +31,6 @@ export function UpsellPrompt({ tier, remaining, resetDate, estimateLow, estimate
   }
 
   // Subscribed user with insufficient credits
-  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const d = new Date(resetDate);
   const resetStr = `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 

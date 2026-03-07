@@ -162,9 +162,10 @@ export function ApplicationFormClient({
     try {
       const res = await fetch(`/api/applications/${application.id}/estimate`);
       if (!res.ok) {
-        // Fallback: submit directly if estimate fails
+        // Fallback: show no-estimate confirm dialog if estimate fails
         setLoadingUsage(false);
-        await handleConfirmSubmit();
+        setEstimateState({ low: 0, high: 0, remaining: 0, canAfford: true, hasEstimate: false });
+        setShowSubmitConfirm(true);
         return;
       }
       const data = await res.json();
@@ -177,8 +178,9 @@ export function ApplicationFormClient({
       });
       setShowSubmitConfirm(true);
     } catch {
-      // Fallback: submit directly if estimate fails
-      await handleConfirmSubmit();
+      // Fallback: show no-estimate confirm dialog if estimate fails
+      setEstimateState({ low: 0, high: 0, remaining: 0, canAfford: true, hasEstimate: false });
+      setShowSubmitConfirm(true);
     } finally {
       setLoadingUsage(false);
     }
@@ -705,12 +707,12 @@ export function ApplicationFormClient({
                   >
                     Cancel
                   </button>
-                  <a
+                  <Link
                     href="/billing"
                     className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700"
                   >
                     Buy Credits
-                  </a>
+                  </Link>
                 </div>
               </>
             )}
