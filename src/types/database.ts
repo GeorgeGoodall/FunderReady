@@ -143,7 +143,9 @@ export type Database = {
           criteria_set_id: string | null
           error_message: string | null
           id: string
+          period_credits_charged: number
           progress: Json
+          purchased_credits_charged: number
           questions_set_id: string | null
           results: Json | null
           review_number: number
@@ -162,7 +164,9 @@ export type Database = {
           criteria_set_id?: string | null
           error_message?: string | null
           id?: string
+          period_credits_charged?: number
           progress?: Json
+          purchased_credits_charged?: number
           questions_set_id?: string | null
           results?: Json | null
           review_number?: number
@@ -181,7 +185,9 @@ export type Database = {
           criteria_set_id?: string | null
           error_message?: string | null
           id?: string
+          period_credits_charged?: number
           progress?: Json
+          purchased_credits_charged?: number
           questions_set_id?: string | null
           results?: Json | null
           review_number?: number
@@ -382,6 +388,7 @@ export type Database = {
       }
       funds: {
         Row: {
+          approved: boolean
           closes_at: string | null
           created_at: string
           created_by: string
@@ -391,13 +398,14 @@ export type Database = {
           notes: string | null
           opens_at: string | null
           organisation_id: string
-          published: boolean
           rejected: boolean
           rejection_reason: string | null
+          shared: boolean
           updated_at: string
           url: string | null
         }
         Insert: {
+          approved?: boolean
           closes_at?: string | null
           created_at?: string
           created_by: string
@@ -407,13 +415,14 @@ export type Database = {
           notes?: string | null
           opens_at?: string | null
           organisation_id: string
-          published?: boolean
           rejected?: boolean
           rejection_reason?: string | null
+          shared?: boolean
           updated_at?: string
           url?: string | null
         }
         Update: {
+          approved?: boolean
           closes_at?: string | null
           created_at?: string
           created_by?: string
@@ -423,9 +432,9 @@ export type Database = {
           notes?: string | null
           opens_at?: string | null
           organisation_id?: string
-          published?: boolean
           rejected?: boolean
           rejection_reason?: string | null
+          shared?: boolean
           updated_at?: string
           url?: string | null
         }
@@ -878,6 +887,10 @@ export type Database = {
           total_input_tokens: number
           total_output_tokens: number
         }[]
+      }
+      cancel_review: {
+        Args: { p_application_id: string; p_user_id: string }
+        Returns: string
       }
       deduct_credits: {
         Args: {
