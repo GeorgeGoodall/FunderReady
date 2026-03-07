@@ -486,7 +486,7 @@ describe("DELETE /api/applications/[id]", () => {
     authenticatedUser();
     mockFrom.mockImplementation(
       tableDispatch({
-        applications: { data: null, error: null },
+        applications: { data: [{ id: APP_ID }], error: null },
       })
     );
     const DELETE = await importRoute();
@@ -795,6 +795,29 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     const res = await POST(new Request("http://localhost"), routeParams(APP_ID));
     expect(res.status).toBe(402);
     expect((await res.json()).error).toContain("Insufficient credits");
+  });
+
+  it("returns 409 when review already in progress (RPC REVIEW_IN_PROGRESS)", async () => {
+    authenticatedUser();
+    mockFrom.mockImplementation(
+      tableDispatch({
+        applications: { data: draftApp, error: null },
+        application_answers: { data: nonEmptyAnswers, error: null },
+      })
+    );
+    mockServiceFrom.mockImplementation(
+      tableDispatch({
+        profiles: { data: proProfile, error: null },
+      })
+    );
+    mockServiceRpc.mockResolvedValue({
+      data: null,
+      error: { message: "REVIEW_IN_PROGRESS" },
+    });
+    const POST = await importRoute();
+    const res = await POST(new Request("http://localhost"), routeParams(APP_ID));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain("already have a review in progress");
   });
 
   it("returns 400 if all answers are empty", async () => {

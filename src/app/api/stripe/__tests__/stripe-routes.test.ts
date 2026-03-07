@@ -36,7 +36,7 @@ vi.mock("@/lib/stripe/client", () => ({
   },
 }));
 
-// Mock PLANS
+// Mock PLANS + TOPUP_PACKS
 vi.mock("@/lib/stripe/plans", () => ({
   PLANS: {
     free: { name: "Free", price: 0, creditsPerMonth: 0 },
@@ -51,6 +51,22 @@ vi.mock("@/lib/stripe/plans", () => ({
       priceMonthly: 4900,
       creditsPerMonth: 100,
       stripePriceId: "price_test_123",
+    },
+  },
+  TOPUP_PACKS: {
+    standard: {
+      name: "Standard Top-Up",
+      pricePence: 500,
+      credits: 10,
+      availableTo: ["basic", "pro"],
+      stripePriceId: "price_standard_topup_123",
+    },
+    pro: {
+      name: "Pro Top-Up",
+      pricePence: 1000,
+      credits: 30,
+      availableTo: ["pro"],
+      stripePriceId: "price_pro_topup_123",
     },
   },
 }));
@@ -178,6 +194,89 @@ describe("POST /api/stripe/portal", () => {
 });
 
 // =====================================================================
+// POST /api/stripe/topup
+// =====================================================================
+
+describe("POST /api/stripe/topup", () => {
+  async function importRoute() {
+    const mod = await import("../../stripe/topup/route");
+    return mod.POST;
+  }
+
+  function makeRequest(body: unknown) {
+    return new Request("http://localhost/api/stripe/topup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("returns 401 for unauthenticated user", async () => {
+    unauthenticatedUser();
+    const POST = await importRoute();
+    const res = await POST(makeRequest({ pack: "standard", quantity: 1 }));
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 400 for invalid pack type", async () => {
+    authenticatedUser();
+    const POST = await importRoute();
+    const res = await POST(makeRequest({ pack: "invalid_pack", quantity: 1 }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid pack" });
+  });
+
+  it("returns 403 for free tier user", async () => {
+    authenticatedUser();
+    mockFrom.mockReturnValue(
+      chainMock({
+        data: {
+          subscription_tier: "free",
+          subscription_status: null,
+          stripe_customer_id: null,
+        },
+        error: null,
+      })
+    );
+    const POST = await importRoute();
+    const res = await POST(makeRequest({ pack: "standard", quantity: 1 }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "Active subscription required" });
+  });
+
+  it("returns 200 with checkout URL for valid request", async () => {
+    authenticatedUser();
+    mockFrom.mockReturnValue(
+      chainMock({
+        data: {
+          subscription_tier: "pro",
+          subscription_status: "active",
+          stripe_customer_id: "cus_topup_123",
+        },
+        error: null,
+      })
+    );
+    mockStripeCheckoutCreate.mockResolvedValue({
+      url: "https://checkout.stripe.com/topup-session",
+    });
+
+    const POST = await importRoute();
+    const res = await POST(makeRequest({ pack: "standard", quantity: 1 }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      url: "https://checkout.stripe.com/topup-session",
+    });
+    expect(mockStripeCheckoutCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: "cus_topup_123",
+        mode: "payment",
+      })
+    );
+  });
+});
+
+// =====================================================================
 // POST /api/stripe/webhooks
 // =====================================================================
 
@@ -264,6 +363,62 @@ describe("POST /api/stripe/webhooks", () => {
     const res = await POST(req);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ received: true });
+  });
+
+  it("routes checkout.session.completed with mode=payment to topup handler", async () => {
+    const mockPaymentSession = {
+      mode: "payment",
+      payment_intent: "pi_topup_123",
+      customer: "cus_123",
+      amount_total: 500,
+      metadata: {
+        user_id: "user-123",
+        pack_type: "standard",
+        quantity: "1",
+        credits: "10",
+      },
+    };
+
+    mockStripeWebhooksConstructEvent.mockReturnValue({
+      type: "checkout.session.completed",
+      data: { object: mockPaymentSession },
+    });
+
+    // handleTopupCompleted uses createServiceClient().from() and .rpc()
+    // Mock idempotency check (no existing purchase) + rpc + insert
+    const creditPurchasesNoExisting: Record<string, ReturnType<typeof vi.fn>> = {};
+    creditPurchasesNoExisting.select = vi.fn(() => creditPurchasesNoExisting);
+    creditPurchasesNoExisting.eq = vi.fn(() => creditPurchasesNoExisting);
+    creditPurchasesNoExisting.maybeSingle = vi.fn(() =>
+      Promise.resolve({ data: null, error: null })
+    );
+    creditPurchasesNoExisting.insert = vi.fn(() =>
+      Promise.resolve({ data: null, error: null })
+    );
+
+    const mockServiceRpc = vi.fn(() =>
+      Promise.resolve({ error: null })
+    );
+
+    // Override createServiceClient to include rpc
+    const { createServiceClient } = await import("@/lib/supabase/server");
+    vi.mocked(createServiceClient).mockReturnValue({
+      from: vi.fn(() => creditPurchasesNoExisting),
+      rpc: mockServiceRpc,
+    } as unknown as ReturnType<typeof createServiceClient>);
+
+    const POST = await importRoute();
+    const req = makeWebhookRequest('{"type":"checkout.session.completed"}');
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
+    // Verify topup path: subscription retrieve should NOT be called (that's the subscription path)
+    expect(mockStripeSubscriptionsRetrieve).not.toHaveBeenCalled();
+
+    // Restore createServiceClient to the standard mock so subsequent tests are not affected.
+    vi.mocked(createServiceClient).mockReturnValue({
+      from: mockServiceFrom,
+    } as unknown as ReturnType<typeof createServiceClient>);
   });
 
   it("routes customer.subscription.updated correctly", async () => {
@@ -427,15 +582,15 @@ describe("Webhook handlers", () => {
         "cus_test_1"
       );
 
-      // Verify usage was synced
-      expect(usageChain.upsert).toHaveBeenCalledWith(
+      // Verify usage was synced (insert-or-update approach: insert first,
+      // then update credits_limit on conflict, never resetting credits_used)
+      expect(usageChain.insert).toHaveBeenCalledWith(
         expect.objectContaining({
           user_id: "user-checkout-1",
           credits_limit: 100,
           credits_used: 0,
           bonus_reviews: 0,
-        }),
-        { onConflict: "user_id,period" }
+        })
       );
     });
 
@@ -636,16 +791,24 @@ describe("Webhook handlers", () => {
 
   describe("handleSubscriptionDeleted", () => {
     it("downgrades to free + cancelled and syncs usage limit to 0", async () => {
+      // Call 1: pre-fetch profile (to read current_period_end before clearing it)
+      const preFetchChain = chainMock({
+        data: { id: "user-del-1", current_period_end: "2026-04-04T00:00:00.000Z" },
+        error: null,
+      });
+      // Call 2: profile update (the actual downgrade)
       const profileChain = chainMock({
         data: { id: "user-del-1" },
         error: null,
       });
+      // Call 3: usage update
       const usageChain = chainMock({ data: null, error: null });
 
       let callCount = 0;
       mockServiceFrom.mockImplementation(() => {
         callCount++;
-        if (callCount === 1) return profileChain;
+        if (callCount === 1) return preFetchChain;
+        if (callCount === 2) return profileChain;
         return usageChain;
       });
 
@@ -674,11 +837,23 @@ describe("Webhook handlers", () => {
     });
 
     it("returns early when profile update fails", async () => {
+      // Call 1: pre-fetch (succeeds)
+      const preFetchChain = chainMock({
+        data: { id: "user-del-fail", current_period_end: null },
+        error: null,
+      });
+      // Call 2: profile update (fails)
       const profileChain = chainMock({
         data: null,
         error: { message: "Not found" },
       });
-      mockServiceFrom.mockReturnValue(profileChain);
+
+      let callCount = 0;
+      mockServiceFrom.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return preFetchChain;
+        return profileChain;
+      });
 
       const { handleSubscriptionDeleted } = await importHandlers();
       await handleSubscriptionDeleted({
@@ -689,16 +864,28 @@ describe("Webhook handlers", () => {
 
       // Profile update was attempted
       expect(profileChain.update).toHaveBeenCalled();
-      // mockServiceFrom should only be called once (no usage update)
-      expect(mockServiceFrom).toHaveBeenCalledTimes(1);
+      // mockServiceFrom called twice (pre-fetch + profile update), no usage call
+      expect(mockServiceFrom).toHaveBeenCalledTimes(2);
     });
 
     it("skips usage sync when profile data is null (no matching customer)", async () => {
+      // Call 1: pre-fetch (returns null — no matching customer)
+      const preFetchChain = chainMock({
+        data: null,
+        error: null,
+      });
+      // Call 2: profile update (returns null data, no error)
       const profileChain = chainMock({
         data: null,
         error: null,
       });
-      mockServiceFrom.mockReturnValue(profileChain);
+
+      let callCount = 0;
+      mockServiceFrom.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return preFetchChain;
+        return profileChain;
+      });
 
       const { handleSubscriptionDeleted } = await importHandlers();
       await handleSubscriptionDeleted({
@@ -709,8 +896,8 @@ describe("Webhook handlers", () => {
 
       // Profile update was attempted but returned no profile
       expect(profileChain.update).toHaveBeenCalled();
-      // Should only have called from() once (for profiles, not for usage)
-      expect(mockServiceFrom).toHaveBeenCalledTimes(1);
+      // Should have called from() twice (pre-fetch + profile update), no usage call
+      expect(mockServiceFrom).toHaveBeenCalledTimes(2);
     });
   });
 
