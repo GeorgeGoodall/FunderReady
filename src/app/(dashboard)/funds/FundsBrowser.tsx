@@ -21,7 +21,8 @@ type MyFund = {
   name: string;
   organisation: { id: string; name: string } | null;
   url: string | null;
-  published: boolean;
+  approved: boolean;
+  shared: boolean;
   created_at: string;
 };
 
@@ -37,11 +38,11 @@ function formatDate(iso: string | null): string | null {
 }
 
 export function FundsBrowser({
-  initialPublishedFunds,
+  initialCommunityFunds,
   initialHasMore,
   myFunds: initialMyFunds,
 }: {
-  initialPublishedFunds: Fund[];
+  initialCommunityFunds: Fund[];
   initialHasMore: boolean;
   myFunds: MyFund[];
 }) {
@@ -49,7 +50,7 @@ export function FundsBrowser({
   const [tab, setTab] = useState<Tab>("browse");
 
   // Browse tab state
-  const [funds, setFunds] = useState<Fund[]>(initialPublishedFunds);
+  const [funds, setFunds] = useState<Fund[]>(initialCommunityFunds);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -63,6 +64,7 @@ export function FundsBrowser({
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [sharingId, setSharingId] = useState<string | null>(null);
 
   const handleSearch = useCallback(async (query: string) => {
     if (!query.trim() || query.trim().length < 2) {
@@ -115,6 +117,26 @@ export function FundsBrowser({
       // Silently fail
     } finally {
       setLoadingMore(false);
+    }
+  }
+
+  async function handleToggleShare(id: string, shared: boolean) {
+    setSharingId(id);
+    try {
+      const res = await fetch(`/api/funds/${id}/share`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shared }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      setMyFunds((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, shared } : f))
+      );
+      router.refresh();
+    } catch {
+      // Silently fail
+    } finally {
+      setSharingId(null);
     }
   }
 
@@ -235,7 +257,7 @@ export function FundsBrowser({
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">
                     {isSearching
                       ? "No funds found matching your search."
-                      : "No published funds yet."}
+                      : "No shared funds yet."}
                   </p>
                 </div>
               ) : (
@@ -328,15 +350,22 @@ export function FundsBrowser({
                       >
                         {fund.name}
                       </Link>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                          fund.published
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
-                            : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
-                        }`}
-                      >
-                        {fund.published ? "Published" : "Unpublished"}
-                      </span>
+                      {fund.shared && (
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                            fund.approved
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                          }`}
+                          title={
+                            fund.approved
+                              ? "This fund has been reviewed and is visible to all users"
+                              : "This fund is awaiting review and is only visible to you"
+                          }
+                        >
+                          {fund.approved ? "Shared" : "Pending review"}
+                        </span>
+                      )}
                     </div>
                     {fund.organisation && (
                       <p className="mt-0.5 truncate text-sm text-zinc-500 dark:text-zinc-400">
@@ -346,6 +375,24 @@ export function FundsBrowser({
                   </div>
 
                   <div className="flex shrink-0 items-center gap-2">
+                    {!fund.shared && !fund.approved && (
+                      <button
+                        onClick={() => handleToggleShare(fund.id, true)}
+                        disabled={sharingId === fund.id}
+                        className="rounded-md px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 disabled:opacity-50"
+                      >
+                        {sharingId === fund.id ? "Sharing..." : "Share"}
+                      </button>
+                    )}
+                    {fund.shared && !fund.approved && (
+                      <button
+                        onClick={() => handleToggleShare(fund.id, false)}
+                        disabled={sharingId === fund.id}
+                        className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
+                      >
+                        {sharingId === fund.id ? "Cancelling..." : "Cancel sharing"}
+                      </button>
+                    )}
                     {confirmingId === fund.id ? (
                       <>
                         <span className="text-sm text-zinc-600 dark:text-zinc-400">
