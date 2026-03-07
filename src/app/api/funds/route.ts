@@ -36,7 +36,8 @@ export async function GET(request: Request) {
     .from("funds")
     .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at")
     .textSearch("name", tsQuery)
-    .eq("published", true)
+    .eq("approved", true)
+    .eq("shared", true)
     .eq("rejected", false)
     .order("created_at", { ascending: false })
     .limit(10);
@@ -62,7 +63,8 @@ export async function GET(request: Request) {
       .from("funds")
       .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at")
       .in("organisation_id", orgIds)
-      .eq("published", true)
+      .eq("approved", true)
+      .eq("shared", true)
       .eq("rejected", false)
       .order("created_at", { ascending: false })
       .limit(10);
@@ -121,7 +123,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { name, organisation_id, url, notes, opens_at, closes_at } = parsed.data;
+  const { name, organisation_id, url, notes, opens_at, closes_at, shared } = parsed.data;
 
   if (opens_at && closes_at && new Date(opens_at) > new Date(closes_at)) {
     return NextResponse.json(
@@ -153,6 +155,7 @@ export async function POST(request: Request) {
       notes: notes ?? null,
       opens_at: opens_at ?? null,
       closes_at: closes_at ?? null,
+      shared: shared ?? false,
       created_by: user.id,
     })
     .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at")

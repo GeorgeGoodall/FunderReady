@@ -128,6 +128,7 @@ export const FundSchema = z.object({
   notes: z.string().optional(),
   opens_at: z.string().datetime().optional().nullable(),
   closes_at: z.string().datetime().optional().nullable(),
+  shared: z.boolean().optional().default(false),
 });
 
 export type Fund = z.infer<typeof FundSchema>;
