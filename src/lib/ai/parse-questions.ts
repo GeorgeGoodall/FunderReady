@@ -32,7 +32,7 @@ Field type detection rules:
 - "checkbox": Use when the funder asks to "select all that apply", "tick all that apply", or presents a multi-select list. Include the options in the "options" array.
 - When in doubt, default to "text_long" — it's always safe.`;
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-haiku-4-5-20251001";
 
 export async function parseQuestionsWithAI(rawText: string, userId?: string): Promise<QuestionsSet> {
   return callClaude({

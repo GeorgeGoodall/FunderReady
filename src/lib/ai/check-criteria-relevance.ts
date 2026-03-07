@@ -16,7 +16,8 @@ Return ONLY valid JSON: { "relevant": true, "confidence": 0.85 }
 
 let _client: GoogleGenAI | null = null;
 function getClient(): GoogleGenAI {
-  if (!_client) _client = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY! });
+  if (!process.env.GOOGLE_AI_API_KEY) throw new Error("GOOGLE_AI_API_KEY is not set");
+  if (!_client) _client = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY });
   return _client;
 }
 
@@ -82,7 +83,8 @@ export async function checkCriteriaRelevance(
       rawAiResponse,
       usage,
     };
-  } catch {
+  } catch (e) {
+    console.warn("[check-criteria-relevance] Unexpected response format:", e);
     return { relevant: false, confidence: 0, rawAiResponse, usage };
   }
 }

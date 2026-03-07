@@ -19,7 +19,7 @@ Rules:
 - Do NOT invent criteria that aren't supported by the text
 - If the text mentions application opening dates, closing dates, or deadlines, extract them as ISO 8601 datetime strings (e.g. "2026-04-30T00:00:00Z"). Only include dates you are confident about.`;
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-haiku-4-5-20251001";
 
 export async function parseCriteriaWithAI(rawText: string, userId?: string): Promise<ParseCriteriaResponse> {
   return callClaude({

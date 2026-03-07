@@ -196,7 +196,7 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
       model,
       max_tokens: maxTokens,
       ...(temperature !== undefined && { temperature }),
-      system: systemPrompt || undefined,
+      system: (Array.isArray(systemPrompt) ? systemPrompt.length > 0 : !!systemPrompt) ? systemPrompt : undefined,
       messages: [{ role: "user", content: prompt }],
       tools: [tool],
       tool_choice: { type: "tool", name: TOOL_NAME },
@@ -241,7 +241,7 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
         model,
         max_tokens: maxTokens,
         ...(temperature !== undefined && { temperature }),
-        system: systemPrompt || undefined,
+        system: (Array.isArray(systemPrompt) ? systemPrompt.length > 0 : !!systemPrompt) ? systemPrompt : undefined,
         messages: [
           { role: "user", content: prompt },
           { role: "assistant", content: message.content },

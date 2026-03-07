@@ -30,6 +30,7 @@ import {
 } from "@/lib/pipeline/application-prompts";
 import type { Criterion } from "@/lib/pipeline/prompt-templates";
 import type { ImprovementAppendixItem } from "@/lib/pipeline/schemas";
+import { calculateCost } from "@/lib/ai/pricing";
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
@@ -787,12 +788,9 @@ export const applicationReviewRequested = inngest.createFunction(
     // -----------------------------------------------------------------------
     const answerTexts = enabledAnswers.map((a) => a.answer_text);
     const knownNumbers = extractKnownNumbers(answerTexts);
-    if (scoring.improvement_appendix) {
-      scoring.improvement_appendix = sanitizeExampleLanguage(
-        scoring.improvement_appendix,
-        knownNumbers
-      );
-    }
+    const sanitizedScoring: ApplicationScoring = scoring.improvement_appendix
+      ? { ...scoring, improvement_appendix: sanitizeExampleLanguage(scoring.improvement_appendix, knownNumbers) }
+      : scoring;
 
     // -----------------------------------------------------------------------
     // Step 5: Save results
@@ -828,7 +826,6 @@ export const applicationReviewRequested = inngest.createFunction(
       }
 
       // Recompute costs from the logged events' calculated values
-      const { calculateCost } = await import("@/lib/ai/pricing");
       for (const e of allUsageEvents) {
         const { cost_usd, cost_gbp } = calculateCost(e.model, e.usage);
         totalCostUsd += cost_usd;
@@ -838,7 +835,7 @@ export const applicationReviewRequested = inngest.createFunction(
       // Compute projected score mechanically
       const gapCount = gapCriteria.length;
       const totalCriteriaCount = criteria.length;
-      const projectedScore = computeProjectedScore(scoring.overall_score, gapCount, totalCriteriaCount);
+      const projectedScore = computeProjectedScore(sanitizedScoring.overall_score, gapCount, totalCriteriaCount);
 
       // Save results JSONB to application_reviews
       const { error: resultsError } = await supabase
@@ -856,7 +853,7 @@ export const applicationReviewRequested = inngest.createFunction(
               answerAnalyses.map((a) => [a.question_id, a])
             ),
             cross_reference: crossReferenceWithGaps,
-            scoring,
+            scoring: sanitizedScoring,
             projected_score: projectedScore,
             gap_count: gapCount,
             total_criteria_count: totalCriteriaCount,
@@ -901,14 +898,14 @@ export const applicationReviewRequested = inngest.createFunction(
       }
 
       // Stamp last_reviewed_text on enabled answers only (skip disabled)
-      await Promise.all(
-        enabledAnswers.map((answer) =>
-          supabase
-            .from("application_answers")
-            .update({ last_reviewed_text: answer.answer_text })
-            .eq("application_id", applicationId)
-            .eq("question_id", answer.question_id)
-        )
+      await supabase.from("application_answers").upsert(
+        enabledAnswers.map((a) => ({
+          application_id: applicationId,
+          question_id: a.question_id,
+          answer_text: a.answer_text,
+          last_reviewed_text: a.answer_text,
+        })),
+        { onConflict: "application_id,question_id" }
       );
 
       // Update application status to reviewed

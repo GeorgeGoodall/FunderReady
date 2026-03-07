@@ -26,7 +26,8 @@ Rules:
 
 let _client: GoogleGenAI | null = null;
 function getClient(): GoogleGenAI {
-  if (!_client) _client = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY! });
+  if (!process.env.GOOGLE_AI_API_KEY) throw new Error("GOOGLE_AI_API_KEY is not set");
+  if (!_client) _client = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY });
   return _client;
 }
 
@@ -102,7 +103,8 @@ export async function filterLinksForCriteria(
       rawAiResponse,
       usage,
     };
-  } catch {
+  } catch (e) {
+    console.warn("[filter-links] Unexpected response format:", e);
     return { selected: [], allLinks: links, selectedIndices: [], rawAiResponse, usage };
   }
 }

@@ -49,7 +49,7 @@ describe("parseCriteriaWithAI", () => {
       expect.objectContaining({
         prompt: expect.stringContaining("1. Clear need (25%)"),
         schema: ParseCriteriaResponseSchema,
-        model: "claude-sonnet-4-6",
+        model: "claude-haiku-4-5-20251001",
         maxTokens: 8192,
       })
     );
@@ -98,7 +98,7 @@ describe("parseCriteriaWithAI", () => {
     expect(logAiUsage).toHaveBeenCalledWith({
       userId: "user-456",
       pipelineStep: "parse_criteria",
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5-20251001",
       usage: mockUsage,
     });
   });

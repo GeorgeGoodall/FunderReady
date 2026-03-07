@@ -274,6 +274,7 @@ export function formatPreviousOverallContext(
 // Cross-reference prompt (uses question_ids instead of section_ids)
 // ---------------------------------------------------------------------------
 
+/** @deprecated Use formatAnswerAnalysesForCrossReference or formatAnswerAnalysesForScoring instead */
 export function formatAnswerAnalysesSummary(
   analyses: AnswerAnalysis[],
   questions: Array<{ id: string; question: string }>
