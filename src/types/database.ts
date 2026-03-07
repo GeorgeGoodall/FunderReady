@@ -891,6 +891,26 @@ export type Database = {
           purchased_deducted: number
         }[]
       }
+      get_avg_answer_chars: {
+        Args: never
+        Returns: {
+          avg_chars: number
+        }[]
+      }
+      get_completed_review_count: {
+        Args: never
+        Returns: {
+          review_count: number
+        }[]
+      }
+      get_estimation_step_stats: {
+        Args: never
+        Returns: {
+          avg_cost_usd: number
+          call_count: number
+          pipeline_step: string
+        }[]
+      }
       increment_ai_daily_usage: {
         Args: { p_limit: number; p_user_id: string }
         Returns: number
