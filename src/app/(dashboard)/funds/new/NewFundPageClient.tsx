@@ -43,6 +43,7 @@ export function NewFundPageClient() {
           organisation_id: organisationId,
           url: data.url,
           notes: data.notes,
+          shared: data.shared ?? false,
         }),
       });
 

@@ -9,6 +9,7 @@ export interface NewFundData {
   newOrg?: { name: string; url?: string; description?: string };
   url?: string;
   notes?: string;
+  shared?: boolean;
 }
 
 interface NewFundFormProps {
@@ -21,6 +22,7 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
   const [name, setName] = useState(suggestedName);
   const [url, setUrl] = useState("");
   const [notes, setNotes] = useState("");
+  const [shared, setShared] = useState(false);
 
   // Org state: either a selected existing org or a new org name
   const [selectedOrg, setSelectedOrg] = useState<OrgOption | null>(null);
@@ -43,6 +45,7 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
       name: name.trim(),
       url: url.trim() || undefined,
       notes: notes.trim() || undefined,
+      shared,
     };
 
     if (selectedOrg) {
@@ -130,6 +133,22 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
           />
         </div>
       </div>
+
+      <div className="mt-4 flex items-start gap-3">
+          <input
+            type="checkbox"
+            id="shared"
+            checked={shared}
+            onChange={(e) => setShared(e.target.checked)}
+            className="mt-1 rounded border-zinc-300 dark:border-zinc-600"
+          />
+          <label htmlFor="shared" className="text-sm text-zinc-700 dark:text-zinc-300">
+            <span className="font-medium">Share with community</span>
+            <span className="mt-0.5 block text-xs text-zinc-500 dark:text-zinc-400">
+              Submit this fund for review so other users can find and use it
+            </span>
+          </label>
+        </div>
 
       <div className="mt-4 flex gap-3">
         <button
