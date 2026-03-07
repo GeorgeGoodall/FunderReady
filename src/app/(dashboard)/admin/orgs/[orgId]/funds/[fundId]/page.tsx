@@ -260,11 +260,11 @@ export default async function FundDetailPage({
         <div className="flex items-center gap-2">
           <h2 className="text-xl font-semibold">{fund.name}</h2>
           <span className={`text-xs px-2 py-0.5 rounded-full ${
-            fund.published
+            fund.approved
               ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
               : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
           }`}>
-            {fund.published ? "Published" : "Unpublished"}
+            {fund.approved ? "Approved" : "Pending review"}
           </span>
         </div>
         {fund.url && (
@@ -290,7 +290,7 @@ export default async function FundDetailPage({
       <AdminActionBar
         entityType="funds"
         entityId={fundId}
-        approved={fund.published}
+        approved={fund.approved}
         parentUrl={`/admin/orgs/${orgId}`}
         editFields={[
           { name: "name", label: "Name", type: "text" },

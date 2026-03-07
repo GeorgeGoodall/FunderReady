@@ -39,8 +39,8 @@ export default async function OrgDetailPage({
 
   const funds = await getFundsForOrg(orgId);
 
-  const pendingFunds = funds.filter((f) => !f.published);
-  const publishedFunds = funds.filter((f) => f.published);
+  const pendingFunds = funds.filter((f) => f.shared && !f.approved);
+  const approvedFunds = funds.filter((f) => f.approved);
 
   return (
     <>
@@ -100,7 +100,7 @@ export default async function OrgDetailPage({
       {pendingFunds.length > 0 && (
         <section>
           <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
-            Pending / Unpublished Funds ({pendingFunds.length})
+            Pending Funds ({pendingFunds.length})
           </h3>
           <div className="space-y-2">
             {pendingFunds.map((fund) => (
@@ -133,16 +133,16 @@ export default async function OrgDetailPage({
         </section>
       )}
 
-      {/* Published Funds */}
+      {/* Approved Funds */}
       <section>
         <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
-          Published Funds ({publishedFunds.length})
+          Approved Funds ({approvedFunds.length})
         </h3>
-        {publishedFunds.length === 0 ? (
-          <p className="text-sm text-zinc-500">No published funds.</p>
+        {approvedFunds.length === 0 ? (
+          <p className="text-sm text-zinc-500">No approved funds.</p>
         ) : (
           <div className="space-y-2">
-            {publishedFunds.map((fund) => (
+            {approvedFunds.map((fund) => (
               <Link
                 key={fund.id}
                 href={`/admin/orgs/${orgId}/funds/${fund.id}`}
