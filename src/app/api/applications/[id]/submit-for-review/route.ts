@@ -7,10 +7,12 @@ import { getEstimationStats } from "@/lib/usage/estimation-stats";
 import { PLANS } from "@/lib/stripe/plans";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const body = await request.json().catch(() => ({}));
+  const isDraft = body.is_draft === true;
   const supabase = await createClient();
   const {
     data: { user },
@@ -132,6 +134,7 @@ export async function POST(
       p_period: period,
       p_default_limit: defaultLimit,
       p_estimated_credits_low: gatingCredits,
+      p_is_draft: isDraft,
     }
   );
 
@@ -173,6 +176,7 @@ export async function POST(
         reviewId,
         reviewNumber,
         userId: user.id,
+        isDraft,
       },
     });
   } catch (err) {
