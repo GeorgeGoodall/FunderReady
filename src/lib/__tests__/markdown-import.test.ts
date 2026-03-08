@@ -360,7 +360,8 @@ describe("parseMarkdown — radio_other field type", () => {
     const result = parseMarkdown(doc, questions);
     expect(result.ok).toBe(true);
     const ans = result.answers.find((a) => a.question_id === "q1");
-    expect(ans?.selected_options).toContain("Option A");
+    // "Other" should NOT be in selected_options when Other text is empty
+    expect(ans?.selected_options).toEqual(["Option A"]);
     expect(ans?.answer_text).toBe("Option A");
   });
 

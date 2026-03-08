@@ -260,7 +260,9 @@ function extractAnswerFromRegion(
       const otherMatch = line.match(/^\(\?\)\s+Other:\s*(.*)$/);
       if (otherMatch) {
         otherText = otherMatch[1].trim();
-        selected.push("Other");
+        if (otherText !== "") {
+          selected.push("Other");
+        }
       }
     }
 

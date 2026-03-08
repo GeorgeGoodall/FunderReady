@@ -163,9 +163,8 @@ describe("docx-import", () => {
       expect(result.ok).toBe(true);
       const answer = result.answers.find((a) => a.question_id === "q1");
       expect(answer).toBeDefined();
-      // "Other" is always pushed when (?) line is matched
-      expect(answer!.selected_options).toEqual(["Health", "Other"]);
-      // answer_text = otherText if non-empty, else the non-Other selected option
+      // "Other" should NOT be in selected_options when Other text is empty
+      expect(answer!.selected_options).toEqual(["Health"]);
       expect(answer!.answer_text).toBe("Health");
     });
 
