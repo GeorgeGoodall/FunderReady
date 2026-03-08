@@ -121,7 +121,7 @@ export function FormField({
               Changed since review
             </span>
           )}
-          {value.trim() && !isDisabled && fieldType !== "date" && fieldType !== "time" && <CopyButton text={value} />}
+          {value.trim() && !isDisabled && fieldType !== "date" && fieldType !== "time" && fieldType !== "radio_other" && fieldType !== "checkbox_other" && <CopyButton text={value} />}
           {onDisabledChange && (
             <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
               <input
@@ -281,6 +281,52 @@ export function FormField({
           </div>
         )}
 
+        {fieldType === "radio_other" && question.options && (
+          <div className="space-y-2">
+            {question.options.map((opt) => (
+              <label key={opt} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name={`q-${question.id}`}
+                  value={opt}
+                  checked={(selectedOptions ?? []).includes(opt)}
+                  onChange={() => {
+                    onOptionsChange?.([opt]);
+                    if (value) onChange(""); // clear Other text when picking a regular option
+                  }}
+                  onBlur={onBlur}
+                  className="text-blue-600 focus:ring-blue-500"
+                />
+                {opt}
+              </label>
+            ))}
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name={`q-${question.id}`}
+                value="Other"
+                checked={(selectedOptions ?? []).includes("Other")}
+                onChange={() => {
+                  onOptionsChange?.(["Other"]);
+                }}
+                onBlur={onBlur}
+                className="text-blue-600 focus:ring-blue-500"
+              />
+              Other (please specify)
+            </label>
+            {(selectedOptions ?? []).includes("Other") && (
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onBlur={onBlur}
+                placeholder="Please specify..."
+                className="ml-6 w-[calc(100%-1.5rem)] rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+              />
+            )}
+          </div>
+        )}
+
         {fieldType === "checkbox" && question.options && (
           <div className="space-y-2">
             {question.options.map((opt) => {
@@ -304,6 +350,67 @@ export function FormField({
                 </label>
               );
             })}
+          </div>
+        )}
+
+        {fieldType === "checkbox_other" && question.options && (
+          <div className="space-y-2">
+            {question.options.map((opt) => {
+              const checked = (selectedOptions ?? []).includes(opt);
+              return (
+                <label key={opt} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      const current = selectedOptions ?? [];
+                      const updated = checked
+                        ? current.filter((o) => o !== opt)
+                        : [...current, opt];
+                      onOptionsChange?.(updated);
+                    }}
+                    onBlur={onBlur}
+                    className="rounded text-blue-600 focus:ring-blue-500"
+                  />
+                  {opt}
+                </label>
+              );
+            })}
+            {(() => {
+              const otherChecked = (selectedOptions ?? []).includes("Other");
+              return (
+                <>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={otherChecked}
+                      onChange={() => {
+                        const current = selectedOptions ?? [];
+                        if (otherChecked) {
+                          onOptionsChange?.(current.filter((o) => o !== "Other"));
+                          if (value) onChange(""); // clear Other text when unchecking
+                        } else {
+                          onOptionsChange?.([...current, "Other"]);
+                        }
+                      }}
+                      onBlur={onBlur}
+                      className="rounded text-blue-600 focus:ring-blue-500"
+                    />
+                    Other (please specify)
+                  </label>
+                  {otherChecked && (
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={(e) => onChange(e.target.value)}
+                      onBlur={onBlur}
+                      placeholder="Please specify..."
+                      className="ml-6 w-[calc(100%-1.5rem)] rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+                    />
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
