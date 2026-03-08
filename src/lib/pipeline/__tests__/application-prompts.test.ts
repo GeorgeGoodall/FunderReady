@@ -1656,3 +1656,84 @@ describe("buildApplicationScoringPrompt — draft mode", () => {
     expect(userPrompt).not.toContain("draft application");
   });
 });
+
+// ---------------------------------------------------------------------------
+// radio_other and checkbox_other field types — answer display
+// ---------------------------------------------------------------------------
+
+describe("buildAnswerAnalysisPrompt — radio_other field type", () => {
+  it("shows 'Selected: Yes' when selected_options=['Yes'] and answer_text=''", () => {
+    const prompt = buildAnswerAnalysisPrompt(
+      makeAnswer({ field_type: "radio_other", selected_options: ["Yes"], answer_text: "" })
+    );
+    expect(prompt).toContain("Selected: Yes");
+  });
+
+  it("shows 'Selected: Other' and 'Other text: custom text' when Other is chosen", () => {
+    const prompt = buildAnswerAnalysisPrompt(
+      makeAnswer({ field_type: "radio_other", selected_options: ["Other"], answer_text: "custom text" })
+    );
+    expect(prompt).toContain("Selected: Other");
+    expect(prompt).toContain("Other text: custom text");
+  });
+
+  it("suppresses word count section (constrained field suppression)", () => {
+    const prompt = buildAnswerAnalysisPrompt(
+      makeAnswer({ field_type: "radio_other", selected_options: ["Yes"], answer_text: "", word_count_max: 300 })
+    );
+    expect(prompt).not.toContain("## Word Count");
+    expect(prompt).not.toContain("utilised");
+  });
+
+  it("includes radio_other field type section in prompt", () => {
+    const prompt = buildAnswerAnalysisPrompt(
+      makeAnswer({ field_type: "radio_other", selected_options: ["Yes"], answer_text: "" })
+    );
+    expect(prompt).toContain("radio_other");
+  });
+});
+
+describe("buildAnswerAnalysisPrompt — checkbox_other field type", () => {
+  it("shows 'Selected: A, B' and 'Other text: extra info' when Other is checked", () => {
+    const prompt = buildAnswerAnalysisPrompt(
+      makeAnswer({ field_type: "checkbox_other", selected_options: ["A", "B", "Other"], answer_text: "extra info" })
+    );
+    expect(prompt).toContain("Selected: A, B");
+    expect(prompt).toContain("Other text: extra info");
+  });
+
+  it("shows only selected options when Other is not chosen", () => {
+    const prompt = buildAnswerAnalysisPrompt(
+      makeAnswer({ field_type: "checkbox_other", selected_options: ["A", "B"], answer_text: "" })
+    );
+    expect(prompt).toContain("Selected: A, B");
+    expect(prompt).not.toContain("Other text:");
+  });
+
+  it("suppresses word count section (constrained field suppression)", () => {
+    const prompt = buildAnswerAnalysisPrompt(
+      makeAnswer({ field_type: "checkbox_other", selected_options: ["A"], answer_text: "", word_count_max: 300 })
+    );
+    expect(prompt).not.toContain("## Word Count");
+    expect(prompt).not.toContain("utilised");
+  });
+});
+
+describe("buildAnswerAnalysisPrompt — checkbox field type with selected_options", () => {
+  it("shows 'Selected: A, B' when selected_options=['A','B'] and answer_text=''", () => {
+    const prompt = buildAnswerAnalysisPrompt(
+      makeAnswer({ field_type: "checkbox", selected_options: ["A", "B"], answer_text: "" })
+    );
+    expect(prompt).toContain("Selected: A, B");
+  });
+});
+
+describe("buildAnswerAnalysisPrompt — time field type suppresses word count", () => {
+  it("suppresses word count section for field_type='time'", () => {
+    const prompt = buildAnswerAnalysisPrompt(
+      makeAnswer({ field_type: "time", answer_text: "14:30", word_count_max: 300 })
+    );
+    expect(prompt).not.toContain("## Word Count");
+    expect(prompt).not.toContain("utilised");
+  });
+});

@@ -221,6 +221,53 @@ export function trimPreviousReviewResults(
 }
 
 /**
+ * Filter answers to those that are enabled and have content (non-empty text or selected options).
+ */
+export function filterEnabledAnswers<T extends {
+  is_disabled: boolean;
+  answer_text: string;
+  selected_options?: string[] | null;
+}>(answers: T[]): T[] {
+  return answers.filter(
+    (a) => !a.is_disabled && (
+      a.answer_text.trim().length > 0 ||
+      (Array.isArray(a.selected_options) && a.selected_options.length > 0)
+    )
+  );
+}
+
+/**
+ * Format an answer's content for the cross-reference step.
+ * Renders selected_options into readable text for radio_other, checkbox_other, and checkbox types.
+ */
+function formatAnswerForCrossRef(a: {
+  answer_text: string;
+  selected_options?: string[] | null;
+  field_type?: string | null;
+}): string {
+  const ft = a.field_type ?? "";
+  if (ft === "radio_other") {
+    if (a.selected_options?.includes("Other") && a.answer_text) {
+      return `Selected: Other\nOther text: ${a.answer_text}`;
+    }
+    const nonOther = (a.selected_options ?? []).filter((s) => s !== "Other");
+    if (nonOther.length > 0) return `Selected: ${nonOther.join(", ")}`;
+    return a.answer_text;
+  }
+  if (ft === "checkbox_other") {
+    const nonOther = (a.selected_options ?? []).filter((s) => s !== "Other");
+    const parts: string[] = [];
+    if (nonOther.length > 0) parts.push(`Selected: ${nonOther.join(", ")}`);
+    if (a.selected_options?.includes("Other") && a.answer_text) parts.push(`Other text: ${a.answer_text}`);
+    return parts.join("\n") || a.answer_text;
+  }
+  if (ft === "checkbox" && Array.isArray(a.selected_options) && a.selected_options.length > 0) {
+    return `Selected: ${a.selected_options.join(", ")}`;
+  }
+  return a.answer_text;
+}
+
+/**
  * Compute which answers have changed since the last review.
  * Returns a map of question_id → boolean (true if answer text differs from last reviewed).
  */
@@ -438,9 +485,7 @@ export const applicationReviewRequested = inngest.createFunction(
       const allAnswers = answers ?? [];
 
       // Split into enabled (non-disabled, non-empty) and disabled
-      const enabledAnswers = allAnswers.filter(
-        (a) => !a.is_disabled && a.answer_text.trim().length > 0
-      );
+      const enabledAnswers = filterEnabledAnswers(allAnswers);
 
       const questions = questionsSet.questions_json as unknown as Array<{
         id: string;
@@ -519,6 +564,7 @@ export const applicationReviewRequested = inngest.createFunction(
         question_id: a.question_id,
         question_text: q.question,
         answer_text: a.answer_text,
+        selected_options: a.selected_options ?? undefined,
         field_type: a.field_type ?? q.field_type,
         guidance: q.guidance,
         word_count_min: q.word_count_min,
@@ -670,7 +716,7 @@ export const applicationReviewRequested = inngest.createFunction(
         questions.map((q) => ({ id: q.id, question: q.question })),
         criteria,
         disabledQuestions,
-        enabledAnswers.map((a) => ({ question_id: a.question_id, answer_text: a.answer_text })),
+        enabledAnswers.map((a) => ({ question_id: a.question_id, answer_text: formatAnswerForCrossRef(a) })),
         isDraft
       );
 
