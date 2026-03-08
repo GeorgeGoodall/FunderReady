@@ -333,6 +333,7 @@ export function ApplicationReviewClient({
               reviewId={review.id}
               feedbackMap={feedbackMap}
               onFeedbackChange={handleFeedbackChange}
+              isDraft={review?.is_draft ?? false}
             />
           )}
 

@@ -55,7 +55,7 @@ export default async function ApplicationReviewPage({
 
   const reviewQuery = supabase
     .from("application_reviews")
-    .select("id, review_number, status, progress, results, error_message, questions_set_id, created_at")
+    .select("id, review_number, status, progress, results, error_message, questions_set_id, created_at, is_draft")
     .eq("application_id", id);
 
   const { data: review } = requestedNumber
@@ -134,6 +134,7 @@ export default async function ApplicationReviewPage({
           results: review.results as Record<string, unknown> | null,
           error_message: review.error_message,
           created_at: review.created_at,
+          is_draft: review.is_draft ?? false,
         } : null}
         isHistorical={isHistorical}
         defaultTab={defaultTab}

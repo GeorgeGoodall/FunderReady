@@ -20,6 +20,7 @@ export function SummaryTab({
   reviewId,
   feedbackMap,
   onFeedbackChange,
+  isDraft,
 }: {
   applicationId: string;
   scoring: ApplicationScoring;
@@ -30,6 +31,7 @@ export function SummaryTab({
   reviewId?: string;
   feedbackMap?: Record<string, "up" | "down">;
   onFeedbackChange?: (itemPath: string, sentiment: "up" | "down" | null) => void;
+  isDraft?: boolean;
 }) {
   const hasGaps = (gap_count ?? 0) > 0 && projected_score !== undefined;
 
@@ -48,6 +50,13 @@ export function SummaryTab({
 
   return (
     <div className="space-y-6">
+      {isDraft && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            <strong>Draft review</strong> — scores assume placeholders will be completed with strong content. Take scores as directional, not definitive.
+          </p>
+        </div>
+      )}
       {/* Score + readiness */}
       <div ref={scoreRef}>
         <div className="flex flex-wrap items-center gap-4">
@@ -67,9 +76,15 @@ export function SummaryTab({
               </span>
             </>
           )}
-          <span className={`rounded-full px-3 py-1 text-sm font-medium ${READINESS_COLOURS[scoring.submission_readiness] ?? ""}`}>
-            {scoring.submission_readiness}
-          </span>
+          {isDraft ? (
+            <span className="rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+              Draft — submission readiness not assessed
+            </span>
+          ) : (
+            <span className={`rounded-full px-3 py-1 text-sm font-medium ${READINESS_COLOURS[scoring.submission_readiness] ?? ""}`}>
+              {scoring.submission_readiness}
+            </span>
+          )}
         </div>
 
         <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">

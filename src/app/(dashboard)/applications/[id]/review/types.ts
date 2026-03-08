@@ -60,6 +60,7 @@ export interface ApplicationReviewClientProps {
     results: Record<string, unknown> | null;
     error_message: string | null;
     created_at: string;
+    is_draft: boolean;
   } | null;
   isHistorical?: boolean;
   defaultTab?: TabId;
