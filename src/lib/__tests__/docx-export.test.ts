@@ -192,6 +192,53 @@ describe("generateDocxBuffer", () => {
   });
 });
 
+describe("generateDocxBuffer — radio_other field type", () => {
+  it("includes (x) marker for selected option and (?) for Other line", async () => {
+    const { generateDocxBuffer } = await importModule();
+    const buf = await generateDocxBuffer(
+      makeParams({
+        questions: [{ id: "q1", question: "Q1", field_type: "radio_other", options: ["Option A", "Option B"] }],
+        answerMap: { q1: "" },
+        optionsMap: { q1: ["Option A"] },
+      }),
+    );
+    const result = await mammoth.extractRawText({ buffer: buf });
+    expect(result.value).toContain("(x) Option A");
+    expect(result.value).toContain("( ) Option B");
+    expect(result.value).toContain("(?) Other:");
+  });
+
+  it("renders Other text when Other is selected", async () => {
+    const { generateDocxBuffer } = await importModule();
+    const buf = await generateDocxBuffer(
+      makeParams({
+        questions: [{ id: "q1", question: "Q1", field_type: "radio_other", options: ["Option A"] }],
+        answerMap: { q1: "Something custom" },
+        optionsMap: { q1: ["Other"] },
+      }),
+    );
+    const result = await mammoth.extractRawText({ buffer: buf });
+    expect(result.value).toContain("( ) Option A");
+    expect(result.value).toContain("(?) Other: Something custom");
+  });
+});
+
+describe("generateDocxBuffer — checkbox_other field type", () => {
+  it("includes [x] marker for checked option and [?] for Other line", async () => {
+    const { generateDocxBuffer } = await importModule();
+    const buf = await generateDocxBuffer(
+      makeParams({
+        questions: [{ id: "q1", question: "Q1", field_type: "checkbox_other", options: ["Training"] }],
+        answerMap: { q1: "Evening classes" },
+        optionsMap: { q1: ["Training", "Other"] },
+      }),
+    );
+    const result = await mammoth.extractRawText({ buffer: buf });
+    expect(result.value).toContain("[x] Training");
+    expect(result.value).toContain("[?] Other: Evening classes");
+  });
+});
+
 describe("getDocxExportFilename", () => {
   it("returns .docx extension", async () => {
     const { getDocxExportFilename } = await importModule();

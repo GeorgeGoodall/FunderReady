@@ -129,6 +129,26 @@ function buildAnswerParagraphs(
     });
   }
 
+  if (ft === "radio_other") {
+    const options = q.options ?? [];
+    const result = options.map((opt) => {
+      const selected = selectedOptions?.includes(opt);
+      return textParagraph(selected ? `(x) ${opt}` : `( ) ${opt}`);
+    });
+    result.push(textParagraph(`(?) Other: ${answerText ?? ""}`));
+    return result;
+  }
+
+  if (ft === "checkbox_other") {
+    const options = q.options ?? [];
+    const result = options.map((opt) => {
+      const selected = selectedOptions?.includes(opt);
+      return textParagraph(selected ? `[x] ${opt}` : `[ ] ${opt}`);
+    });
+    result.push(textParagraph(`[?] Other: ${answerText ?? ""}`));
+    return result;
+  }
+
   // Text-based: split by newlines
   if (!answerText) return [new Paragraph("")];
   return answerText.split("\n").map((line) => textParagraph(line));
