@@ -1,6 +1,8 @@
 "use client";
 
 import { CopyButton } from "./CopyButton";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 interface Question {
   id: string;
@@ -185,6 +187,52 @@ export function FormField({
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
             className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+          />
+        )}
+
+        {fieldType === "date" && (
+          <DatePicker
+            selected={value ? new Date(value + "T00:00:00") : null}
+            onChange={(date: Date | null) => {
+              if (!date) { onChange(""); return; }
+              const y = date.getFullYear();
+              const m = String(date.getMonth() + 1).padStart(2, "0");
+              const d = String(date.getDate()).padStart(2, "0");
+              onChange(`${y}-${m}-${d}`);
+            }}
+            onBlur={onBlur}
+            dateFormat="dd/MM/yyyy"
+            placeholderText="Select a date"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+            wrapperClassName="w-full"
+          />
+        )}
+
+        {fieldType === "time" && (
+          <DatePicker
+            selected={(() => {
+              if (!value) return null;
+              const [h, m] = value.split(":").map(Number);
+              const d = new Date();
+              d.setHours(h, m, 0, 0);
+              return d;
+            })()}
+            onChange={(date: Date | null) => {
+              if (!date) { onChange(""); return; }
+              const h = String(date.getHours()).padStart(2, "0");
+              const m = String(date.getMinutes()).padStart(2, "0");
+              onChange(`${h}:${m}`);
+            }}
+            onBlur={onBlur}
+            showTimeSelect
+            showTimeSelectOnly
+            timeIntervals={15}
+            timeCaption="Time"
+            dateFormat="HH:mm"
+            timeFormat="HH:mm"
+            placeholderText="Select a time"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
+            wrapperClassName="w-full"
           />
         )}
 
