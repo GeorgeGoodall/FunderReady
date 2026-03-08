@@ -233,6 +233,78 @@ describe("generateMarkdown", () => {
   });
 });
 
+describe("generateMarkdown — radio_other field type", () => {
+  it("renders selected option with (x) and Other line with (?)", () => {
+    const md = generateMarkdown(makeParams({
+      questions: [{ id: "q1", question: "Q1", field_type: "radio_other", options: ["Option A", "Option B"] }],
+      answerMap: { q1: "" },
+      optionsMap: { q1: ["Option A"] },
+    }));
+    const block = md.match(/<!-- answer_start: q1 -->([\s\S]*?)<!-- answer_end: q1 -->/)?.[1] ?? "";
+    expect(block).toContain("(x) Option A");
+    expect(block).toContain("( ) Option B");
+    expect(block).toContain("(?) Other:");
+  });
+
+  it("renders Other text when Other is selected", () => {
+    const md = generateMarkdown(makeParams({
+      questions: [{ id: "q1", question: "Q1", field_type: "radio_other", options: ["Option A"] }],
+      answerMap: { q1: "Something custom" },
+      optionsMap: { q1: ["Other"] },
+    }));
+    const block = md.match(/<!-- answer_start: q1 -->([\s\S]*?)<!-- answer_end: q1 -->/)?.[1] ?? "";
+    expect(block).toContain("( ) Option A");
+    expect(block).toContain("(?) Other: Something custom");
+  });
+});
+
+describe("generateMarkdown — checkbox_other field type", () => {
+  it("renders checked options with [x] and Other line with [?]", () => {
+    const md = generateMarkdown(makeParams({
+      questions: [{ id: "q1", question: "Q1", field_type: "checkbox_other", options: ["Training", "Mentoring"] }],
+      answerMap: { q1: "" },
+      optionsMap: { q1: ["Training"] },
+    }));
+    const block = md.match(/<!-- answer_start: q1 -->([\s\S]*?)<!-- answer_end: q1 -->/)?.[1] ?? "";
+    expect(block).toContain("[x] Training");
+    expect(block).toContain("[ ] Mentoring");
+    expect(block).toContain("[?] Other:");
+  });
+
+  it("renders Other text when Other is checked", () => {
+    const md = generateMarkdown(makeParams({
+      questions: [{ id: "q1", question: "Q1", field_type: "checkbox_other", options: ["Training"] }],
+      answerMap: { q1: "Evening classes" },
+      optionsMap: { q1: ["Training", "Other"] },
+    }));
+    const block = md.match(/<!-- answer_start: q1 -->([\s\S]*?)<!-- answer_end: q1 -->/)?.[1] ?? "";
+    expect(block).toContain("[x] Training");
+    expect(block).toContain("[?] Other: Evening classes");
+  });
+});
+
+describe("generateMarkdown — date and time field types", () => {
+  it("renders date value in fenced code block", () => {
+    const md = generateMarkdown(makeParams({
+      questions: [{ id: "q1", question: "Q1", field_type: "date" }],
+      answerMap: { q1: "2026-06-01" },
+      optionsMap: {},
+    }));
+    const block = md.match(/<!-- answer_start: q1 -->([\s\S]*?)<!-- answer_end: q1 -->/)?.[1] ?? "";
+    expect(block).toContain("2026-06-01");
+  });
+
+  it("renders time value in fenced code block", () => {
+    const md = generateMarkdown(makeParams({
+      questions: [{ id: "q1", question: "Q1", field_type: "time" }],
+      answerMap: { q1: "14:30" },
+      optionsMap: {},
+    }));
+    const block = md.match(/<!-- answer_start: q1 -->([\s\S]*?)<!-- answer_end: q1 -->/)?.[1] ?? "";
+    expect(block).toContain("14:30");
+  });
+});
+
 describe("getExportFilename", () => {
   it("returns formatted filename", () => {
     expect(getExportFilename("Community Fund", "My Project", "abc-123")).toBe(

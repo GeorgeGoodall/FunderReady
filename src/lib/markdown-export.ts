@@ -83,6 +83,28 @@ function formatAnswerBlock(
     return lines.join("\n");
   }
 
+  if (ft === "radio_other") {
+    const options = q.options ?? [];
+    for (const opt of options) {
+      const selected = selectedOptions?.includes(opt);
+      lines.push(selected ? `(x) ${opt}` : `( ) ${opt}`);
+    }
+    const otherText = answerText ?? "";
+    lines.push(`(?) Other: ${otherText}`);
+    return lines.join("\n");
+  }
+
+  if (ft === "checkbox_other") {
+    const options = q.options ?? [];
+    for (const opt of options) {
+      const selected = selectedOptions?.includes(opt);
+      lines.push(selected ? `[x] ${opt}` : `[ ] ${opt}`);
+    }
+    const otherText = answerText ?? "";
+    lines.push(`[?] Other: ${otherText}`);
+    return lines.join("\n");
+  }
+
   // Text-based fields: fenced code block
   return "```\n" + escapeCodeFences(answerText) + "\n```";
 }
