@@ -126,7 +126,7 @@ export function buildAnswerAnalysisPrompt(
   isDraft?: boolean
 ): string {
   const displayText = formatAnswerDisplay(answer);
-  const wordCount = displayText.trim().split(/\s+/).length;
+  const wordCount = displayText.trim() ? displayText.trim().split(/\s+/).length : 0;
 
   const factualFieldTypes = new Set(["email", "url", "phone", "number"]);
   const constrainedFieldTypes = new Set(["dropdown", "select", "radio", "checkbox", "yes_no", "date", "time", "radio_other", "checkbox_other"]);

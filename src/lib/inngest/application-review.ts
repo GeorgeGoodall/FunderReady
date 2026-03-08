@@ -26,6 +26,7 @@ import {
   buildApplicationScoringPrompt,
   formatPreviousAnswerContext,
   formatPreviousOverallContext,
+  formatAnswerDisplay,
   type AnswerContext,
 } from "@/lib/pipeline/application-prompts";
 import type { Criterion } from "@/lib/pipeline/prompt-templates";
@@ -238,33 +239,20 @@ export function filterEnabledAnswers<T extends {
 
 /**
  * Format an answer's content for the cross-reference step.
- * Renders selected_options into readable text for radio_other, checkbox_other, and checkbox types.
+ * Delegates to formatAnswerDisplay from application-prompts.ts.
  */
 function formatAnswerForCrossRef(a: {
   answer_text: string;
   selected_options?: string[] | null;
   field_type?: string | null;
 }): string {
-  const ft = a.field_type ?? "";
-  if (ft === "radio_other") {
-    if (a.selected_options?.includes("Other") && a.answer_text) {
-      return `Selected: Other\nOther text: ${a.answer_text}`;
-    }
-    const nonOther = (a.selected_options ?? []).filter((s) => s !== "Other");
-    if (nonOther.length > 0) return `Selected: ${nonOther.join(", ")}`;
-    return a.answer_text;
-  }
-  if (ft === "checkbox_other") {
-    const nonOther = (a.selected_options ?? []).filter((s) => s !== "Other");
-    const parts: string[] = [];
-    if (nonOther.length > 0) parts.push(`Selected: ${nonOther.join(", ")}`);
-    if (a.selected_options?.includes("Other") && a.answer_text) parts.push(`Other text: ${a.answer_text}`);
-    return parts.join("\n") || a.answer_text;
-  }
-  if (ft === "checkbox" && Array.isArray(a.selected_options) && a.selected_options.length > 0) {
-    return `Selected: ${a.selected_options.join(", ")}`;
-  }
-  return a.answer_text;
+  return formatAnswerDisplay({
+    question_id: "",
+    question_text: "",
+    answer_text: a.answer_text,
+    selected_options: a.selected_options ?? undefined,
+    field_type: a.field_type ?? undefined,
+  });
 }
 
 /**
