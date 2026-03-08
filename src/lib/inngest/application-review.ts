@@ -361,7 +361,7 @@ export const applicationReviewRequested = inngest.createFunction(
   },
   { event: "application/review-requested" },
   async ({ event, step }) => {
-    const { applicationId, reviewId, userId } = event.data;
+    const { applicationId, reviewId, userId, isDraft = false } = event.data;
 
     // -----------------------------------------------------------------------
     // Step 1: Load application data
@@ -578,7 +578,7 @@ export const applicationReviewRequested = inngest.createFunction(
                 previousReview.review_number + 1
               )
             : null;
-          const prompt = buildAnswerAnalysisPrompt(ctx, prevContext);
+          const prompt = buildAnswerAnalysisPrompt(ctx, prevContext, isDraft);
           return callClaude({
             prompt,
             systemPrompt,
@@ -670,7 +670,8 @@ export const applicationReviewRequested = inngest.createFunction(
         questions.map((q) => ({ id: q.id, question: q.question })),
         criteria,
         disabledQuestions,
-        enabledAnswers.map((a) => ({ question_id: a.question_id, answer_text: a.answer_text }))
+        enabledAnswers.map((a) => ({ question_id: a.question_id, answer_text: a.answer_text })),
+        isDraft
       );
 
       const result = await callClaude({
@@ -752,7 +753,8 @@ export const applicationReviewRequested = inngest.createFunction(
         criteria,
         overallWordLimit,
         disabledQuestions,
-        prevOverallContext
+        prevOverallContext,
+        isDraft
       );
 
       const result = await callClaude({
