@@ -30,6 +30,10 @@ Field type detection rules:
 - "dropdown": Use when the funder presents a single-select list like "Select one:", "Choose from:", or a defined set of mutually exclusive options (e.g. regions, categories, funding bands). Include the options in the "options" array.
 - "radio": Use when the funder presents yes/no questions or a small set of mutually exclusive choices (e.g. "Yes / No / Not applicable"). Include the options in the "options" array.
 - "checkbox": Use when the funder asks to "select all that apply", "tick all that apply", or presents a multi-select list. Include the options in the "options" array.
+- "date": Use when the question asks for a specific date — e.g., "project start date", "when will the project begin", "anticipated completion date". Do NOT set word_count_min or word_count_max for this type.
+- "time": Use when the question asks for a specific time of day — e.g., "start time", "event time". Do NOT set word_count_min or word_count_max for this type.
+- "radio_other": Use when the funder presents a small set of mutually exclusive choices (like "radio") BUT also explicitly indicates that applicants can provide a free-text "other" answer — e.g., "Select one (or specify other)", "Yes / No / Other (please describe)". Include the defined options in the "options" array. Do NOT include "Other" in the options array — it is appended automatically.
+- "checkbox_other": Use when the funder asks to "select all that apply" with a predefined list AND also explicitly allows a free-text "other" answer — e.g., "Tick all that apply (or specify other)". Include the defined options in the "options" array. Do NOT include "Other" in the options array — it is appended automatically.
 - When in doubt, default to "text_long" — it's always safe.`;
 
 const MODEL = "claude-haiku-4-5-20251001";
