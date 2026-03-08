@@ -239,6 +239,99 @@ function extractAnswerFromRegion(
     };
   }
 
+  if (ft === "radio_other") {
+    const selected: string[] = [];
+    let otherText = "";
+    const allowedSet = new Set(question.options ?? []);
+    for (const line of region.lines) {
+      const regularMatch = line.match(/^\(x\)\s+(.+)$/);
+      if (regularMatch) {
+        const value = regularMatch[1].trim();
+        selected.push(value);
+        if (allowedSet.size > 0 && !allowedSet.has(value)) {
+          warnings.push({
+            type: "warning",
+            message: `Question "${question.question}" has unrecognised option: "${value}"`,
+            question_id: region.questionId,
+          });
+        }
+        continue;
+      }
+      const otherMatch = line.match(/^\(\?\)\s+Other:\s*(.*)$/);
+      if (otherMatch) {
+        otherText = otherMatch[1].trim();
+        selected.push("Other");
+      }
+    }
+
+    const nonOtherSelected = selected.filter((s) => s !== "Other");
+    if (nonOtherSelected.length > 1) {
+      return {
+        answer: {
+          question_id: region.questionId,
+          answer_text: otherText || (nonOtherSelected[0] ?? ""),
+          selected_options: selected,
+          is_disabled: region.isDisabled,
+        },
+        warnings,
+        errors: [{
+          type: "error" as const,
+          message: `Radio question "${question.question}" has multiple selections — only one is allowed.`,
+          question_id: region.questionId,
+        }],
+      };
+    }
+
+    const answerText = otherText !== "" ? otherText : nonOtherSelected[0] ?? "";
+    return {
+      answer: {
+        question_id: region.questionId,
+        answer_text: answerText,
+        selected_options: selected,
+        is_disabled: region.isDisabled,
+      },
+      warnings,
+    };
+  }
+
+  if (ft === "checkbox_other") {
+    const selected: string[] = [];
+    let otherText = "";
+    const allowedSet = new Set(question.options ?? []);
+    for (const line of region.lines) {
+      const regularMatch = line.match(/^\[x\]\s+(.+)$/);
+      if (regularMatch) {
+        const value = regularMatch[1].trim();
+        selected.push(value);
+        if (allowedSet.size > 0 && !allowedSet.has(value)) {
+          warnings.push({
+            type: "warning",
+            message: `Question "${question.question}" has unrecognised option: "${value}"`,
+            question_id: region.questionId,
+          });
+        }
+        continue;
+      }
+      const otherMatch = line.match(/^\[\?\]\s+Other:\s*(.*)$/);
+      if (otherMatch) {
+        otherText = otherMatch[1].trim();
+        if (otherText !== "") {
+          selected.push("Other");
+        }
+      }
+    }
+
+    return {
+      answer: {
+        question_id: region.questionId,
+        answer_text: otherText,
+        selected_options: selected,
+        is_disabled: region.isDisabled,
+      },
+      warnings,
+    };
+  }
+
   // Text-based answer: skip metadata lines and empty lines at start
   const contentLines: string[] = [];
   let foundContent = false;

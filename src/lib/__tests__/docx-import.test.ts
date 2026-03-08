@@ -139,6 +139,149 @@ describe("docx-import", () => {
     });
   });
 
+  describe("parseDocx – radio_other", () => {
+    it("extracts radio_other when a regular option is selected (no Other)", async () => {
+      const { parseDocx } = await importModule();
+      const params = makeParams({
+        questions: [
+          {
+            id: "q1",
+            question: "Choose your sector",
+            field_type: "radio_other",
+            options: ["Health", "Education", "Arts"],
+            required: true,
+          },
+        ],
+        answerMap: { q1: "" },
+        optionsMap: { q1: ["Health"] },
+      });
+      const buf = await generateDocxBuffer(params);
+      const questions = makeImportQuestions(params);
+
+      const result = await parseDocx(buf, questions);
+
+      expect(result.ok).toBe(true);
+      const answer = result.answers.find((a) => a.question_id === "q1");
+      expect(answer).toBeDefined();
+      // "Other" is always pushed when (?) line is matched
+      expect(answer!.selected_options).toEqual(["Health", "Other"]);
+      // answer_text = otherText if non-empty, else the non-Other selected option
+      expect(answer!.answer_text).toBe("Health");
+    });
+
+    it("extracts radio_other when Other is selected with text", async () => {
+      const { parseDocx } = await importModule();
+      const params = makeParams({
+        questions: [
+          {
+            id: "q1",
+            question: "Choose your sector",
+            field_type: "radio_other",
+            options: ["Health", "Education", "Arts"],
+            required: true,
+          },
+        ],
+        answerMap: { q1: "My custom sector" },
+        optionsMap: { q1: [] },
+      });
+      const buf = await generateDocxBuffer(params);
+      const questions = makeImportQuestions(params);
+
+      const result = await parseDocx(buf, questions);
+
+      expect(result.ok).toBe(true);
+      const answer = result.answers.find((a) => a.question_id === "q1");
+      expect(answer).toBeDefined();
+      expect(answer!.selected_options).toEqual(["Other"]);
+      expect(answer!.answer_text).toBe("My custom sector");
+    });
+
+    it("returns error when multiple non-Other options are selected in radio_other", async () => {
+      const { parseDocx } = await importModule();
+      // We need to craft a scenario where 2 (x) lines appear.
+      // generateDocxBuffer won't do this naturally (radio_other respects selectedOptions),
+      // but we can set selectedOptions to include two options.
+      const params = makeParams({
+        questions: [
+          {
+            id: "q1",
+            question: "Choose your sector",
+            field_type: "radio_other",
+            options: ["Health", "Education", "Arts"],
+            required: true,
+          },
+        ],
+        answerMap: { q1: "" },
+        optionsMap: { q1: ["Health", "Education"] },
+      });
+      const buf = await generateDocxBuffer(params);
+      const questions = makeImportQuestions(params);
+
+      const result = await parseDocx(buf, questions);
+
+      // Should produce an error (multiple selections not allowed for radio)
+      expect(result.ok).toBe(false);
+      expect(result.errors.some((e) => e.message.includes("multiple selections"))).toBe(true);
+    });
+  });
+
+  describe("parseDocx – checkbox_other", () => {
+    it("extracts checkbox_other with multiple options and Other with text", async () => {
+      const { parseDocx } = await importModule();
+      const params = makeParams({
+        questions: [
+          {
+            id: "q1",
+            question: "Select skills",
+            field_type: "checkbox_other",
+            options: ["Writing", "Research", "Design"],
+            required: false,
+          },
+        ],
+        answerMap: { q1: "Custom skill" },
+        optionsMap: { q1: ["Writing", "Research"] },
+      });
+      const buf = await generateDocxBuffer(params);
+      const questions = makeImportQuestions(params);
+
+      const result = await parseDocx(buf, questions);
+
+      expect(result.ok).toBe(true);
+      const answer = result.answers.find((a) => a.question_id === "q1");
+      expect(answer).toBeDefined();
+      expect(answer!.selected_options).toEqual(["Writing", "Research", "Other"]);
+      expect(answer!.answer_text).toBe("Custom skill");
+    });
+
+    it("does NOT include Other in selected_options when Other line is empty in checkbox_other", async () => {
+      const { parseDocx } = await importModule();
+      const params = makeParams({
+        questions: [
+          {
+            id: "q1",
+            question: "Select skills",
+            field_type: "checkbox_other",
+            options: ["Writing", "Research", "Design"],
+            required: false,
+          },
+        ],
+        answerMap: { q1: "" },
+        optionsMap: { q1: ["Writing"] },
+      });
+      const buf = await generateDocxBuffer(params);
+      const questions = makeImportQuestions(params);
+
+      const result = await parseDocx(buf, questions);
+
+      expect(result.ok).toBe(true);
+      const answer = result.answers.find((a) => a.question_id === "q1");
+      expect(answer).toBeDefined();
+      // "Other" should NOT be in selected_options since otherText is empty
+      expect(answer!.selected_options).toEqual(["Writing"]);
+      expect(answer!.answer_text).toBe("");
+    });
+  });
+
   describe("parseDocx – checkbox", () => {
     it("extracts checkbox selections", async () => {
       const { parseDocx } = await importModule();
