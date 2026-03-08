@@ -40,7 +40,7 @@ export default async function ApplicationHistoryPage({
   // Fetch all reviews with results (to extract overall_score server-side)
   const { data: rawReviews } = await supabase
     .from("application_reviews")
-    .select("id, review_number, status, results, error_message, created_at")
+    .select("id, review_number, status, results, error_message, created_at, is_draft")
     .eq("application_id", id)
     .order("review_number", { ascending: true });
 
@@ -54,6 +54,7 @@ export default async function ApplicationHistoryPage({
       submission_readiness: typeof scoring?.submission_readiness === "string" ? scoring.submission_readiness : null,
       error_message: r.error_message,
       created_at: r.created_at,
+      is_draft: r.is_draft ?? false,
     };
   });
 

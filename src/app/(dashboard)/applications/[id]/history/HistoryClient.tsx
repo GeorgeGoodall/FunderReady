@@ -27,6 +27,7 @@ interface ReviewSummary {
   submission_readiness: string | null;
   error_message: string | null;
   created_at: string;
+  is_draft: boolean;
 }
 
 interface HistoryClientProps {
@@ -156,8 +157,13 @@ function ReviewRow({ review, applicationId }: { review: ReviewSummary; applicati
 
   return (
     <div className="flex items-center gap-4 px-5 py-3">
-      <span className="w-20 shrink-0 text-sm font-medium">
+      <span className="flex w-20 shrink-0 items-center gap-1.5 text-sm font-medium">
         Review #{review.review_number}
+        {review.is_draft && (
+          <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-normal text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+            Draft
+          </span>
+        )}
       </span>
 
       <span className="w-28 shrink-0 text-sm text-zinc-500">{date}</span>
