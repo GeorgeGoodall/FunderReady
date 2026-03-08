@@ -121,7 +121,7 @@ export function FormField({
               Changed since review
             </span>
           )}
-          {value.trim() && !isDisabled && <CopyButton text={value} />}
+          {value.trim() && !isDisabled && fieldType !== "date" && fieldType !== "time" && <CopyButton text={value} />}
           {onDisabledChange && (
             <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
               <input
@@ -213,8 +213,7 @@ export function FormField({
             selected={(() => {
               if (!value) return null;
               const [h, m] = value.split(":").map(Number);
-              const d = new Date();
-              d.setHours(h, m, 0, 0);
+              const d = new Date(2000, 0, 1, h, m, 0, 0);
               return d;
             })()}
             onChange={(date: Date | null) => {
