@@ -368,6 +368,30 @@ describe("CreateApplicationRequestSchema", () => {
   });
 });
 
+describe("FIELD_TYPES — new types accepted by QuestionSchema", () => {
+  const newTypes = ["date", "time", "radio_other", "checkbox_other"] as const;
+
+  for (const ft of newTypes) {
+    it(`accepts field_type="${ft}"`, () => {
+      const result = QuestionSchema.safeParse({
+        id: "q1",
+        question: "Test question",
+        field_type: ft,
+      });
+      expect(result.success).toBe(true);
+    });
+  }
+
+  it("rejects unknown field_type", () => {
+    const result = QuestionSchema.safeParse({
+      id: "q1",
+      question: "Test",
+      field_type: "unknown_type",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("SaveAnswersRequestSchema", () => {
   it("accepts valid answers", () => {
     const result = SaveAnswersRequestSchema.safeParse({

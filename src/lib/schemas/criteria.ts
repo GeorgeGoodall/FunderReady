@@ -65,7 +65,7 @@ export const QuestionSchema = z.object({
   char_count_max: z.number().int().positive().optional(),
   guidance: z.string().optional(),
   priority: z.number().int().min(1).max(5).optional(),
-  field_type: z.enum(["text_short", "text_long", "dropdown", "radio", "checkbox", "email", "url", "phone", "number"]).optional(),
+  field_type: z.enum(["text_short", "text_long", "dropdown", "radio", "checkbox", "radio_other", "checkbox_other", "email", "url", "phone", "number", "date", "time"]).optional(),
   options: z.array(z.string()).optional(),
 });
 
@@ -147,10 +147,14 @@ export const FIELD_TYPES = [
   "dropdown",
   "radio",
   "checkbox",
+  "radio_other",
+  "checkbox_other",
   "email",
   "url",
   "phone",
   "number",
+  "date",
+  "time",
 ] as const;
 
 export const FieldTypeSchema = z.enum(FIELD_TYPES);
