@@ -132,9 +132,9 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
         let questionsLoaded = false;
 
         try {
-          applyFundData(data);
           criteriaLoaded = !!data.criteriaSet;
           questionsLoaded = !!data.questionsSet;
+          applyFundData(data);
         } catch {
           // Non-fatal
         }
@@ -181,9 +181,9 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
       const res = await fetch(`/api/funds/${fund.id}`);
       if (res.ok) {
         const data = await res.json();
-        applyFundData(data);
         criteriaLoaded = !!data.criteriaSet;
         questionsLoaded = !!data.questionsSet;
+        applyFundData(data);
       }
     } catch {
       // Non-fatal
