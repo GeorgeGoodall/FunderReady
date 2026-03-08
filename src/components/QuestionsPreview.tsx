@@ -30,13 +30,17 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
   dropdown: "Dropdown",
   radio: "Radio buttons",
   checkbox: "Checkboxes",
+  radio_other: "Radio (with Other)",
+  checkbox_other: "Checkboxes (with Other)",
   email: "Email address",
   url: "Website / URL",
   phone: "Phone number",
   number: "Number / Amount",
+  date: "Date",
+  time: "Time",
 };
 
-const FIELD_TYPES = ["text_long", "text_short", "dropdown", "radio", "checkbox", "email", "url", "phone", "number"] as const;
+const FIELD_TYPES = ["text_long", "text_short", "dropdown", "radio", "checkbox", "radio_other", "checkbox_other", "email", "url", "phone", "number", "date", "time"] as const;
 
 export function validateQuestionsSet(qs: QuestionsSet): string[] {
   const errors: string[] = [];
@@ -199,17 +203,17 @@ function SortableQuestionCard({
   };
 
   const fieldType = question.field_type ?? "text_long";
-  const hasOptions = fieldType === "dropdown" || fieldType === "radio" || fieldType === "checkbox";
+  const hasOptions = fieldType === "dropdown" || fieldType === "radio" || fieldType === "checkbox" || fieldType === "radio_other" || fieldType === "checkbox_other";
   const isSelectionType = hasOptions;
-  const isSingleValueType = fieldType === "email" || fieldType === "url" || fieldType === "phone" || fieldType === "number";
+  const isSingleValueType = fieldType === "email" || fieldType === "url" || fieldType === "phone" || fieldType === "number" || fieldType === "date" || fieldType === "time";
   const showWordCount = !isSelectionType && !isSingleValueType;
   const showCharCount = !isSelectionType;
   const [newOption, setNewOption] = useState("");
 
   const handleFieldTypeChange = (newType: string) => {
     const updates: Partial<Question> = { field_type: newType as Question["field_type"] };
-    const newIsSelection = newType === "dropdown" || newType === "radio" || newType === "checkbox";
-    const newIsSingleValue = newType === "email" || newType === "url" || newType === "phone" || newType === "number";
+    const newIsSelection = newType === "dropdown" || newType === "radio" || newType === "checkbox" || newType === "radio_other" || newType === "checkbox_other";
+    const newIsSingleValue = newType === "email" || newType === "url" || newType === "phone" || newType === "number" || newType === "date" || newType === "time";
     if (!newIsSelection) {
       updates.options = undefined;
     }
@@ -418,6 +422,11 @@ function SortableQuestionCard({
                 </button>
               </div>
             </div>
+          )}
+          {(fieldType === "radio_other" || fieldType === "checkbox_other") && (
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              An &ldquo;Other (please specify)&rdquo; option will be appended automatically.
+            </p>
           )}
 
           {/* Guidance (collapsible) */}
