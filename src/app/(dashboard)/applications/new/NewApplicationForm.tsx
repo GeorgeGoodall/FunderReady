@@ -128,13 +128,24 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
         setSelectedFund(fund);
         setError("");
 
+        let criteriaLoaded = false;
+        let questionsLoaded = false;
+
         try {
           applyFundData(data);
+          criteriaLoaded = !!data.criteriaSet;
+          questionsLoaded = !!data.questionsSet;
         } catch {
           // Non-fatal
         }
 
-        setStep("criteria");
+        if (criteriaLoaded && questionsLoaded) {
+          setStep("confirm");
+        } else if (criteriaLoaded) {
+          setStep("questions");
+        } else {
+          setStep("criteria");
+        }
       } catch {
         // Fall back to normal flow
       } finally {
@@ -163,17 +174,28 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
     setSelectedFund(fund);
     setError("");
 
+    let criteriaLoaded = false;
+    let questionsLoaded = false;
+
     try {
       const res = await fetch(`/api/funds/${fund.id}`);
       if (res.ok) {
         const data = await res.json();
         applyFundData(data);
+        criteriaLoaded = !!data.criteriaSet;
+        questionsLoaded = !!data.questionsSet;
       }
     } catch {
       // Non-fatal
     }
 
-    setStep("criteria");
+    if (criteriaLoaded && questionsLoaded) {
+      setStep("confirm");
+    } else if (criteriaLoaded) {
+      setStep("questions");
+    } else {
+      setStep("criteria");
+    }
   };
 
   const handleNewFundData = (data: NewFundData) => {
