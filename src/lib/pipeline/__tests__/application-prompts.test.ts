@@ -1573,3 +1573,86 @@ describe("formatPreviousAnswerContext — cross-answer softening", () => {
     expect(result).not.toContain("still outstanding");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Draft mode: buildAnswerAnalysisPrompt
+// ---------------------------------------------------------------------------
+
+describe("buildAnswerAnalysisPrompt — draft mode", () => {
+  it("includes draft instruction block when isDraft is true", () => {
+    const prompt = buildAnswerAnalysisPrompt(makeAnswer(), null, true);
+    expect(prompt).toContain("draft application");
+    expect(prompt).toContain("Do not penalise placeholders");
+    expect(prompt).toContain("Consider including");
+  });
+
+  it("does NOT include draft instruction block when isDraft is false", () => {
+    const prompt = buildAnswerAnalysisPrompt(makeAnswer(), null, false);
+    expect(prompt).not.toContain("draft application");
+  });
+
+  it("does NOT include draft instruction block by default", () => {
+    const prompt = buildAnswerAnalysisPrompt(makeAnswer());
+    expect(prompt).not.toContain("draft application");
+  });
+
+  it("suppresses word count feedback when isDraft is true (regardless of field type)", () => {
+    const prompt = buildAnswerAnalysisPrompt(
+      makeAnswer({ word_count_max: 500 }),
+      null,
+      true
+    );
+    expect(prompt).not.toContain("## Word Count");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Draft mode: buildApplicationCrossReferencePrompt
+// ---------------------------------------------------------------------------
+
+describe("buildApplicationCrossReferencePrompt — draft mode", () => {
+  const analyses: AnswerAnalysis[] = [];
+  const questions = [{ id: "q1", question: "Describe your project" }];
+  const criteria = [{ id: "c1", criterion: "Impact" }];
+
+  it("includes draft instruction block when isDraft is true", () => {
+    const { userPrompt } = buildApplicationCrossReferencePrompt(
+      analyses, questions, criteria, [], [], true
+    );
+    expect(userPrompt).toContain("draft application");
+    expect(userPrompt).toContain("Placeholders may cause apparent gaps");
+  });
+
+  it("does NOT include draft instruction block when isDraft is false", () => {
+    const { userPrompt } = buildApplicationCrossReferencePrompt(
+      analyses, questions, criteria, [], [], false
+    );
+    expect(userPrompt).not.toContain("draft application");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Draft mode: buildApplicationScoringPrompt
+// ---------------------------------------------------------------------------
+
+describe("buildApplicationScoringPrompt — draft mode", () => {
+  const analyses: AnswerAnalysis[] = [];
+  const crossRef = { findings: [], gap_criteria: [] } as unknown as import("../schemas").CrossReference;
+  const questions = [{ id: "q1", question: "Describe your project" }];
+  const criteria = [{ id: "c1", criterion: "Impact" }];
+
+  it("includes draft instruction block when isDraft is true", () => {
+    const { userPrompt } = buildApplicationScoringPrompt(
+      analyses, crossRef, questions, criteria, undefined, [], undefined, true
+    );
+    expect(userPrompt).toContain("draft application");
+    expect(userPrompt).toContain("Score leniently");
+  });
+
+  it("does NOT include draft instruction block when isDraft is false", () => {
+    const { userPrompt } = buildApplicationScoringPrompt(
+      analyses, crossRef, questions, criteria, undefined, [], undefined, false
+    );
+    expect(userPrompt).not.toContain("draft application");
+  });
+});
