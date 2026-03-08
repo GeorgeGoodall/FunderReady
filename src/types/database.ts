@@ -143,6 +143,7 @@ export type Database = {
           criteria_set_id: string | null
           error_message: string | null
           id: string
+          is_draft: boolean
           period_credits_charged: number
           progress: Json
           purchased_credits_charged: number
@@ -164,6 +165,7 @@ export type Database = {
           criteria_set_id?: string | null
           error_message?: string | null
           id?: string
+          is_draft?: boolean
           period_credits_charged?: number
           progress?: Json
           purchased_credits_charged?: number
@@ -185,6 +187,7 @@ export type Database = {
           criteria_set_id?: string | null
           error_message?: string | null
           id?: string
+          is_draft?: boolean
           period_credits_charged?: number
           progress?: Json
           purchased_credits_charged?: number
@@ -940,6 +943,23 @@ export type Database = {
               p_criteria_set_id: string
               p_default_limit?: number
               p_estimated_credits_low?: number
+              p_period: string
+              p_questions_set_id: string
+              p_review_number: number
+              p_user_id: string
+            }
+            Returns: {
+              review_id: string
+              review_number: number
+            }[]
+          }
+        | {
+            Args: {
+              p_application_id: string
+              p_criteria_set_id: string
+              p_default_limit?: number
+              p_estimated_credits_low?: number
+              p_is_draft?: boolean
               p_period: string
               p_questions_set_id: string
               p_review_number: number
