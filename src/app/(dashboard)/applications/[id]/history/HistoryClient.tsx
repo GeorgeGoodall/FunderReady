@@ -157,7 +157,7 @@ function ReviewRow({ review, applicationId }: { review: ReviewSummary; applicati
 
   return (
     <div className="flex items-center gap-4 px-5 py-3">
-      <span className="flex w-20 shrink-0 items-center gap-1.5 text-sm font-medium">
+      <span className="flex w-32 shrink-0 items-center gap-1.5 text-sm font-medium">
         Review #{review.review_number}
         {review.is_draft && (
           <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-normal text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
