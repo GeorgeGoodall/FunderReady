@@ -207,7 +207,7 @@ function SortableQuestionCard({
   const isSelectionType = hasOptions;
   const isSingleValueType = fieldType === "email" || fieldType === "url" || fieldType === "phone" || fieldType === "number" || fieldType === "date" || fieldType === "time";
   const showWordCount = !isSelectionType && !isSingleValueType;
-  const showCharCount = !isSelectionType;
+  const showCharCount = !isSelectionType && !isSingleValueType;
   const [newOption, setNewOption] = useState("");
 
   const handleFieldTypeChange = (newType: string) => {
@@ -225,8 +225,8 @@ function SortableQuestionCard({
       updates.word_count_min = undefined;
       updates.word_count_max = undefined;
     }
-    // Clear char count when switching to selection type
-    if (newIsSelection) {
+    // Clear char count when switching to selection or single-value type
+    if (newIsSelection || newIsSingleValue) {
       updates.char_count_max = undefined;
     }
     onUpdate(updates);
