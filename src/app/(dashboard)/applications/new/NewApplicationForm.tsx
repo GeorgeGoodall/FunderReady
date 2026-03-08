@@ -611,16 +611,36 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
                 <dt className="text-zinc-500">Fund</dt>
                 <dd className="font-medium">{selectedFund?.name ?? pendingNewFundData?.name ?? "—"}</dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <dt className="text-zinc-500">Criteria</dt>
-                <dd className="font-medium">{criteriaSet?.criteria.length} criteria</dd>
+                <dd className="flex items-center gap-3">
+                  <span className="font-medium">{criteriaSet?.criteria.length} criteria</span>
+                  <button
+                    type="button"
+                    onClick={() => setStep("criteria")}
+                    className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                  >
+                    Edit
+                  </button>
+                </dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <dt className="text-zinc-500">Questions</dt>
-                <dd className="font-medium">
-                  {questionsSet
-                    ? `${questionsSet.questions.length} questions${questionsSet.overall_word_limit ? ` (${questionsSet.overall_word_limit} word limit)` : ""}`
-                    : "None"}
+                <dd className="flex items-center gap-3">
+                  <span className="font-medium">
+                    {questionsSet
+                      ? `${questionsSet.questions.length} questions${questionsSet.overall_word_limit ? ` (${questionsSet.overall_word_limit} word limit)` : ""}`
+                      : "None"}
+                  </span>
+                  {questionsSet && (
+                    <button
+                      type="button"
+                      onClick={() => setStep("questions")}
+                      className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                    >
+                      Edit
+                    </button>
+                  )}
                 </dd>
               </div>
               {(selectedFund?.closes_at || detectedClosesAt) && (
