@@ -137,6 +137,66 @@ function parseCheckboxBlock(raw: string, allowedOptions: string[]): { answer_tex
   };
 }
 
+function parseRadioOtherBlock(raw: string, allowedOptions: string[]): { answer_text: string; selected_options: string[]; invalid_options: string[] } {
+  const selected: string[] = [];
+  const invalid: string[] = [];
+  const allowedSet = new Set(allowedOptions);
+  let otherText = "";
+
+  for (const line of raw.split("\n")) {
+    const radioMatch = line.match(/^\(x\)\s+(.+)$/);
+    if (radioMatch) {
+      const value = radioMatch[1].trim();
+      selected.push(value);
+      if (allowedSet.size > 0 && !allowedSet.has(value)) {
+        invalid.push(value);
+      }
+    }
+    const otherMatch = line.match(/^\(\?\)\s+Other:\s*(.*)$/);
+    if (otherMatch) {
+      otherText = otherMatch[1].trim();
+      selected.push("Other");
+    }
+  }
+
+  return {
+    answer_text: otherText !== "" ? otherText : (selected.filter(s => s !== "Other")[0] ?? ""),
+    selected_options: selected,
+    invalid_options: invalid,
+  };
+}
+
+function parseCheckboxOtherBlock(raw: string, allowedOptions: string[]): { answer_text: string; selected_options: string[]; invalid_options: string[] } {
+  const selected: string[] = [];
+  const invalid: string[] = [];
+  const allowedSet = new Set(allowedOptions);
+  let otherText = "";
+
+  for (const line of raw.split("\n")) {
+    const checkMatch = line.match(/^\[x\]\s+(.+)$/);
+    if (checkMatch) {
+      const value = checkMatch[1].trim();
+      selected.push(value);
+      if (allowedSet.size > 0 && !allowedSet.has(value)) {
+        invalid.push(value);
+      }
+    }
+    const otherMatch = line.match(/^\[\?\]\s+Other:\s*(.*)$/);
+    if (otherMatch) {
+      otherText = otherMatch[1].trim();
+      if (otherText !== "") {
+        selected.push("Other");
+      }
+    }
+  }
+
+  return {
+    answer_text: otherText,
+    selected_options: selected,
+    invalid_options: invalid,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Disabled detection
 // ---------------------------------------------------------------------------
@@ -227,6 +287,41 @@ export function parseMarkdown(rawContent: string, questions: ImportQuestion[]): 
       }
     } else if (ft === "checkbox") {
       const parsed = parseCheckboxBlock(rawBlock, question.options ?? []);
+      answerText = parsed.answer_text;
+      selectedOptions = parsed.selected_options;
+
+      for (const inv of parsed.invalid_options) {
+        warnings.push({
+          type: "warning",
+          message: `Question "${question.question}" has unrecognised option: "${inv}"`,
+          question_id: qId,
+        });
+      }
+    } else if (ft === "radio_other") {
+      const parsed = parseRadioOtherBlock(rawBlock, question.options ?? []);
+      answerText = parsed.answer_text;
+      selectedOptions = parsed.selected_options;
+
+      // Validate: at most one non-Other option selected
+      const nonOtherSelected = parsed.selected_options.filter((s) => s !== "Other");
+      if (nonOtherSelected.length > 1) {
+        errors.push({
+          type: "error",
+          message: `Radio question "${question.question}" has multiple selections — only one is allowed.`,
+          question_id: qId,
+        });
+        continue;
+      }
+
+      for (const inv of parsed.invalid_options) {
+        warnings.push({
+          type: "warning",
+          message: `Question "${question.question}" has unrecognised option: "${inv}"`,
+          question_id: qId,
+        });
+      }
+    } else if (ft === "checkbox_other") {
+      const parsed = parseCheckboxOtherBlock(rawBlock, question.options ?? []);
       answerText = parsed.answer_text;
       selectedOptions = parsed.selected_options;
 

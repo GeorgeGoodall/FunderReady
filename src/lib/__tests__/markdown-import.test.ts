@@ -347,6 +347,97 @@ describe("MAX_IMPORT_FILE_SIZE", () => {
   });
 });
 
+describe("parseMarkdown — radio_other field type", () => {
+  const questions: ImportQuestion[] = [
+    { id: "q1", question: "Q1", field_type: "radio_other", options: ["Option A", "Option B"] },
+  ];
+
+  it("parses selected option correctly", () => {
+    const doc = makeFullDoc([
+      `<!-- question_id: q1 -->\n#### 1. Q1 *(required)*\n\n> **Type:** radio_other\n\n` +
+      makeAnswerBlock("q1", "(x) Option A\n( ) Option B\n(?) Other: "),
+    ]);
+    const result = parseMarkdown(doc, questions);
+    expect(result.ok).toBe(true);
+    const ans = result.answers.find((a) => a.question_id === "q1");
+    expect(ans?.selected_options).toContain("Option A");
+    expect(ans?.answer_text).toBe("Option A");
+  });
+
+  it("parses Other selection and captures free text", () => {
+    const doc = makeFullDoc([
+      `<!-- question_id: q1 -->\n#### 1. Q1 *(required)*\n\n> **Type:** radio_other\n\n` +
+      makeAnswerBlock("q1", "( ) Option A\n( ) Option B\n(?) Other: Something custom"),
+    ]);
+    const result = parseMarkdown(doc, questions);
+    expect(result.ok).toBe(true);
+    const ans = result.answers.find((a) => a.question_id === "q1");
+    expect(ans?.selected_options).toContain("Other");
+    expect(ans?.answer_text).toBe("Something custom");
+  });
+
+  it("errors when multiple non-Other options are selected", () => {
+    const doc = makeFullDoc([
+      `<!-- question_id: q1 -->\n#### 1. Q1 *(required)*\n\n> **Type:** radio_other\n\n` +
+      makeAnswerBlock("q1", "(x) Option A\n(x) Option B\n(?) Other: "),
+    ]);
+    const result = parseMarkdown(doc, questions);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.message.includes("multiple selections"))).toBe(true);
+  });
+});
+
+describe("parseMarkdown — checkbox_other field type", () => {
+  const questions: ImportQuestion[] = [
+    { id: "q1", question: "Q1", field_type: "checkbox_other", options: ["Training", "Mentoring"] },
+  ];
+
+  it("parses multiple checked options without Other", () => {
+    const doc = makeFullDoc([
+      `<!-- question_id: q1 -->\n#### 1. Q1 *(required)*\n\n> **Type:** checkbox_other\n\n` +
+      makeAnswerBlock("q1", "[x] Training\n[ ] Mentoring\n[?] Other: "),
+    ]);
+    const result = parseMarkdown(doc, questions);
+    expect(result.ok).toBe(true);
+    const ans = result.answers.find((a) => a.question_id === "q1");
+    expect(ans?.selected_options).toEqual(["Training"]);
+    expect(ans?.answer_text).toBe(""); // Other text is empty
+  });
+
+  it("parses Other checked with free text", () => {
+    const doc = makeFullDoc([
+      `<!-- question_id: q1 -->\n#### 1. Q1 *(required)*\n\n> **Type:** checkbox_other\n\n` +
+      makeAnswerBlock("q1", "[x] Training\n[?] Other: Evening classes"),
+    ]);
+    const result = parseMarkdown(doc, questions);
+    expect(result.ok).toBe(true);
+    const ans = result.answers.find((a) => a.question_id === "q1");
+    expect(ans?.selected_options).toContain("Training");
+    expect(ans?.selected_options).toContain("Other");
+    expect(ans?.answer_text).toBe("Evening classes");
+  });
+});
+
+describe("parseMarkdown — date and time field types", () => {
+  const questions: ImportQuestion[] = [
+    { id: "q1", question: "Start date", field_type: "date" },
+    { id: "q2", question: "Start time", field_type: "time" },
+  ];
+
+  it("parses date and time answers as plain text", () => {
+    const doc = makeFullDoc([
+      `<!-- question_id: q1 -->\n#### 1. Start date *(required)*\n\n> **Type:** date\n\n` +
+      makeAnswerBlock("q1", "```\n2026-06-01\n```"),
+      `<!-- question_id: q2 -->\n#### 2. Start time *(required)*\n\n> **Type:** time\n\n` +
+      makeAnswerBlock("q2", "```\n14:30\n```"),
+    ]);
+    const result = parseMarkdown(doc, questions);
+    expect(result.ok).toBe(true);
+    expect(result.answers.find((a) => a.question_id === "q1")?.answer_text).toBe("2026-06-01");
+    expect(result.answers.find((a) => a.question_id === "q2")?.answer_text).toBe("14:30");
+  });
+});
+
 describe("round-trip: generate → parse → compare", () => {
   it("round-trips text, radio, and checkbox answers", () => {
     const exportQuestions = [
