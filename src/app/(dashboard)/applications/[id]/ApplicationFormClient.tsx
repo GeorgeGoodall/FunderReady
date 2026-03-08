@@ -107,6 +107,7 @@ export function ApplicationFormClient({
     hasEstimate: boolean;
   } | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
+  const [draftReviewMode, setDraftReviewMode] = useState(false);
 
   // Parse questions from the questions set
   const questions: Question[] = Array.isArray(questionsSet?.questions_json)
@@ -194,6 +195,8 @@ export function ApplicationFormClient({
     try {
       const res = await fetch(`/api/applications/${application.id}/submit-for-review`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_draft: draftReviewMode }),
       });
 
       const data = await res.json();
@@ -645,10 +648,28 @@ export function ApplicationFormClient({
                   You have <strong>{estimateState.remaining} credits</strong> remaining.
                   Credits will be deducted based on actual usage after the review completes.
                 </p>
+                <div className="mt-4">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={draftReviewMode}
+                      onChange={(e) => setDraftReviewMode(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-blue-600"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        This is a draft review
+                      </span>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Placeholders won&apos;t be penalised. Feedback will be framed as suggestions to help you develop your answers.
+                      </p>
+                    </div>
+                  </label>
+                </div>
                 <div className="mt-6 flex justify-end gap-3">
                   <button
                     type="button"
-                    onClick={() => setShowSubmitConfirm(false)}
+                    onClick={() => { setShowSubmitConfirm(false); setDraftReviewMode(false); }}
                     className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                   >
                     Cancel
@@ -672,10 +693,28 @@ export function ApplicationFormClient({
                     You have <strong>{estimateState.remaining} credits</strong> remaining.
                   </p>
                 </div>
+                <div className="mt-4">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={draftReviewMode}
+                      onChange={(e) => setDraftReviewMode(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-blue-600"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        This is a draft review
+                      </span>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Placeholders won&apos;t be penalised. Feedback will be framed as suggestions to help you develop your answers.
+                      </p>
+                    </div>
+                  </label>
+                </div>
                 <div className="mt-6 flex justify-end gap-3">
                   <button
                     type="button"
-                    onClick={() => setShowSubmitConfirm(false)}
+                    onClick={() => { setShowSubmitConfirm(false); setDraftReviewMode(false); }}
                     className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                   >
                     Cancel
