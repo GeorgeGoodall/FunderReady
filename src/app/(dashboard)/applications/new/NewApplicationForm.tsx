@@ -618,7 +618,8 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
                   <button
                     type="button"
                     onClick={() => setStep("criteria")}
-                    className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                    aria-label="Edit criteria"
+                    className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 px-1 py-0.5 -mx-1"
                   >
                     Edit
                   </button>
@@ -636,7 +637,8 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
                     <button
                       type="button"
                       onClick={() => setStep("questions")}
-                      className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                      aria-label="Edit questions"
+                      className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 px-1 py-0.5 -mx-1"
                     >
                       Edit
                     </button>
