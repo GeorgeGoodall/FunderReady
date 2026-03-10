@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Temporary analysis scripts — not application code
+    "tmp-analysis/**",
   ]),
 ]);
 

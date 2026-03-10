@@ -61,7 +61,10 @@ export function FeedbackButton({
   const [saving, setSaving] = useState(false);
   // Use ref to avoid stale closure in toggle callback
   const sentimentRef = useRef(sentiment);
-  sentimentRef.current = sentiment;
+  // Keep ref in sync after each render (done in effect to avoid updating during render)
+  useEffect(() => {
+    sentimentRef.current = sentiment;
+  });
 
   // Sync local state when parent provides a new value (e.g. after server data refresh)
   useEffect(() => {

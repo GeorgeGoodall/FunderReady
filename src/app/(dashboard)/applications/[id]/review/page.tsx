@@ -93,7 +93,7 @@ export default async function ApplicationReviewPage({
   }
 
   // Load user feedback for this review
-  let initialFeedback: Record<string, "up" | "down"> = {};
+  const initialFeedback: Record<string, "up" | "down"> = {};
   if (review) {
     const { data: feedbackRows } = await supabase
       .from("review_feedback")

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextResponse } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Shared mocking helpers
@@ -41,10 +42,7 @@ const mockRequireProWithRateLimit = vi.fn();
 vi.mock("@/lib/usage/require-pro-with-rate-limit", () => ({
   requireProWithRateLimit: (...args: unknown[]) =>
     mockRequireProWithRateLimit(...args),
-  isGuardError: (result: unknown) => {
-    const { NextResponse } = require("next/server");
-    return result instanceof NextResponse;
-  },
+  isGuardError: (result: unknown) => result instanceof NextResponse,
 }));
 
 beforeEach(() => {

@@ -17,17 +17,18 @@ const BreadcrumbContext = createContext<BreadcrumbContextValue>({
 });
 
 export function BreadcrumbProvider({ children }: { children: ReactNode }) {
-  const [labels, setLabels] = useState<Record<string, string>>({});
+  const [labelsPerPath, setLabelsPerPath] = useState<Record<string, Record<string, string>>>({});
   const pathname = usePathname();
 
-  // Clear stale labels on navigation
-  useEffect(() => {
-    setLabels({});
-  }, [pathname]);
+  // Labels are scoped to the current pathname — stale labels from previous paths are ignored automatically
+  const labels = useMemo(() => labelsPerPath[pathname] ?? {}, [labelsPerPath, pathname]);
 
   const registerLabels = useCallback((newLabels: Record<string, string>) => {
-    setLabels((prev) => ({ ...prev, ...newLabels }));
-  }, []);
+    setLabelsPerPath((prev) => ({
+      ...prev,
+      [pathname]: { ...(prev[pathname] ?? {}), ...newLabels },
+    }));
+  }, [pathname]);
 
   return (
     <BreadcrumbContext.Provider value={{ labels, registerLabels }}>

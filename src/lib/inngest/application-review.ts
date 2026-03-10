@@ -649,7 +649,7 @@ export const applicationReviewRequested = inngest.createFunction(
         }
 
         // First pass (only fresh answers need Claude calls)
-        let settled = freshContexts.length > 0
+        const settled = freshContexts.length > 0
           ? await runBatched(freshContexts)
           : [];
 
