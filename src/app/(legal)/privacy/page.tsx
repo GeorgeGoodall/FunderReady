@@ -41,9 +41,11 @@ export default function PrivacyPolicyPage() {
 
       <h2>3. How We Use Your Data</h2>
       <ul>
-        <li>To provide and improve the FunderReady service.</li>
+        <li>To provide the FunderReady service and process your funding applications through our AI review pipeline.</li>
         <li>
-          To process your funding applications through our AI review pipeline.
+          To improve the quality of our AI review pipeline — we may review application
+          data and AI-generated results internally to evaluate and improve review accuracy.
+          This data is treated as confidential and is not shared externally.
         </li>
         <li>To manage your account and subscription.</li>
         <li>To monitor and fix errors in the service.</li>
@@ -52,10 +54,17 @@ export default function PrivacyPolicyPage() {
       <h2>4. AI Processing</h2>
       <p>
         When you submit an application for review, the text of your answers is
-        sent to Anthropic&apos;s Claude API for AI analysis. Anthropic processes this
-        data under their data processing terms and does not use your data to
-        train their models. The AI review results are stored in our database and
-        associated with your account.
+        sent to Anthropic&apos;s Claude API for AI analysis. The AI review results
+        are stored in our database and associated with your account. Anthropic
+        processes this data subject to their own{" "}
+        <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener noreferrer">
+          Privacy Policy
+        </a>{" "}
+        and{" "}
+        <a href="https://www.anthropic.com/legal/aup" target="_blank" rel="noopener noreferrer">
+          Usage Policies
+        </a>
+        .
       </p>
 
       <h2>5. Third-Party Processors</h2>
@@ -71,42 +80,47 @@ export default function PrivacyPolicyPage() {
           <tr>
             <td>Supabase</td>
             <td>Database, authentication, file storage</td>
-            <td>US (AWS)</td>
+            <td>[verify]</td>
           </tr>
           <tr>
-            <td>Anthropic</td>
+            <td>
+              <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener noreferrer">
+                Anthropic
+              </a>
+            </td>
             <td>AI review of application answers</td>
             <td>US</td>
           </tr>
           <tr>
             <td>Stripe</td>
             <td>Payment processing</td>
-            <td>US</td>
+            <td>[verify]</td>
           </tr>
           <tr>
             <td>Inngest</td>
-            <td>Background job processing (metadata only)</td>
-            <td>US</td>
+            <td>Background job processing</td>
+            <td>[verify]</td>
           </tr>
           <tr>
             <td>Sentry</td>
             <td>Error monitoring and diagnostics</td>
-            <td>US</td>
+            <td>[verify]</td>
           </tr>
           <tr>
             <td>Vercel</td>
             <td>Application hosting</td>
-            <td>US/Global CDN</td>
+            <td>[verify]</td>
           </tr>
         </tbody>
       </table>
 
       <h2>6. International Data Transfers</h2>
       <p>
-        Your data may be transferred to and processed in the United States by
-        our third-party processors listed above. These transfers are protected
-        by Standard Contractual Clauses (SCCs) approved by the European
-        Commission, or equivalent safeguards.
+        Some of our third-party processors may store or process your data outside
+        the UK. Where this occurs, transfers are protected by Standard Contractual
+        Clauses (SCCs) or equivalent safeguards recognised under UK GDPR. Please
+        refer to each processor&apos;s privacy policy for details of their data
+        transfer mechanisms.
       </p>
 
       <h2>7. Data Retention</h2>

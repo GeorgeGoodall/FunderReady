@@ -39,6 +39,12 @@ export default async function AdminLayout({
           >
             Metrics
           </Link>
+          <Link
+            href="/admin/beta"
+            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            Beta
+          </Link>
         </nav>
       </div>
       <div className="mt-6">{children}</div>
