@@ -80,7 +80,6 @@ export default function PrivacyPolicyPage() {
           <tr>
             <td>Supabase</td>
             <td>Database, authentication, file storage</td>
-            <td>[verify]</td>
           </tr>
           <tr>
             <td>
@@ -94,22 +93,18 @@ export default function PrivacyPolicyPage() {
           <tr>
             <td>Stripe</td>
             <td>Payment processing</td>
-            <td>[verify]</td>
           </tr>
           <tr>
             <td>Inngest</td>
             <td>Background job processing</td>
-            <td>[verify]</td>
           </tr>
           <tr>
             <td>Sentry</td>
             <td>Error monitoring and diagnostics</td>
-            <td>[verify]</td>
           </tr>
           <tr>
             <td>Vercel</td>
             <td>Application hosting</td>
-            <td>[verify]</td>
           </tr>
         </tbody>
       </table>
