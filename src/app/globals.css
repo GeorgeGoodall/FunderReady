@@ -24,3 +24,160 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Landing page review animation
+   Total cycle: 8000ms. All animated elements use
+   animation-duration: 8000ms; animation-iteration-count: infinite
+   Each keyframe encodes its window as a % of that 8s cycle.
+   Elements hold their final state until 92.5% then reset to initial.
+   ───────────────────────────────────────────────────────────── */
+
+/* Progress bar width (delay 400ms, duration 2200ms → 5%–32.5%) */
+@keyframes lp-progress {
+  0%, 5%    { width: 0%; }
+  32.5%     { width: 100%; }
+  92.5%     { width: 100%; }
+  95%, 100% { width: 0%; }
+}
+.lp-progress {
+  animation: lp-progress 8000ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Step-indicator pills */
+@keyframes lp-pill-1 {
+  0%, 7%    { background-color: #1e293b; }
+  11%       { background-color: #2563eb; }
+  92.5%     { background-color: #2563eb; }
+  95%, 100% { background-color: #1e293b; }
+}
+@keyframes lp-pill-2 {
+  0%, 12%   { background-color: #1e293b; }
+  16%       { background-color: #2563eb; }
+  92.5%     { background-color: #2563eb; }
+  95%, 100% { background-color: #1e293b; }
+}
+@keyframes lp-pill-3 {
+  0%, 17%   { background-color: #1e293b; }
+  21%       { background-color: #2563eb; }
+  92.5%     { background-color: #2563eb; }
+  95%, 100% { background-color: #1e293b; }
+}
+@keyframes lp-pill-4 {
+  0%, 22%   { background-color: #1e293b; }
+  26%       { background-color: #2563eb; }
+  92.5%     { background-color: #2563eb; }
+  95%, 100% { background-color: #1e293b; }
+}
+.lp-pill-1 { animation: lp-pill-1 8000ms linear infinite; }
+.lp-pill-2 { animation: lp-pill-2 8000ms linear infinite; }
+.lp-pill-3 { animation: lp-pill-3 8000ms linear infinite; }
+.lp-pill-4 { animation: lp-pill-4 8000ms linear infinite; }
+
+/* Tabs fade in (delay 2600ms → 32.5%) */
+@keyframes lp-tabs {
+  0%, 32%   { opacity: 0; }
+  36%       { opacity: 1; }
+  92.5%     { opacity: 1; }
+  95%, 100% { opacity: 0; }
+}
+.lp-tabs { animation: lp-tabs 8000ms ease infinite; }
+
+/* Scores section container (delay 2900ms → 36.25%) */
+@keyframes lp-scores {
+  0%, 36%   { opacity: 0; transform: translateY(6px); }
+  41%       { opacity: 1; transform: translateY(0); }
+  92.5%     { opacity: 1; transform: translateY(0); }
+  95%, 100% { opacity: 0; transform: translateY(6px); }
+}
+.lp-scores { animation: lp-scores 8000ms ease infinite; }
+
+/* Score cards (staggered: 3200ms, 3450ms, 3700ms, 3950ms) */
+@keyframes lp-card-1 {
+  0%, 40%   { opacity: 0; transform: translateY(6px); }
+  44%       { opacity: 1; transform: translateY(0); }
+  92.5%     { opacity: 1; transform: translateY(0); }
+  95%, 100% { opacity: 0; transform: translateY(6px); }
+}
+@keyframes lp-card-2 {
+  0%, 43%   { opacity: 0; transform: translateY(6px); }
+  47%       { opacity: 1; transform: translateY(0); }
+  92.5%     { opacity: 1; transform: translateY(0); }
+  95%, 100% { opacity: 0; transform: translateY(6px); }
+}
+@keyframes lp-card-3 {
+  0%, 46%   { opacity: 0; transform: translateY(6px); }
+  50%       { opacity: 1; transform: translateY(0); }
+  92.5%     { opacity: 1; transform: translateY(0); }
+  95%, 100% { opacity: 0; transform: translateY(6px); }
+}
+@keyframes lp-card-4 {
+  0%, 49%   { opacity: 0; transform: translateY(6px); }
+  53%       { opacity: 1; transform: translateY(0); }
+  92.5%     { opacity: 1; transform: translateY(0); }
+  95%, 100% { opacity: 0; transform: translateY(6px); }
+}
+.lp-card-1 { animation: lp-card-1 8000ms ease infinite; }
+.lp-card-2 { animation: lp-card-2 8000ms ease infinite; }
+.lp-card-3 { animation: lp-card-3 8000ms ease infinite; }
+.lp-card-4 { animation: lp-card-4 8000ms ease infinite; }
+
+/* Score bar fills — each animates to its specific final width */
+@keyframes lp-bar-1 {
+  0%, 42%   { width: 0%; }
+  50%       { width: 82%; }
+  92.5%     { width: 82%; }
+  95%, 100% { width: 0%; }
+}
+@keyframes lp-bar-2 {
+  0%, 45%   { width: 0%; }
+  53%       { width: 61%; }
+  92.5%     { width: 61%; }
+  95%, 100% { width: 0%; }
+}
+@keyframes lp-bar-3 {
+  0%, 48%   { width: 0%; }
+  56%       { width: 74%; }
+  92.5%     { width: 74%; }
+  95%, 100% { width: 0%; }
+}
+@keyframes lp-bar-4 {
+  0%, 51%   { width: 0%; }
+  59%       { width: 88%; }
+  92.5%     { width: 88%; }
+  95%, 100% { width: 0%; }
+}
+.lp-bar-1 { animation: lp-bar-1 8000ms ease infinite; }
+.lp-bar-2 { animation: lp-bar-2 8000ms ease infinite; }
+.lp-bar-3 { animation: lp-bar-3 8000ms ease infinite; }
+.lp-bar-4 { animation: lp-bar-4 8000ms ease infinite; }
+
+/* Answer text (delay 4500ms → 56.25%) */
+@keyframes lp-answer {
+  0%, 56%   { opacity: 0; transform: translateY(6px); }
+  61%       { opacity: 1; transform: translateY(0); }
+  92.5%     { opacity: 1; transform: translateY(0); }
+  95%, 100% { opacity: 0; transform: translateY(6px); }
+}
+.lp-answer { animation: lp-answer 8000ms ease infinite; }
+
+/* Inline comment (delay 5100ms → 63.75%) */
+@keyframes lp-comment {
+  0%, 63%   { opacity: 0; transform: translateY(6px); }
+  68%       { opacity: 1; transform: translateY(0); }
+  92.5%     { opacity: 1; transform: translateY(0); }
+  95%, 100% { opacity: 0; transform: translateY(6px); }
+}
+.lp-comment { animation: lp-comment 8000ms ease infinite; }
+
+/* Inline text highlight (static, no animation needed) */
+.lp-highlight {
+  background-color: rgba(250, 204, 21, 0.18);
+  border-bottom: 1.5px solid #fbbf24;
+  border-radius: 2px;
+  padding: 0 2px;
+}
