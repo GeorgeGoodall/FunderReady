@@ -54,7 +54,8 @@ export default async function AdminBetaPage() {
       .eq("status", "completed")
       .in("applications.user_id", betaIds);
     for (const r of reviews ?? []) {
-      const userId = (r.applications as { user_id: string } | null)?.user_id;
+      const app = r.applications as unknown as { user_id: string } | { user_id: string }[] | null;
+      const userId = Array.isArray(app) ? app[0]?.user_id : app?.user_id;
       if (userId) {
         reviewCountMap[userId] = (reviewCountMap[userId] ?? 0) + 1;
       }
