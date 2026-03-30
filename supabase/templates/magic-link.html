@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Your FunderReady login link</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f5;">
+    <tr>
+      <td align="center" style="padding: 40px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
+
+          <!-- Brand -->
+          <tr>
+            <td align="center" style="padding-bottom: 32px;">
+              <span style="font-size: 24px; font-weight: 700; color: #2563eb; text-decoration: none;">FunderReady</span>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background-color: #ffffff; border-radius: 8px; padding: 48px 40px;">
+
+              <!-- Heading -->
+              <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #171717; text-align: center;">
+                Sign in to FunderReady
+              </h1>
+
+              <!-- Body -->
+              <p style="margin: 0 0 32px; font-size: 16px; line-height: 24px; color: #171717; text-align: center;">
+                Click the button below to sign in to your account. This link expires in 1 hour.
+              </p>
+
+              <!-- CTA Button -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 8px;">
+                      Sign In
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Fallback Link -->
+              <p style="margin: 32px 0 0; font-size: 13px; line-height: 20px; color: #71717a; text-align: center;">
+                Or copy and paste this link into your browser:<br>
+                <a href="{{ .ConfirmationURL }}" style="color: #2563eb; word-break: break-all;">{{ .ConfirmationURL }}</a>
+              </p>
+
+              <!-- Security Note -->
+              <p style="margin: 16px 0 0; font-size: 13px; line-height: 20px; color: #71717a; text-align: center;">
+                If you didn't request this link, you can safely ignore this email.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding-top: 32px;">
+              <p style="margin: 0 0 8px; font-size: 13px; color: #71717a;">
+                &copy; 2026 FunderReady. All rights reserved.
+              </p>
+              <p style="margin: 0; font-size: 13px; color: #71717a;">
+                <a href="{{ .SiteURL }}/privacy" style="color: #71717a; text-decoration: underline;">Privacy Policy</a>
+                &nbsp;&middot;&nbsp;
+                <a href="{{ .SiteURL }}/terms" style="color: #71717a; text-decoration: underline;">Terms of Service</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
