@@ -1,127 +1,30 @@
-"use client";
-
-import { useState } from "react";
-
 export function BillingClient({ tier }: { tier: "free" | "basic" | "pro" }) {
-  const [loading, setLoading] = useState<string | null>(null);
-  const [error, setError] = useState("");
-
-  async function handleSubscribe(selectedTier: "basic" | "pro") {
-    setLoading(selectedTier);
-    setError("");
-    try {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier: selectedTier }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.url) {
-        setError(data.error ?? "Failed to start checkout. Please try again.");
-        return;
-      }
-      window.location.href = data.url;
-    } finally {
-      setLoading(null);
-    }
-  }
-
-  async function handleTopup(pack: "standard" | "pro", quantity: number = 1) {
-    setLoading(pack);
-    setError("");
-    try {
-      const res = await fetch("/api/stripe/topup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pack, quantity }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.url) {
-        setError(data.error ?? "Failed to start checkout. Please try again.");
-        return;
-      }
-      window.location.href = data.url;
-    } finally {
-      setLoading(null);
-    }
-  }
-
   if (tier === "free") {
     return (
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Choose a Plan</h2>
-        {error && (
-          <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
-            {error}
-          </div>
-        )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
-            <h3 className="text-lg font-semibold">Basic</h3>
-            <p className="mt-1 text-2xl font-bold">£19<span className="text-sm font-normal text-zinc-500">/month</span></p>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">30 credits/month</p>
-            <button
-              onClick={() => handleSubscribe("basic")}
-              disabled={loading !== null}
-              className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {loading === "basic" ? "Redirecting..." : "Subscribe to Basic"}
-            </button>
-          </div>
-          <div className="rounded-lg border-2 border-blue-600 p-6">
-            <h3 className="text-lg font-semibold">Pro</h3>
-            <p className="mt-1 text-2xl font-bold">£49<span className="text-sm font-normal text-zinc-500">/month</span></p>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">100 credits/month + Pro top-ups</p>
-            <button
-              onClick={() => handleSubscribe("pro")}
-              disabled={loading !== null}
-              className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {loading === "pro" ? "Redirecting..." : "Subscribe to Pro"}
-            </button>
-          </div>
-        </div>
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 dark:border-amber-800/50 dark:bg-amber-900/10">
+        <h2 className="text-lg font-semibold text-amber-900 dark:text-amber-200">
+          Closed Beta
+        </h2>
+        <p className="mt-2 text-sm text-amber-800 dark:text-amber-300">
+          FunderReady is currently in closed beta. Paid plans are not yet available to the public — full launch is coming soon.
+        </p>
+        <a
+          href="mailto:hello@funderready.com?subject=Beta%20access%20request%20%E2%80%94%20FunderReady&body=Hi%20FunderReady%20team%2C%0A%0AI%27d%20like%20to%20request%20beta%20access.%0A%0AName%3A%20%5Byour%20name%5D%0AOrganisation%20(if%20applicable)%3A%20%5Bname%5D%0ARole%3A%20%5Be.g.%20Grants%20Manager%2C%20Fundraiser%2C%20freelance%20bid%20writer%5D%0AHow%20I%20heard%20about%20FunderReady%3A%20%5Boptional%5D%0A%0AThanks"
+          className="mt-3 inline-block rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-700"
+        >
+          Apply for early access
+        </a>
       </div>
     );
   }
 
-  // Subscribed user — show top-up options
+  // Subscribed user (granted beta access) — top-ups not yet available
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Buy Credits</h2>
-      {error && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
-          {error}
-        </div>
-      )}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
-          <h3 className="font-semibold">Standard Pack</h3>
-          <p className="mt-1 text-lg font-bold">£5</p>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">10 credits</p>
-          <button
-            onClick={() => handleTopup("standard")}
-            disabled={loading !== null}
-            className="mt-3 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading === "standard" ? "Redirecting..." : "Buy"}
-          </button>
-        </div>
-        {tier === "pro" && (
-          <div className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
-            <h3 className="font-semibold">Pro Pack</h3>
-            <p className="mt-1 text-lg font-bold">£10</p>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">30 credits</p>
-            <button
-              onClick={() => handleTopup("pro")}
-              disabled={loading !== null}
-              className="mt-3 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {loading === "pro" ? "Redirecting..." : "Buy"}
-            </button>
-          </div>
-        )}
-      </div>
+    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900/50">
+      <h2 className="text-lg font-semibold">Credit top-ups</h2>
+      <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+        Credit top-ups will be available at full launch. If you need more credits in the meantime, please get in touch.
+      </p>
     </div>
   );
 }
