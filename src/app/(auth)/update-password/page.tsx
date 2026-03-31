@@ -34,6 +34,7 @@ export default function UpdatePasswordPage() {
       return;
     }
 
+    router.refresh();
     router.push("/dashboard");
   }
 
