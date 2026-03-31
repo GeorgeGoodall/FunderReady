@@ -21,6 +21,7 @@
     "@sentry/nextjs": "^10.42.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.97.0",
+    "@vercel/analytics": "^2.0.1",
     "docx": "^9.5.3",
     "inngest": "^3.52.3",
     "mammoth": "^1.11.0",
