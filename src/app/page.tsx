@@ -221,54 +221,88 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            {/* Score cards */}
+            {/* Score rings */}
             <div className="lp-scores px-5 py-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-500">
                 Criteria scores
               </p>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-6">
                 {(
                   [
                     {
-                      label: "Community Impact & Reach",
+                      label: "Community Impact",
                       pct: 82,
-                      color: "#22c55e",
-                      cardCls: "lp-card-1",
-                      barCls: "lp-bar-1",
+                      color: "#4ade80",
+                      ringCls: "lp-ring-1",
+                      strokeCls: "lp-ring-1-stroke",
+                      numCls: "lp-num-1",
                     },
                     {
-                      label: "Financial Case & Value for Money",
+                      label: "Financial Case",
                       pct: 61,
-                      color: "#f59e0b",
-                      cardCls: "lp-card-2",
-                      barCls: "lp-bar-2",
+                      color: "#fcd34d",
+                      ringCls: "lp-ring-2",
+                      strokeCls: "lp-ring-2-stroke",
+                      numCls: "lp-num-2",
                     },
                     {
-                      label: "Organisational Capacity",
+                      label: "Org. Capacity",
                       pct: 74,
-                      color: "#3b82f6",
-                      cardCls: "lp-card-3",
-                      barCls: "lp-bar-3",
+                      color: "#bef264",
+                      ringCls: "lp-ring-3",
+                      strokeCls: "lp-ring-3-stroke",
+                      numCls: "lp-num-3",
                     },
                     {
-                      label: "Long-term Sustainability",
+                      label: "Sustainability",
                       pct: 88,
-                      color: "#22c55e",
-                      cardCls: "lp-card-4",
-                      barCls: "lp-bar-4",
+                      color: "#34d399",
+                      ringCls: "lp-ring-4",
+                      strokeCls: "lp-ring-4-stroke",
+                      numCls: "lp-num-4",
                     },
                   ] as const
-                ).map(({ label, pct, color, cardCls, barCls }) => (
-                  <div key={label} className={`${cardCls} rounded-lg bg-slate-800 p-3`}>
-                    <p className="mb-2 text-xs leading-snug text-slate-400">{label}</p>
-                    <div className="mb-1.5 h-1 overflow-hidden rounded-full bg-slate-900">
-                      <div
-                        className={`${barCls} h-full rounded-full`}
-                        style={{ backgroundColor: color }}
-                      />
+                ).map(({ label, pct, color, ringCls, strokeCls, numCls }) => (
+                  <div
+                    key={label}
+                    className={`${ringCls} flex flex-col items-center gap-2`}
+                  >
+                    <div className="relative flex items-center justify-center">
+                      <svg
+                        width="72"
+                        height="72"
+                        viewBox="0 0 72 72"
+                        aria-hidden="true"
+                      >
+                        <circle
+                          cx="36"
+                          cy="36"
+                          r="28"
+                          fill="none"
+                          stroke="#1e293b"
+                          strokeWidth="6"
+                        />
+                        <circle
+                          cx="36"
+                          cy="36"
+                          r="28"
+                          fill="none"
+                          stroke={color}
+                          strokeWidth="6"
+                          strokeLinecap="round"
+                          transform="rotate(-90 36 36)"
+                          className={strokeCls}
+                        />
+                      </svg>
+                      <span
+                        className={`${numCls} absolute text-sm font-bold`}
+                        style={{ color }}
+                      >
+                        {pct}%
+                      </span>
                     </div>
-                    <p className="text-base font-bold" style={{ color }}>
-                      {pct}%
+                    <p className="text-center text-xs leading-snug text-slate-400">
+                      {label}
                     </p>
                   </div>
                 ))}
