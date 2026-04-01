@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "FunderReady — AI bid review for UK charities",
@@ -45,7 +46,10 @@ const FAQ_ITEMS = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
   const showSocialProof =
     SOCIAL_PROOF.quote !== null || SOCIAL_PROOF.fundNames !== null;
 
@@ -56,12 +60,21 @@ export default function Home() {
         <span className="text-sm font-bold tracking-tight text-slate-50">
           FunderReady
         </span>
-        <Link
-          href="/login"
-          className="rounded-lg border border-slate-700 px-4 py-1.5 text-sm text-slate-400 transition-colors hover:border-slate-500 hover:text-slate-200"
-        >
-          Sign in
-        </Link>
+        {user ? (
+          <Link
+            href="/dashboard"
+            className="rounded-lg border border-slate-700 px-4 py-1.5 text-sm text-slate-400 transition-colors hover:border-slate-500 hover:text-slate-200"
+          >
+            Go to dashboard
+          </Link>
+        ) : (
+          <Link
+            href="/login"
+            className="rounded-lg border border-slate-700 px-4 py-1.5 text-sm text-slate-400 transition-colors hover:border-slate-500 hover:text-slate-200"
+          >
+            Sign in
+          </Link>
+        )}
       </nav>
 
       {/* ── Hero ── */}
