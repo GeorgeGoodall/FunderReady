@@ -68,6 +68,13 @@ describe("submitAnswerBatch", () => {
     expect(req.params.model).toBe("claude-sonnet-4-6");
   });
 
+  it("throws if requests array is empty", async () => {
+    await expect(
+      submitAnswerBatch([], "claude-sonnet-4-6", 1024, TestSchema)
+    ).rejects.toThrow("submitAnswerBatch: requests array must not be empty");
+    expect(mockBatchCreate).not.toHaveBeenCalled();
+  });
+
   it("sets the user prompt as the message content", async () => {
     mockBatchCreate.mockResolvedValue({ id: "msgbatch_xyz" });
 

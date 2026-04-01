@@ -34,6 +34,9 @@ export async function submitAnswerBatch<T>(
   maxTokens: number,
   schema: ZodSchema<T>
 ): Promise<BatchSubmitResult> {
+  if (requests.length === 0) {
+    throw new Error("submitAnswerBatch: requests array must not be empty");
+  }
   const tool = buildTool(schema);
   const client = getClient();
 
