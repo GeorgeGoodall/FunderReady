@@ -635,7 +635,7 @@ export const applicationReviewRequested = inngest.createFunction(
         if (done) break;
         pollAttempt++;
         if (pollAttempt >= 40) {
-          throw new Error("Answer batch polling timeout after 20 minutes");
+          throw new NonRetriableError("Answer batch polling timeout after 20 minutes");
         }
       }
 
