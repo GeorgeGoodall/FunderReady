@@ -123,6 +123,34 @@ describe("inferWithClaude", () => {
     expect(step.ai.infer).toHaveBeenCalledTimes(1);
   });
 
+  it("throws NonRetriableError when retry call returns stop_reason max_tokens", async () => {
+    const truncatedRetryMessage = {
+      stop_reason: "max_tokens",
+      content: [],
+      usage: { input_tokens: 200, output_tokens: 80 },
+    };
+    const step = makeStep([
+      makeToolUseMessage({ wrong: "shape" }), // initial call: valid tool use block, fails Zod
+      truncatedRetryMessage,                  // retry call: truncated
+    ]);
+
+    await expect(
+      inferWithClaude(step, "test-step", {
+        prompt: "test prompt",
+        schema: TestSchema,
+        model: "claude-sonnet-4-6",
+        maxTokens: 1024,
+      })
+    ).rejects.toThrow(NonRetriableError);
+
+    expect(step.ai.infer).toHaveBeenCalledTimes(2);
+    expect(step.ai.infer).toHaveBeenNthCalledWith(
+      2,
+      "test-step-retry",
+      expect.anything()
+    );
+  });
+
   it("includes system prompt in request body when provided", async () => {
     const step = makeStep([makeToolUseMessage({ value: "hello" })]);
 
