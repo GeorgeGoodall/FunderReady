@@ -7,9 +7,7 @@
 import { anthropic as anthropicModel, NonRetriableError } from "inngest";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ZodSchema } from "zod";
-import { buildTool, TOOL_NAME, type ClaudeUsageData } from "./anthropic";
-
-type CacheBlock = { type: "text"; text: string; cache_control?: { type: "ephemeral" } };
+import { buildTool, TOOL_NAME, type CacheBlock, type ClaudeUsageData } from "./anthropic";
 
 export interface InferWithClaudeOptions<T> {
   prompt: string;
@@ -79,6 +77,12 @@ export async function inferWithClaude<T>(
     buildInferOptions([{ role: "user", content: prompt }])
   );
 
+  if (message.stop_reason === "max_tokens") {
+    throw new NonRetriableError(
+      `inferWithClaude response truncated (hit max_tokens=${maxTokens}). Increase maxTokens for this call.`
+    );
+  }
+
   const toolBlock = message.content.find((b) => b.type === "tool_use");
   if (!toolBlock || toolBlock.type !== "tool_use") {
     throw new NonRetriableError("inferWithClaude: no tool use block in response");
@@ -112,6 +116,12 @@ export async function inferWithClaude<T>(
       },
     ])
   );
+
+  if (retryMessage.stop_reason === "max_tokens") {
+    throw new NonRetriableError(
+      `inferWithClaude response truncated (hit max_tokens=${maxTokens}). Increase maxTokens for this call.`
+    );
+  }
 
   const retryToolBlock = retryMessage.content.find((b) => b.type === "tool_use");
   if (!retryToolBlock || retryToolBlock.type !== "tool_use") {

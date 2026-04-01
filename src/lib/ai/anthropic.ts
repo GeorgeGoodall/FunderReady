@@ -107,7 +107,7 @@ export function parseJsonPermissive(text: string): unknown {
 // Claude API call with tool use for structured output
 // ---------------------------------------------------------------------------
 
-type CacheBlock = { type: "text"; text: string; cache_control?: { type: "ephemeral" } };
+export type CacheBlock = { type: "text"; text: string; cache_control?: { type: "ephemeral" } };
 
 export interface ClaudeUsageData {
   input_tokens: number;
