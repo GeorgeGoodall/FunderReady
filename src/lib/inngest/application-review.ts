@@ -10,6 +10,13 @@ import { inngest } from "./client";
 import { createServiceClient } from "@/lib/supabase/server";
 import { callClaude, type ClaudeUsageData } from "@/lib/ai/anthropic";
 import { logAiUsage, type LogAiUsageParams } from "@/lib/ai/log-usage";
+import { inferWithClaude } from "@/lib/ai/infer-with-claude";
+import {
+  submitAnswerBatch,
+  pollBatch,
+  parseBatchResults,
+  type AnswerBatchRequest,
+} from "@/lib/ai/anthropic-batch";
 import {
   AnswerAnalysisSchema,
   CrossReferenceSchema,
@@ -572,39 +579,32 @@ export const applicationReviewRequested = inngest.createFunction(
       return { applicationId, status: "failed", reason: "No answers" };
     }
 
+    // Split contexts into fresh (need Claude) and reusable (unchanged from previous review)
+    // Pure computation — safe to run in function body on every replay
+    const freshContexts: AnswerContext[] = [];
+    const reusedAnalyses: AnswerAnalysis[] = [];
+    for (const ctx of answerContexts) {
+      const cached = reusableAnalyses[ctx.question_id];
+      if (cached) {
+        reusedAnalyses.push(cached);
+      } else {
+        freshContexts.push(ctx);
+      }
+    }
+
+    const answerSystemPrompt = buildAnswerAnalysisSystemPrompt(criteria);
+
     // -----------------------------------------------------------------------
-    // Step 2: Answer analysis (parallel Claude calls inside a single step)
-    //
-    // Runs up to MAX_CONCURRENT analyses at a time to stay within API rate
-    // limits (Tier 1: 50 RPM, 8k OTPM). If any fail transiently we retry
-    // only the failures (up to 2 retries) to avoid re-spending tokens on
-    // calls that already succeeded.
+    // Steps 2a–2e: Answer analysis via Anthropic Batch API
     // -----------------------------------------------------------------------
-    const MAX_CONCURRENT = 5;
+    const answerUsageEvents: LogAiUsageParams[] = [];
+    let allFreshAnalyses: AnswerAnalysis[] = [];
 
-    const answerAnalysisResult = await step.run(
-      "answer-analyses",
-      async () => {
-        const stepUsage: LogAiUsageParams[] = [];
-
-        // Split into fresh (need Claude) and reusable (pull from previous review)
-        const freshContexts: AnswerContext[] = [];
-        const reusedAnalyses: AnswerAnalysis[] = [];
-
-        for (const ctx of answerContexts) {
-          const cached = reusableAnalyses[ctx.question_id];
-          if (cached) {
-            reusedAnalyses.push(cached);
-          } else {
-            freshContexts.push(ctx);
-          }
-        }
-
-        const systemPrompt = buildAnswerAnalysisSystemPrompt(criteria);
-
-        const analyseAnswer = (ctx: AnswerContext) => {
-          // Build previous context for feedback evolution (re-reviews)
-          const prevContext = previousReview
+    if (freshContexts.length > 0) {
+      // Step 2a: Submit batch
+      const { batchId } = await step.run("submit-answer-batch", async () => {
+        const requests: AnswerBatchRequest[] = freshContexts.map((ctx) => {
+          const prevCtx = previousReview
             ? formatPreviousAnswerContext(
                 ctx.question_id,
                 previousReview.results,
@@ -612,80 +612,88 @@ export const applicationReviewRequested = inngest.createFunction(
                 previousReview.review_number + 1
               )
             : null;
-          const prompt = buildAnswerAnalysisPrompt(ctx, prevContext, isDraft);
-          return callClaude({
-            prompt,
-            systemPrompt,
+          return {
+            questionId: ctx.question_id,
+            systemPrompt: answerSystemPrompt,
+            userPrompt: buildAnswerAnalysisPrompt(ctx, prevCtx, isDraft),
+          };
+        });
+        const result = await submitAnswerBatch(requests, MODEL, 12288, LenientAnswerAnalysisSchema);
+        await updateAppReviewProgress(reviewId, "analysing", {
+          batch_submitted: Date.now(),
+        });
+        return result;
+      });
+
+      // Steps 2b: Poll every 30s until batch is complete (max 40 attempts = 20 min)
+      let pollAttempt = 0;
+      while (true) {
+        await step.sleep(`poll-wait-${pollAttempt}`, "30s");
+        const { done } = await step.run(`poll-batch-${pollAttempt}`, async () => {
+          return pollBatch(batchId);
+        });
+        if (done) break;
+        pollAttempt++;
+        if (pollAttempt >= 40) {
+          throw new Error("Answer batch polling timeout after 20 minutes");
+        }
+      }
+
+      // Step 2c: Parse batch results
+      const batchResults = await step.run("parse-batch-results", async () => {
+        return parseBatchResults(batchId, LenientAnswerAnalysisSchema);
+      });
+
+      // Collect successful analyses and usage
+      for (const success of batchResults.successes) {
+        allFreshAnalyses.push(success.analysis);
+        answerUsageEvents.push({
+          applicationReviewId: reviewId,
+          userId,
+          pipelineStep: "answer_analysis",
+          model: MODEL,
+          usage: success.usage,
+          isRetry: false,
+        });
+      }
+
+      // Step 2d: Real-time fallback for any failed batch answers
+      for (const questionId of batchResults.failures) {
+        const ctx = freshContexts.find((c) => c.question_id === questionId);
+        if (!ctx) continue;
+        const prevCtx = previousReview
+          ? formatPreviousAnswerContext(
+              questionId,
+              previousReview.results,
+              answerChanges[questionId] ?? false,
+              previousReview.review_number + 1
+            )
+          : null;
+        const { result, usage } = await inferWithClaude(
+          step,
+          `retry-answer-${questionId}`,
+          {
+            prompt: buildAnswerAnalysisPrompt(ctx, prevCtx, isDraft),
+            systemPrompt: answerSystemPrompt,
             schema: LenientAnswerAnalysisSchema,
             model: MODEL,
             maxTokens: 12288,
             temperature: 0,
-            onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
-              stepUsage.push({
-                applicationReviewId: reviewId,
-                userId,
-                pipelineStep: "answer_analysis",
-                model: MODEL,
-                usage,
-                isRetry,
-              });
-            },
-          });
-        };
-
-        // Run in batches of MAX_CONCURRENT to respect rate limits
-        async function runBatched(
-          contexts: AnswerContext[]
-        ): Promise<PromiseSettledResult<AnswerAnalysis>[]> {
-          const results: PromiseSettledResult<AnswerAnalysis>[] = [];
-          for (let i = 0; i < contexts.length; i += MAX_CONCURRENT) {
-            const batch = contexts.slice(i, i + MAX_CONCURRENT);
-            const batchResults = await Promise.allSettled(
-              batch.map((ctx) => analyseAnswer(ctx))
-            );
-            results.push(...batchResults);
           }
-          return results;
-        }
-
-        // First pass (only fresh answers need Claude calls)
-        const settled = freshContexts.length > 0
-          ? await runBatched(freshContexts)
-          : [];
-
-        // Retry only failures (up to 2 additional attempts)
-        for (let attempt = 0; attempt < 2; attempt++) {
-          const failedIndices = settled
-            .map((r, i) => (r.status === "rejected" ? i : -1))
-            .filter((i) => i !== -1);
-          if (failedIndices.length === 0) break;
-
-          // Exponential backoff before retrying (2s, then 8s)
-          await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt + 1) * 1000));
-
-          const retryContexts = failedIndices.map((i) => freshContexts[i]);
-          const retryResults = await runBatched(retryContexts);
-
-          // Merge retry results back into settled
-          failedIndices.forEach((originalIdx, retryIdx) => {
-            settled[originalIdx] = retryResults[retryIdx];
-          });
-        }
-
-        // Collect results — throw on any remaining failures
-        const freshAnalyses = settled.map((result) => {
-          if (result.status === "fulfilled") return result.value;
-          throw result.reason;
+        );
+        allFreshAnalyses.push(result);
+        answerUsageEvents.push({
+          applicationReviewId: reviewId,
+          userId,
+          pipelineStep: "answer_analysis",
+          model: MODEL,
+          usage,
+          isRetry: true,
         });
-
-        // Merge: reused analyses + fresh analyses
-        const analyses = [...reusedAnalyses, ...freshAnalyses];
-
-        return { analyses, usage: stepUsage };
       }
-    );
+    }
 
-    const answerAnalyses = answerAnalysisResult.analyses;
+    const answerAnalyses: AnswerAnalysis[] = [...reusedAnalyses, ...allFreshAnalyses];
 
     // -----------------------------------------------------------------------
     // Step 3: Cross-reference
@@ -836,7 +844,7 @@ export const applicationReviewRequested = inngest.createFunction(
 
       // Aggregate usage from all pipeline steps
       const allUsageEvents = [
-        ...answerAnalysisResult.usage,
+        ...answerUsageEvents,
         ...crossRefResult.usage,
         ...scoringResult.usage,
       ];
