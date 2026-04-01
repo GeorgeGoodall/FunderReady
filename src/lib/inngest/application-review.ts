@@ -680,7 +680,7 @@ export const applicationReviewRequested = inngest.createFunction(
             temperature: 0,
           }
         );
-        allFreshAnalyses.push(result);
+        allFreshAnalyses.push({ ...result, question_id: questionId });
         answerUsageEvents.push({
           applicationReviewId: reviewId,
           userId,

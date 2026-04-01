@@ -104,6 +104,21 @@ describe("submitAnswerBatch", () => {
     const req = mockBatchCreate.mock.calls[0][0].requests[0];
     expect(req.params.temperature).toBe(0);
   });
+
+  it("omits temperature from request params when not provided", async () => {
+    mockBatchCreate.mockResolvedValue({ id: "msgbatch_xyz" });
+
+    await submitAnswerBatch(
+      [{ questionId: "q1", systemPrompt: "sys", userPrompt: "prompt" }],
+      "claude-sonnet-4-6",
+      1024,
+      TestSchema
+      // no temperature argument
+    );
+
+    const req = mockBatchCreate.mock.calls[0][0].requests[0];
+    expect(req.params).not.toHaveProperty("temperature");
+  });
 });
 
 describe("pollBatch", () => {
