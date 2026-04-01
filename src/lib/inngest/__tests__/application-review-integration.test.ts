@@ -1,22 +1,13 @@
 /**
  * Integration test for the application review pipeline.
  *
- * Mocks: callClaude, Supabase, Inngest step.run, logAiUsage
+ * Mocks: Supabase, Inngest step.run, logAiUsage
  * Verifies: data flows between pipeline steps, correct schemas per stage,
  * final save structure. Zero real API calls / tokens.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { AnswerAnalysis, CrossReference, ApplicationScoring } from "@/lib/pipeline/schemas";
-
-// ---------------------------------------------------------------------------
-// Mock callClaude
-// ---------------------------------------------------------------------------
-
-const mockCallClaude = vi.fn();
-vi.mock("@/lib/ai/anthropic", () => ({
-  callClaude: (...args: unknown[]) => mockCallClaude(...args),
-}));
 
 // ---------------------------------------------------------------------------
 // Mock logAiUsage
@@ -178,31 +169,6 @@ describe("Application review pipeline integration", () => {
     expect(userPrompt).toContain("Final Scoring");
     // Scoring format should NOT include inline comments
     expect(userPrompt).not.toContain("Issues flagged:");
-  });
-
-  it("callClaude receives temperature: 0 from pipeline callers", async () => {
-    // Simulate what application-review.ts does
-    mockCallClaude.mockResolvedValue(mockAnalysis);
-
-    const systemPrompt = buildAnswerAnalysisSystemPrompt([{ id: "c1", criterion: "Need" }]);
-    const prompt = buildAnswerAnalysisPrompt({
-      question_id: "q1",
-      question_text: "Describe need",
-      answer_text: "We address need.",
-    });
-
-    await mockCallClaude({
-      prompt,
-      systemPrompt,
-      schema: {},
-      model: "claude-sonnet-4-6",
-      maxTokens: 8192,
-      temperature: 0,
-    });
-
-    expect(mockCallClaude).toHaveBeenCalledWith(
-      expect.objectContaining({ temperature: 0 })
-    );
   });
 
   it("sanitizeExampleLanguage processes scoring output correctly", async () => {
