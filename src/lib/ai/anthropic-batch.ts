@@ -63,7 +63,7 @@ export async function pollBatch(batchId: string): Promise<BatchPollResult> {
   return { done: batch.processing_status === "ended" };
 }
 
-// Re-export ClaudeUsageData so Task 4 (parseBatchResults) can use it from this module
+// Re-export ClaudeUsageData so callers of parseBatchResults can type-annotate ParsedBatchSuccess
 export type { ClaudeUsageData };
 
 export interface ParsedBatchSuccess<T> {
@@ -85,7 +85,7 @@ export async function parseBatchResults<T>(
   const successes: ParsedBatchSuccess<T>[] = [];
   const failures: string[] = [];
 
-  for await (const item of client.messages.batches.results(batchId)) {
+  for await (const item of await client.messages.batches.results(batchId)) {
     const { custom_id: questionId, result } = item as {
       custom_id: string;
       result: { type: string; message?: Anthropic.Message; error?: unknown };

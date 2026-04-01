@@ -138,7 +138,7 @@ describe("parseBatchResults", () => {
   });
 
   it("returns succeeded analyses with usage", async () => {
-    mockBatchResults.mockReturnValue(
+    mockBatchResults.mockResolvedValue(
       asyncItems([makeSucceededItem("q1", { score: 42 }, 100, 50)])
     );
 
@@ -153,7 +153,7 @@ describe("parseBatchResults", () => {
   });
 
   it("adds errored results to failures", async () => {
-    mockBatchResults.mockReturnValue(asyncItems([makeErroredItem("q1")]));
+    mockBatchResults.mockResolvedValue(asyncItems([makeErroredItem("q1")]));
 
     const { successes, failures } = await parseBatchResults("batch_1", TestSchema);
 
@@ -162,7 +162,7 @@ describe("parseBatchResults", () => {
   });
 
   it("adds Zod validation failures to failures list", async () => {
-    mockBatchResults.mockReturnValue(
+    mockBatchResults.mockResolvedValue(
       asyncItems([makeSucceededItem("q1", { wrong: "type" })])
     );
 
@@ -173,7 +173,7 @@ describe("parseBatchResults", () => {
   });
 
   it("handles mixed success and failure", async () => {
-    mockBatchResults.mockReturnValue(
+    mockBatchResults.mockResolvedValue(
       asyncItems([
         makeSucceededItem("q1", { score: 7 }),
         makeErroredItem("q2"),
@@ -188,7 +188,7 @@ describe("parseBatchResults", () => {
   });
 
   it("calls results() with the provided batchId", async () => {
-    mockBatchResults.mockReturnValue(asyncItems([]));
+    mockBatchResults.mockResolvedValue(asyncItems([]));
 
     await parseBatchResults("msgbatch_specific", TestSchema);
 
