@@ -5,7 +5,7 @@ export const PLANS = {
     name: "Free",
     price: 0,
     creditsPerMonth: 0,
-    features: ["No active plan"],
+    features: [],
   },
   basic: {
     name: "Basic",
