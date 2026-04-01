@@ -705,44 +705,46 @@ export const applicationReviewRequested = inngest.createFunction(
       return { status: "Cross-referencing answers against criteria" };
     });
 
-    const crossRefResult = await step.run("cross-reference", async () => {
-      const stepUsage: LogAiUsageParams[] = [];
-      const { systemPrompt, userPrompt } = buildApplicationCrossReferencePrompt(
+    const { systemPrompt: crossRefSystemPrompt, userPrompt: crossRefUserPrompt } =
+      buildApplicationCrossReferencePrompt(
         answerAnalyses,
         questions.map((q) => ({ id: q.id, question: q.question })),
         criteria,
         disabledQuestions,
-        enabledAnswers.map((a) => ({ question_id: a.question_id, answer_text: formatAnswerForCrossRef(a) })),
+        enabledAnswers.map((a) => ({
+          question_id: a.question_id,
+          answer_text: formatAnswerForCrossRef(a),
+        })),
         isDraft
       );
 
-      const result = await callClaude({
-        prompt: userPrompt,
-        systemPrompt,
+    const { result: crossReference, usage: crossRefUsageData } = await inferWithClaude(
+      step,
+      "cross-reference",
+      {
+        prompt: crossRefUserPrompt,
+        systemPrompt: crossRefSystemPrompt,
         schema: CrossReferenceSchema,
         model: MODEL,
         maxTokens: 16384,
         temperature: 0,
-        onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
-          stepUsage.push({
-            applicationReviewId: reviewId,
-            userId,
-            pipelineStep: "cross_reference",
-            model: MODEL,
-            usage,
-            isRetry,
-          });
-        },
-      });
+      }
+    );
 
+    const crossRefUsage: LogAiUsageParams = {
+      applicationReviewId: reviewId,
+      userId,
+      pipelineStep: "cross_reference",
+      model: MODEL,
+      usage: crossRefUsageData,
+      isRetry: false,
+    };
+
+    await step.run("cross-reference-progress", async () => {
       await updateAppReviewProgress(reviewId, "cross_referencing", {
         crossref_completed: Date.now(),
       });
-
-      return { result, usage: stepUsage };
     });
-
-    const crossReference: CrossReference = crossRefResult.result;
 
     // -----------------------------------------------------------------------
     // Compute gap_criteria server-side (no AI call)
@@ -845,7 +847,7 @@ export const applicationReviewRequested = inngest.createFunction(
       // Aggregate usage from all pipeline steps
       const allUsageEvents = [
         ...answerUsageEvents,
-        ...crossRefResult.usage,
+        crossRefUsage,
         ...scoringResult.usage,
       ];
 
