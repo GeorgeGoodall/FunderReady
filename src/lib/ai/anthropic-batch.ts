@@ -32,7 +32,8 @@ export async function submitAnswerBatch<T>(
   requests: AnswerBatchRequest[],
   model: string,
   maxTokens: number,
-  schema: ZodSchema<T>
+  schema: ZodSchema<T>,
+  temperature?: number
 ): Promise<BatchSubmitResult> {
   if (requests.length === 0) {
     throw new Error("submitAnswerBatch: requests array must not be empty");
@@ -46,6 +47,7 @@ export async function submitAnswerBatch<T>(
       params: {
         model,
         max_tokens: maxTokens,
+        ...(temperature !== undefined ? { temperature } : {}),
         messages: [{ role: "user" as const, content: req.userPrompt }],
         system: req.systemPrompt as Anthropic.MessageCreateParamsNonStreaming["system"],
         tools: [tool] as Anthropic.Tool[],

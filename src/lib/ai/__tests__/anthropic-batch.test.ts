@@ -89,6 +89,21 @@ describe("submitAnswerBatch", () => {
     expect(req.params.messages[0].content).toBe("answer for q1");
     expect(req.params.system).toBe("sys");
   });
+
+  it("includes temperature in request params when provided", async () => {
+    mockBatchCreate.mockResolvedValue({ id: "msgbatch_xyz" });
+
+    await submitAnswerBatch(
+      [{ questionId: "q1", systemPrompt: "sys", userPrompt: "prompt" }],
+      "claude-sonnet-4-6",
+      1024,
+      TestSchema,
+      0
+    );
+
+    const req = mockBatchCreate.mock.calls[0][0].requests[0];
+    expect(req.params.temperature).toBe(0);
+  });
 });
 
 describe("pollBatch", () => {

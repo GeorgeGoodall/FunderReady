@@ -617,7 +617,7 @@ export const applicationReviewRequested = inngest.createFunction(
             userPrompt: buildAnswerAnalysisPrompt(ctx, prevCtx, isDraft),
           };
         });
-        const result = await submitAnswerBatch(requests, MODEL, 12288, LenientAnswerAnalysisSchema);
+        const result = await submitAnswerBatch(requests, MODEL, 12288, LenientAnswerAnalysisSchema, 0);
         await updateAppReviewProgress(reviewId, "analysing", {
           batch_submitted: Date.now(),
         });
@@ -645,7 +645,7 @@ export const applicationReviewRequested = inngest.createFunction(
 
       // Collect successful analyses and usage
       for (const success of batchResults.successes) {
-        allFreshAnalyses.push(success.analysis);
+        allFreshAnalyses.push({ ...success.analysis, question_id: success.questionId });
         answerUsageEvents.push({
           applicationReviewId: reviewId,
           userId,
