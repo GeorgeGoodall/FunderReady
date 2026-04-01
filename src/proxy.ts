@@ -11,7 +11,8 @@ export async function proxy(request: NextRequest) {
     publicRoutes.includes(pathname) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/inngest") ||
-    pathname.startsWith("/api/stripe/webhooks")
+    pathname.startsWith("/api/stripe/webhooks") ||
+    pathname.startsWith("/monitoring")
   ) {
     return NextResponse.next();
   }
