@@ -130,7 +130,7 @@ interface CallClaudeOptions<T> {
   temperature?: number;
 }
 
-const TOOL_NAME = "structured_output";
+export const TOOL_NAME = "structured_output";
 
 let _client: Anthropic | null = null;
 function getClient(): Anthropic {
@@ -138,7 +138,7 @@ function getClient(): Anthropic {
   return _client;
 }
 
-function buildTool<T>(schema: ZodSchema<T>): Anthropic.Tool {
+export function buildTool<T>(schema: ZodSchema<T>): Anthropic.Tool {
   const jsonSchema = zodToJsonSchema(schema, { target: "openApi3" });
   return {
     name: TOOL_NAME,
