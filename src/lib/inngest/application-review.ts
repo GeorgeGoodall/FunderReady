@@ -8,7 +8,6 @@
 import { NonRetriableError } from "inngest";
 import { inngest } from "./client";
 import { createServiceClient } from "@/lib/supabase/server";
-import { callClaude, type ClaudeUsageData } from "@/lib/ai/anthropic";
 import { logAiUsage, type LogAiUsageParams } from "@/lib/ai/log-usage";
 import { inferWithClaude } from "@/lib/ai/infer-with-claude";
 import {
@@ -784,50 +783,53 @@ export const applicationReviewRequested = inngest.createFunction(
       return { status: "Scoring application against fund criteria" };
     });
 
-    const scoringResult = await step.run("scoring", async () => {
-      const stepUsage: LogAiUsageParams[] = [];
-      // Build previous overall context for feedback evolution
-      const prevOverallContext = previousReview
-        ? formatPreviousOverallContext(previousReview.results, previousReview.review_number + 1)
-        : null;
-      const { systemPrompt: scoringSystemPrompt, userPrompt: scoringUserPrompt } = buildApplicationScoringPrompt(
-        answerAnalyses,
-        crossReferenceWithGaps,
-        questions.map((q) => ({ id: q.id, question: q.question })),
-        criteria,
-        overallWordLimit,
-        disabledQuestions,
-        prevOverallContext,
-        isDraft
-      );
+    const prevOverallContext = previousReview
+      ? formatPreviousOverallContext(previousReview.results, previousReview.review_number + 1)
+      : null;
 
-      const result = await callClaude({
+    const {
+      systemPrompt: scoringSystemPrompt,
+      userPrompt: scoringUserPrompt,
+    } = buildApplicationScoringPrompt(
+      answerAnalyses,
+      crossReferenceWithGaps,
+      questions.map((q) => ({ id: q.id, question: q.question })),
+      criteria,
+      overallWordLimit,
+      disabledQuestions,
+      prevOverallContext,
+      isDraft
+    );
+
+    const { result: scoringRaw, usage: scoringUsageData } = await inferWithClaude(
+      step,
+      "scoring",
+      {
         prompt: scoringUserPrompt,
         systemPrompt: scoringSystemPrompt,
         schema: ApplicationScoringSchema,
         model: MODEL,
         maxTokens: 16384,
         temperature: 0,
-        onUsage: (usage: ClaudeUsageData, isRetry: boolean) => {
-          stepUsage.push({
-            applicationReviewId: reviewId,
-            userId,
-            pipelineStep: "scoring",
-            model: MODEL,
-            usage,
-            isRetry,
-          });
-        },
-      });
+      }
+    );
 
+    const scoring: ApplicationScoring = scoringRaw;
+
+    const scoringUsage: LogAiUsageParams = {
+      applicationReviewId: reviewId,
+      userId,
+      pipelineStep: "scoring",
+      model: MODEL,
+      usage: scoringUsageData,
+      isRetry: false,
+    };
+
+    await step.run("scoring-progress", async () => {
       await updateAppReviewProgress(reviewId, "scoring", {
         scoring_completed: Date.now(),
       });
-
-      return { result, usage: stepUsage };
     });
-
-    const scoring: ApplicationScoring = scoringResult.result;
 
     // -----------------------------------------------------------------------
     // Post-processing: sanitize fabricated stats in example_language
@@ -848,7 +850,7 @@ export const applicationReviewRequested = inngest.createFunction(
       const allUsageEvents = [
         ...answerUsageEvents,
         crossRefUsage,
-        ...scoringResult.usage,
+        scoringUsage,
       ];
 
       // Flush all usage log events
