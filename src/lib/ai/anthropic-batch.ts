@@ -65,3 +65,64 @@ export async function pollBatch(batchId: string): Promise<BatchPollResult> {
 
 // Re-export ClaudeUsageData so Task 4 (parseBatchResults) can use it from this module
 export type { ClaudeUsageData };
+
+export interface ParsedBatchSuccess<T> {
+  questionId: string;
+  analysis: T;
+  usage: ClaudeUsageData;
+}
+
+export interface ParseBatchResultsOutput<T> {
+  successes: ParsedBatchSuccess<T>[];
+  failures: string[];
+}
+
+export async function parseBatchResults<T>(
+  batchId: string,
+  schema: ZodSchema<T>
+): Promise<ParseBatchResultsOutput<T>> {
+  const client = getClient();
+  const successes: ParsedBatchSuccess<T>[] = [];
+  const failures: string[] = [];
+
+  for await (const item of client.messages.batches.results(batchId)) {
+    const { custom_id: questionId, result } = item as {
+      custom_id: string;
+      result: { type: string; message?: Anthropic.Message; error?: unknown };
+    };
+
+    if (result.type !== "succeeded" || !result.message) {
+      failures.push(questionId);
+      continue;
+    }
+
+    const toolBlock = result.message.content.find(
+      (b: Anthropic.ContentBlock) => b.type === "tool_use"
+    );
+
+    if (!toolBlock || toolBlock.type !== "tool_use") {
+      failures.push(questionId);
+      continue;
+    }
+
+    const parsed = schema.safeParse(toolBlock.input);
+    if (!parsed.success) {
+      failures.push(questionId);
+      continue;
+    }
+
+    const u = result.message.usage as unknown as Record<string, number>;
+    successes.push({
+      questionId,
+      analysis: parsed.data,
+      usage: {
+        input_tokens: result.message.usage.input_tokens,
+        output_tokens: result.message.usage.output_tokens,
+        cache_creation_input_tokens: u.cache_creation_input_tokens ?? 0,
+        cache_read_input_tokens: u.cache_read_input_tokens ?? 0,
+      },
+    });
+  }
+
+  return { successes, failures };
+}

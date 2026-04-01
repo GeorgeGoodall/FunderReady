@@ -20,7 +20,7 @@ vi.mock("@anthropic-ai/sdk", () => ({
   },
 }));
 
-import { submitAnswerBatch, pollBatch } from "../anthropic-batch";
+import { submitAnswerBatch, pollBatch, parseBatchResults } from "../anthropic-batch";
 import type { AnswerBatchRequest } from "../anthropic-batch";
 import { z } from "zod";
 
@@ -105,5 +105,93 @@ describe("pollBatch", () => {
 
     const result = await pollBatch("msgbatch_abc");
     expect(result.done).toBe(true);
+  });
+});
+
+function makeSucceededItem(questionId: string, input: unknown, inputTokens = 100, outputTokens = 50) {
+  return {
+    custom_id: questionId,
+    result: {
+      type: "succeeded" as const,
+      message: {
+        content: [{ type: "tool_use", id: "toolu_1", name: "structured_output", input }],
+        usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+      },
+    },
+  };
+}
+
+function makeErroredItem(questionId: string) {
+  return {
+    custom_id: questionId,
+    result: { type: "errored" as const, error: { message: "API error" } },
+  };
+}
+
+async function* asyncItems<T>(items: T[]) {
+  for (const item of items) yield item;
+}
+
+describe("parseBatchResults", () => {
+  beforeEach(() => {
+    mockBatchResults.mockReset();
+  });
+
+  it("returns succeeded analyses with usage", async () => {
+    mockBatchResults.mockReturnValue(
+      asyncItems([makeSucceededItem("q1", { score: 42 }, 100, 50)])
+    );
+
+    const { successes, failures } = await parseBatchResults("batch_1", TestSchema);
+
+    expect(failures).toHaveLength(0);
+    expect(successes).toHaveLength(1);
+    expect(successes[0].questionId).toBe("q1");
+    expect(successes[0].analysis).toEqual({ score: 42 });
+    expect(successes[0].usage.input_tokens).toBe(100);
+    expect(successes[0].usage.output_tokens).toBe(50);
+  });
+
+  it("adds errored results to failures", async () => {
+    mockBatchResults.mockReturnValue(asyncItems([makeErroredItem("q1")]));
+
+    const { successes, failures } = await parseBatchResults("batch_1", TestSchema);
+
+    expect(successes).toHaveLength(0);
+    expect(failures).toContain("q1");
+  });
+
+  it("adds Zod validation failures to failures list", async () => {
+    mockBatchResults.mockReturnValue(
+      asyncItems([makeSucceededItem("q1", { wrong: "type" })])
+    );
+
+    const { successes, failures } = await parseBatchResults("batch_1", TestSchema);
+
+    expect(successes).toHaveLength(0);
+    expect(failures).toContain("q1");
+  });
+
+  it("handles mixed success and failure", async () => {
+    mockBatchResults.mockReturnValue(
+      asyncItems([
+        makeSucceededItem("q1", { score: 7 }),
+        makeErroredItem("q2"),
+      ])
+    );
+
+    const { successes, failures } = await parseBatchResults("batch_1", TestSchema);
+
+    expect(successes).toHaveLength(1);
+    expect(successes[0].questionId).toBe("q1");
+    expect(failures).toContain("q2");
+  });
+
+  it("calls results() with the provided batchId", async () => {
+    mockBatchResults.mockReturnValue(asyncItems([]));
+
+    await parseBatchResults("msgbatch_specific", TestSchema);
+
+    expect(mockBatchResults).toHaveBeenCalledWith("msgbatch_specific");
   });
 });
