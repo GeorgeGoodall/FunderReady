@@ -28,6 +28,9 @@ export function Header({
             {new Date(submittedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
           </span>
         )}
+        {submittedAt && (
+          <span className="text-xs text-zinc-400 dark:text-zinc-600">· 1 credit</span>
+        )}
       </div>
     </div>
   );
