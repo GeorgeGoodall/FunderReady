@@ -38,8 +38,10 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
     setSelectedOrg(null);
   };
 
+  const hasOrg = !!(selectedOrg || newOrgName.trim());
+
   const handleSubmit = () => {
-    if (!name.trim()) return;
+    if (!name.trim() || !hasOrg) return;
 
     const data: NewFundData = {
       name: name.trim(),
@@ -82,7 +84,7 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
 
         <div>
           <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Funder organisation (optional)
+            Funder organisation <span className="text-red-500">*</span>
           </label>
           {orgLabel ? (
             <div className="mt-1 flex items-center gap-2">
@@ -154,7 +156,7 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!name.trim()}
+          disabled={!name.trim() || !hasOrg}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Create Fund
