@@ -509,6 +509,9 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
       {/* Step: Fund */}
       {step === "fund" && (
         <div className="space-y-4">
+          <p className="rounded-lg border border-zinc-100 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+            Search for an existing fund, or paste content from the guidance document to detect it automatically. New fund? You can add it.
+          </p>
           {!creatingFund ? (
             <FundDetection
               fileName=""
@@ -528,6 +531,9 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
       {/* Step: Criteria */}
       {step === "criteria" && (
         <div className="space-y-6">
+          <p className="rounded-lg border border-zinc-100 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+            Paste the scoring criteria from the fund&apos;s guidance document — the AI will structure them for you. You can also enter them manually.
+          </p>
           {criteriaPreLoaded && criteriaSet && !criteriaEdited && (
             <div className="rounded-lg border border-green-100 bg-green-50 p-3 dark:border-green-900/30 dark:bg-green-900/10">
               <p className="text-sm text-green-800 dark:text-green-300">
@@ -607,12 +613,9 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
       {/* Step: Questions */}
       {step === "questions" && (
         <div className="space-y-6">
-          <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 dark:border-blue-900/30 dark:bg-blue-900/10">
-            <p className="text-sm text-blue-800 dark:text-blue-300">
-              <strong>Required:</strong> Paste the funder&apos;s application questions below.
-              These define the form you&apos;ll fill out.
-            </p>
-          </div>
+          <p className="rounded-lg border border-zinc-100 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+            Paste the application questions from the fund&apos;s form — the AI will extract them. You can also enter them manually.
+          </p>
 
           {questionsPreLoaded && questionsSet && !questionsEdited && (
             <div className="rounded-lg border border-green-100 bg-green-50 p-3 dark:border-green-900/30 dark:bg-green-900/10">
