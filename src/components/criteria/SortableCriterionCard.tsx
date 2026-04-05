@@ -79,7 +79,7 @@ export function SortableCriterionCard({
 
           {criterion.sub_questions.length > 0 && (
             <div className="space-y-1.5 pl-2">
-              <p className="text-xs font-medium text-zinc-500">Sub-questions:</p>
+              <p className="text-xs font-medium text-zinc-500">Scoring points:</p>
               {criterion.sub_questions.map((sq, sqi) => {
                 const sqText = typeof sq === "string" ? sq : sq.text;
                 const sqRequired = typeof sq === "string" ? true : sq.required;
@@ -120,7 +120,7 @@ export function SortableCriterionCard({
             onClick={onAddSubQuestion}
             className="text-xs text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400"
           >
-            + Add sub-question
+            + Add scoring point
           </button>
         </div>
         {canRemove && (

@@ -145,7 +145,7 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
           <label htmlFor="shared" className="text-sm text-zinc-700 dark:text-zinc-300">
             <span className="font-medium">Share with community</span>
             <span className="mt-0.5 block text-xs text-zinc-500 dark:text-zinc-400">
-              Submit this fund for review so other users can find and use it
+              Share with other FunderReady users after admin approval
             </span>
           </label>
         </div>
