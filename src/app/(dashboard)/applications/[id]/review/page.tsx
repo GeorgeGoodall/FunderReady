@@ -64,7 +64,7 @@ export default async function ApplicationReviewPage({
 
   // Use review's questions_set_id if available, otherwise fall back to application's
   const questionsSetId = review?.questions_set_id ?? application.questions_set_id;
-  let questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number }> = [];
+  let questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number; priority?: number }> = [];
   if (questionsSetId) {
     const { data: qs } = await supabase
       .from("questions_sets")

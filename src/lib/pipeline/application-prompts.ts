@@ -158,7 +158,13 @@ export function buildAnswerAnalysisPrompt(
 
   let prioritySection = "";
   if (answer.priority) {
-    prioritySection = `\nPriority/weight: ${answer.priority}/5`;
+    if (answer.priority >= 4) {
+      prioritySection = `\n## Question Priority: ${answer.priority}/5 (HIGH)\n\nThis question carries high weight in the funder's assessment. A weak answer here significantly damages the application's chances. You MUST: flag any weaknesses prominently in inline_comments and in the weaknesses array; reflect the importance of any shortcomings in your score — do not soften a poor answer just because some elements are present.`;
+    } else if (answer.priority <= 2) {
+      prioritySection = `\n## Question Priority: ${answer.priority}/5 (LOW)\n\nThis question carries low weight in the funder's assessment. Keep feedback proportionate — do not over-weight minor issues or inflate their impact on the overall application. A weak answer here is a minor concern, not a critical risk.`;
+    } else {
+      prioritySection = `\n## Question Priority: ${answer.priority}/5 (MEDIUM)\n\nThis question carries standard weight. Apply normal scoring and feedback.`;
+    }
   }
 
   const ft = answer.field_type ?? "";

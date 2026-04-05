@@ -9,7 +9,7 @@ import { FeedbackButton } from "./FeedbackButton";
 
 interface AnswerFeedbackCardProps {
   questionNumber: number;
-  question: { id: string; question: string; guidance?: string };
+  question: { id: string; question: string; guidance?: string; priority?: number };
   answer: string;
   feedback: AnswerAnalysis;
   isOutdated: boolean;
@@ -50,6 +50,16 @@ export function AnswerFeedbackCard({
             {isOutdated && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                 Changed since review
+              </span>
+            )}
+            {question.priority !== undefined && question.priority >= 4 && (
+              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                Priority {question.priority}/5
+              </span>
+            )}
+            {question.priority !== undefined && question.priority <= 2 && (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
+                Lower priority
               </span>
             )}
           </div>

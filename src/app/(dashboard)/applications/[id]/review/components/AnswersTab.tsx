@@ -16,7 +16,7 @@ export function AnswersTab({
   feedbackMap,
   onFeedbackChange,
 }: {
-  questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number }>;
+  questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number; priority?: number }>;
   answers: Array<{ question_id: string; answer_text: string; last_reviewed_text: string | null; is_disabled?: boolean | null }>;
   answerFeedback: Record<string, AnswerAnalysis>;
   outdatedMap: Record<string, boolean>;

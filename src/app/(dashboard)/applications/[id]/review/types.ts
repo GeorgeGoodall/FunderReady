@@ -49,7 +49,7 @@ export interface ApplicationReviewClientProps {
     fund_id: string;
   };
   fund: { id: string; name: string; organisation: { id: string; name: string } | null } | null;
-  questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number }>;
+  questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number; priority?: number }>;
   criteria: Array<{ id: string; criterion: string }>;
   answers: Array<{ question_id: string; answer_text: string; last_reviewed_text: string | null; is_disabled?: boolean | null }>;
   review: {
