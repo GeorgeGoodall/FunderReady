@@ -66,7 +66,7 @@ export function CommentHighlight({
           <span className="mt-1 block text-xs text-zinc-600 dark:text-zinc-400">
             <span className="font-medium">Suggestion:</span> {comment.suggestion}
           </span>
-          {reviewId && applicationId && itemPath && (
+          {reviewId && applicationId && itemPath && onFeedbackChange && (
             <span className="mt-2 flex items-center border-t border-zinc-100 pt-2 dark:border-zinc-700">
               <FeedbackButton
                 reviewId={reviewId}

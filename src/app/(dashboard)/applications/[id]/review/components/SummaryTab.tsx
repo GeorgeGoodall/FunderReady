@@ -230,7 +230,7 @@ function CriteriaScoresSection({
                 </div>
               </div>
 
-              {reviewId && applicationId && (
+              {reviewId && applicationId && onFeedbackChange && (
                 <div className="px-5 pb-2">
                   <FeedbackButton
                     reviewId={reviewId}

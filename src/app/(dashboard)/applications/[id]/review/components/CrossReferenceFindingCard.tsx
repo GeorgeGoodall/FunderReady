@@ -56,7 +56,7 @@ export function CrossReferenceFindingCard({
           <ReferenceTag key={cId} id={cId} type="criteria" fullText={criteriaMap.get(cId)} variant="chip" />
         ))}
       </div>
-      {reviewId && applicationId && (
+      {reviewId && applicationId && onFeedbackChange && (
         <div className="mt-2">
           <FeedbackButton
             reviewId={reviewId}
