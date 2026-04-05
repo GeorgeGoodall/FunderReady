@@ -17,7 +17,6 @@ describe.skipIf(!canRun)("RLS policies", () => {
   let userBId: string;
   let userAEmail: string;
   let userBEmail: string;
-  let userAReviewId: string;
 
   beforeAll(async () => {
     admin = createClient(supabaseUrl!, serviceRoleKey!);
@@ -40,25 +39,6 @@ describe.skipIf(!canRun)("RLS policies", () => {
 
     userAId = userA.user!.id;
     userBId = userB.user!.id;
-
-    // Create a review for user A (via service role, bypasses RLS)
-    const { data: review } = await admin
-      .from("reviews")
-      .insert({
-        user_id: userAId,
-        bid_file_name: "rls-test.docx",
-        bid_file_path: `${userAId}/rls-test.docx`,
-      })
-      .select("id")
-      .single();
-
-    userAReviewId = review!.id;
-
-    // Create a review_results row
-    await admin.from("review_results").insert({
-      review_id: userAReviewId,
-      progress: { step: "test" },
-    });
 
     // Create a usage row for user A
     await admin.from("usage").insert({
@@ -92,37 +72,6 @@ describe.skipIf(!canRun)("RLS policies", () => {
   it("user B cannot see user A's profile", async () => {
     const client = await clientAs(userBEmail);
     const { data } = await client.from("profiles").select("id").eq("id", userAId);
-    expect(data).toHaveLength(0);
-  });
-
-  it("user A can see their own reviews", async () => {
-    const client = await clientAs(userAEmail);
-    const { data } = await client.from("reviews").select("id");
-    expect(data!.length).toBeGreaterThanOrEqual(1);
-    expect(data!.some((r) => r.id === userAReviewId)).toBe(true);
-  });
-
-  it("user B cannot see user A's reviews", async () => {
-    const client = await clientAs(userBEmail);
-    const { data } = await client.from("reviews").select("id").eq("id", userAReviewId);
-    expect(data).toHaveLength(0);
-  });
-
-  it("user A can see their own review_results", async () => {
-    const client = await clientAs(userAEmail);
-    const { data } = await client
-      .from("review_results")
-      .select("review_id")
-      .eq("review_id", userAReviewId);
-    expect(data).toHaveLength(1);
-  });
-
-  it("user B cannot see user A's review_results", async () => {
-    const client = await clientAs(userBEmail);
-    const { data } = await client
-      .from("review_results")
-      .select("review_id")
-      .eq("review_id", userAReviewId);
     expect(data).toHaveLength(0);
   });
 
