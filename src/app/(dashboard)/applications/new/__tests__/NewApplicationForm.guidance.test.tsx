@@ -29,6 +29,7 @@ describe("NewApplicationForm — guidance intro panel", () => {
   };
 
   beforeEach(async () => {
+    vi.resetModules();
     React = await import("react");
     const rtl = await import("@testing-library/react");
     render = rtl.render;
@@ -40,7 +41,6 @@ describe("NewApplicationForm — guidance intro panel", () => {
 
   afterEach(() => {
     cleanup();
-    vi.resetModules();
   });
 
   async function renderForm(props = defaultProps) {
