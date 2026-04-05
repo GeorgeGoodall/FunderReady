@@ -26,7 +26,7 @@ const SOCIAL_PROOF = {
 const FAQ_ITEMS = [
   {
     q: "Is my application data private and secure?",
-    a: "Yes. Your answers are stored securely and only ever used to generate your review. We never share your application data with funders or third parties. See our Privacy Policy for full details.",
+    a: "Yes. Your answers are stored securely and only ever used to generate your review. We never share your application data with funders or other users. To power AI reviews, your answers are sent to Anthropic's Claude API — Anthropic is bound by strict data processing terms and does not use your data to train models. See our Privacy Policy for full details.",
   },
   {
     q: "How accurate is the AI feedback?",
@@ -42,7 +42,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "What does beta access include?",
-    a: "Beta users get full access to all features — unlimited applications, AI reviews, and the community fund library — at no cost while we're in beta.",
+    a: "Beta users get full access to all features — unlimited applications, AI reviews, and the community fund library — free of charge. In return, we ask for honest feedback and a genuine interest in helping FunderReady improve. Beta testers are the people who shape what this becomes.",
   },
 ];
 
