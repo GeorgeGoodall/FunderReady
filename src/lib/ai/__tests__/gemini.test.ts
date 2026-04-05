@@ -73,13 +73,15 @@ describe("geminiWithRetry", () => {
     mockGenerateContent.mockRejectedValue(error);
 
     const promise = geminiWithRetry(mockClient, testParams);
+    // Attach rejection handler before advancing timers to avoid unhandled rejection
+    const assertRejects = expect(promise).rejects.toThrow("429 RESOURCE_EXHAUSTED");
 
     // Advance through all retry delays: 2000, 4000, 8000
     await vi.advanceTimersByTimeAsync(2000);
     await vi.advanceTimersByTimeAsync(4000);
     await vi.advanceTimersByTimeAsync(8000);
 
-    await expect(promise).rejects.toThrow("429 RESOURCE_EXHAUSTED");
+    await assertRejects;
     // 1 initial + 3 retries = 4 attempts
     expect(mockGenerateContent).toHaveBeenCalledTimes(4);
   });

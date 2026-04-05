@@ -198,12 +198,12 @@ describe("buildAnswerAnalysisPrompt — guidance section", () => {
 describe("buildAnswerAnalysisPrompt — priority", () => {
   it("includes priority when set", () => {
     const prompt = buildAnswerAnalysisPrompt(makeAnswer({ priority: 4 }));
-    expect(prompt).toContain("Priority/weight: 4/5");
+    expect(prompt).toContain("## Question Priority: 4/5 (HIGH)");
   });
 
   it("omits priority section when not set", () => {
     const prompt = buildAnswerAnalysisPrompt(makeAnswer());
-    expect(prompt).not.toContain("Priority/weight");
+    expect(prompt).not.toContain("Question Priority");
   });
 });
 
