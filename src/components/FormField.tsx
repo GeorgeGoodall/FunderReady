@@ -1,6 +1,8 @@
 "use client";
 
 import { CopyButton } from "./CopyButton";
+import { WordCounter } from "./WordCounter";
+import { CharCounter } from "./CharCounter";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -28,51 +30,6 @@ interface FormFieldProps {
   onOptionsChange?: (options: string[]) => void;
   onDisabledChange?: (disabled: boolean) => void;
   onBlur: () => void;
-}
-
-function wordCount(text: string): number {
-  return text.trim() ? text.trim().split(/\s+/).length : 0;
-}
-
-function WordCounter({ text, min, max }: { text: string; min?: number; max?: number }) {
-  const count = wordCount(text);
-  if (!min && !max) return null;
-
-  const limit = max ?? 0;
-  const ratio = limit > 0 ? count / limit : 0;
-  const colour =
-    limit > 0 && ratio > 0.95
-      ? "text-red-600 dark:text-red-400"
-      : limit > 0 && ratio > 0.8
-        ? "text-amber-600 dark:text-amber-400"
-        : "text-zinc-500";
-
-  return (
-    <span className={`text-xs ${colour}`}>
-      {count} words
-      {max ? ` / ${max}` : ""}
-      {min && count < min ? ` (min ${min})` : ""}
-    </span>
-  );
-}
-
-function CharCounter({ text, max }: { text: string; max: number }) {
-  const count = text.length;
-  const ratio = count / max;
-  const colour =
-    ratio > 1
-      ? "text-red-600 dark:text-red-400 font-semibold"
-      : ratio > 0.95
-        ? "text-red-600 dark:text-red-400"
-        : ratio > 0.8
-          ? "text-amber-600 dark:text-amber-400"
-          : "text-zinc-500";
-
-  return (
-    <span className={`text-xs ${colour}`}>
-      {count} / {max} chars{count > max ? " (over limit)" : ""}
-    </span>
-  );
 }
 
 export function FormField({
