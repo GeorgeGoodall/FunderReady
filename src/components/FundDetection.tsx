@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { NewFundForm, type NewFundData } from "./NewFundForm";
+import { FundSearchResults } from "./funds/FundSearchResults";
 
 interface Fund {
   id: string;
@@ -191,22 +192,7 @@ export function FundDetection({
           <p className="mt-2 text-xs text-zinc-500">Searching...</p>
         )}
 
-        {searchResults.length > 0 && (
-          <div className="mt-2 space-y-2">
-            {searchResults.map((fund) => (
-              <button
-                key={fund.id}
-                onClick={() => onFundSelected(fund)}
-                className="w-full rounded-lg border border-zinc-200 p-3 text-left transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-              >
-                <p className="text-sm font-medium">{fund.name}</p>
-                {fund.organisation && (
-                  <p className="text-xs text-zinc-500">{fund.organisation.name}</p>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+        <FundSearchResults results={searchResults} onSelect={onFundSelected} />
       </div>
 
       {/* Create new fund */}
