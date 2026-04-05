@@ -398,34 +398,44 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
             What you&apos;ll need
           </h2>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Before you start, gather these three things from the fund&apos;s guidance document or website.
+            Many funds are already set up in FunderReady. You may only need the fund name — criteria and questions are often pre-loaded.
           </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             {[
               {
                 title: "Fund",
+                badge: undefined,
                 what: "The funder and programme you're applying to.",
                 where:
                   'It may already be in FunderReady — search first. If not, check the fund\'s website or application guidance document (often called "Application Guidance" or "Applicant Information Pack").',
               },
               {
                 title: "Criteria",
+                badge: "if not pre-loaded",
                 what: "The scoring criteria the funder uses to evaluate bids.",
                 where:
                   "The guidance document — look for a scoring rubric, assessment criteria, or a list of what the fund prioritises.",
               },
               {
                 title: "Questions",
+                badge: "if not pre-loaded",
                 what: "The specific questions on the application form.",
                 where:
                   "The application form itself — usually a Word doc or PDF download from the fund's website.",
               },
-            ].map(({ title: cardTitle, what, where }) => (
+            ].map(({ title: cardTitle, badge, what, where }) => (
               <div
                 key={cardTitle}
                 className="rounded-lg border border-zinc-100 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800"
               >
-                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{cardTitle}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{cardTitle}</p>
+                  {badge && (
+                    <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
+                      {badge}
+                    </span>
+                  )}
+                </div>
                 <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{what}</p>
                 <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
                   <span className="font-medium">Find it:</span> {where}
