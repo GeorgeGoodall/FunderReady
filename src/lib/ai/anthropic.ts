@@ -139,7 +139,7 @@ function getClient(): Anthropic {
 }
 
 export function buildTool<T>(schema: ZodSchema<T>): Anthropic.Tool {
-  const jsonSchema = zodToJsonSchema(schema, { target: "openApi3" });
+  const jsonSchema = zodToJsonSchema(schema, { target: "jsonSchema7" });
   return {
     name: TOOL_NAME,
     description: "Return the structured analysis result",
@@ -175,6 +175,20 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
   const client = getClient();
   const tool = buildTool(schema);
 
+  function logContext(response?: Anthropic.Message) {
+    console.error("[callClaude] request:", JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      ...(temperature !== undefined && { temperature }),
+      system: systemPrompt,
+      prompt,
+      tool_input_schema: tool.input_schema,
+    }, null, 2));
+    if (response) {
+      console.error("[callClaude] response:", JSON.stringify(response, null, 2));
+    }
+  }
+
   function emitUsage(msg: Anthropic.Message, isRetry: boolean) {
     if (onUsage && msg.usage) {
       const usage = msg.usage as unknown as Record<string, number>;
@@ -206,6 +220,7 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
     if (isTransientError(error)) {
       throw error; // Let Inngest retry
     }
+    logContext();
     throw new NonRetriableError(
       `Claude API error (permanent): ${error instanceof Error ? error.message : String(error)}`,
       { cause: error instanceof Error ? error : undefined }
@@ -217,6 +232,7 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
     if (allowPartial) {
       return null;
     }
+    logContext(message);
     throw new NonRetriableError(
       `Claude response truncated (hit max_tokens=${maxTokens}). Increase maxTokens for this call.`
     );
@@ -264,6 +280,7 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
       if (isTransientError(error)) {
         throw error;
       }
+      logContext(message);
       throw new NonRetriableError(
         `Claude API error on validation retry (permanent): ${error instanceof Error ? error.message : String(error)}`,
         { cause: error instanceof Error ? error : undefined }
@@ -279,12 +296,14 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
         return retryResult.data;
       }
       // Failed validation twice — this is deterministic, don't retry
+      logContext(retryMessage);
       throw new NonRetriableError(
         `Claude tool use failed validation after retry. ` +
         `Original errors: ${errors}. ` +
         `Retry errors: ${retryResult.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(", ")}`
       );
     }
+    logContext(retryMessage);
     throw new NonRetriableError(`Claude retry did not return a tool use block`);
   }
 
@@ -295,11 +314,13 @@ export async function callClaude<T>(options: CallClaudeOptions<T>): Promise<T | 
       const parsed = parseJsonPermissive(textBlock.text);
       return schema.parse(parsed);
     } catch (error) {
+      logContext(message);
       throw new NonRetriableError(
         `Claude returned text instead of tool use and parsing failed: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
 
+  logContext(message);
   throw new NonRetriableError("No tool use or text response from Claude");
 }
