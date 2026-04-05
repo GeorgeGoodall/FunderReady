@@ -4,14 +4,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ApplicationReviewClientProps, TabId } from "./types";
-import { safeNumber, parseReviewResults } from "./types";
-import { PIPELINE_STEPS, GOOD_SCORES } from "./constants";
+import { parseReviewResults } from "./types";
+import { GOOD_SCORES } from "./constants";
 import { Header } from "./components/Header";
 import { TabBar } from "./components/TabBar";
 import { SummaryTab } from "./components/SummaryTab";
 import { AnswersTab } from "./components/AnswersTab";
 import { CrossReferenceTab } from "./components/CrossReferenceTab";
 import { NewReviewButton } from "@/components/NewReviewButton";
+import { ReviewFailed } from "./components/ReviewFailed";
+import { ReviewProgress } from "./components/ReviewProgress";
 import { useAnimateOnView } from "./hooks/useAnimateOnView";
 import { ANIMATE_ON_VIEW_THRESHOLD } from "./constants";
 
@@ -139,95 +141,22 @@ export function ApplicationReviewClient({
     return (
       <div className="space-y-4">
         <Header application={application} fund={fund} submittedAt={review?.created_at} />
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-900/20">
-          <h2 className="font-semibold text-red-700 dark:text-red-400">Review Failed</h2>
-          <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-            {review.error_message ?? "An unexpected error occurred."}
-          </p>
-        </div>
-        <Link
-          href={`/applications/${application.id}`}
-          className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-        >
-          Edit & Retry
-        </Link>
+        <ReviewFailed review={review} application={application} />
       </div>
     );
   }
 
   // In progress
   if (isInProgress) {
-    const currentIndex = PIPELINE_STEPS.findIndex((s) => s.key === review.status);
-    const answersCompleted = safeNumber(review.progress?.answers_completed);
-    const answersTotal = safeNumber(review.progress?.answers_total);
-
     return (
       <div className="space-y-6">
         <Header application={application} fund={fund} submittedAt={review?.created_at} />
-        <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="font-semibold">Review in progress</h2>
-          <p className="mt-1 text-sm text-zinc-500">This page updates automatically.</p>
-
-          <div className="mt-6 space-y-3">
-            {PIPELINE_STEPS.map((step, i) => {
-              const isCurrent = i === currentIndex;
-              const isDone = i < currentIndex;
-              const isPending = i > currentIndex;
-
-              return (
-                <div key={step.key} className="flex items-center gap-3">
-                  {isDone && (
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                      <svg className="h-3.5 w-3.5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                      </svg>
-                    </span>
-                  )}
-                  {isCurrent && (
-                    <span className="flex h-6 w-6 items-center justify-center">
-                      <span className="h-3 w-3 animate-pulse rounded-full bg-blue-500" />
-                    </span>
-                  )}
-                  {isPending && (
-                    <span className="flex h-6 w-6 items-center justify-center">
-                      <span className="h-2 w-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
-                    </span>
-                  )}
-                  <span className={`text-sm ${isCurrent ? "font-medium text-blue-600 dark:text-blue-400" : isDone ? "text-zinc-500" : "text-zinc-400 dark:text-zinc-500"}`}>
-                    {step.label}
-                    {isCurrent && review.status === "analysing" && answersTotal > 0 && ` (${answersCompleted}/${answersTotal})`}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-6 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-            {review.status === "pending" ? (
-              <button
-                type="button"
-                onClick={handleCancelReview}
-                disabled={cancellingReview}
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-              >
-                {cancellingReview
-                  ? "Cancelling..."
-                  : showCancelConfirm
-                    ? "Are you sure? Click to confirm"
-                    : "Cancel review"}
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled
-                title="Reviews can't be cancelled once started"
-                className="cursor-not-allowed rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-400 opacity-50 dark:border-zinc-800 dark:text-zinc-600"
-              >
-                Cancel review
-              </button>
-            )}
-          </div>
-        </div>
+        <ReviewProgress
+          review={review}
+          cancellingReview={cancellingReview}
+          showCancelConfirm={showCancelConfirm}
+          onCancel={handleCancelReview}
+        />
       </div>
     );
   }
