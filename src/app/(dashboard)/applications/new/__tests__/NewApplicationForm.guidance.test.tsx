@@ -86,3 +86,48 @@ describe("NewApplicationForm — guidance intro panel", () => {
     expect(localStorage.getItem(LS_KEY)).toBe("true");
   });
 });
+
+describe("NewApplicationForm — per-step hints", () => {
+  let React: typeof import("react");
+  let render: typeof import("@testing-library/react").render;
+  let cleanup: typeof import("@testing-library/react").cleanup;
+  let screen: typeof import("@testing-library/react").screen;
+
+  const defaultProps = {
+    tier: "pro" as const,
+    usage: {
+      allowed: true,
+      remaining: 10,
+      resetDate: new Date("2026-05-01"),
+    },
+    isAdmin: false,
+  };
+
+  beforeEach(async () => {
+    vi.resetModules();
+    React = await import("react");
+    const rtl = await import("@testing-library/react");
+    render = rtl.render;
+    cleanup = rtl.cleanup;
+    screen = rtl.screen;
+    // Dismiss intro so it doesn't interfere
+    localStorage.setItem("new-application-intro-dismissed", "true");
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+  });
+
+  async function renderForm(props = defaultProps) {
+    const { NewApplicationForm } = await import("../NewApplicationForm");
+    return render(React.createElement(NewApplicationForm, props));
+  }
+
+  it("shows fund step hint on the fund step", async () => {
+    await renderForm();
+    expect(
+      screen.getByText(/Search for an existing fund/)
+    ).toBeInTheDocument();
+  });
+});
