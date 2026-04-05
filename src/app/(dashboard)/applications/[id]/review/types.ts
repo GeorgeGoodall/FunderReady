@@ -65,6 +65,7 @@ export interface ApplicationReviewClientProps {
   isHistorical?: boolean;
   defaultTab?: TabId;
   initialFeedback?: Record<string, "up" | "down">;
+  isAdminView?: boolean;
 }
 
 export type TabId = "summary" | "answers" | "cross-ref";
