@@ -650,7 +650,7 @@ export const applicationReviewRequested = inngest.createFunction(
           applicationReviewId: reviewId,
           userId,
           pipelineStep: "answer_analysis",
-          model: MODEL,
+          model: MODEL + "-batch",
           usage: success.usage,
           isRetry: false,
         });

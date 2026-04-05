@@ -76,4 +76,32 @@ describe("calculateCost", () => {
     expect(MODEL_PRICING["claude-sonnet-4-6"]).toBeDefined();
     expect(MODEL_PRICING["claude-haiku-4-5-20251001"]).toBeDefined();
   });
+
+  it("batch pricing is exactly half of real-time pricing", () => {
+    const sonnet = MODEL_PRICING["claude-sonnet-4-6"];
+    const sonnetBatch = MODEL_PRICING["claude-sonnet-4-6-batch"];
+    expect(sonnetBatch.input).toBe(sonnet.input / 2);
+    expect(sonnetBatch.output).toBe(sonnet.output / 2);
+    expect(sonnetBatch.cache_write).toBe(sonnet.cache_write / 2);
+    expect(sonnetBatch.cache_read).toBe(sonnet.cache_read / 2);
+
+    const haiku = MODEL_PRICING["claude-haiku-4-5-20251001"];
+    const haikuBatch = MODEL_PRICING["claude-haiku-4-5-20251001-batch"];
+    expect(haikuBatch.input).toBe(haiku.input / 2);
+    expect(haikuBatch.output).toBe(haiku.output / 2);
+    expect(haikuBatch.cache_write).toBe(haiku.cache_write / 2);
+    expect(haikuBatch.cache_read).toBe(haiku.cache_read / 2);
+  });
+
+  it("calculates correct cost for Sonnet batch", () => {
+    const result = calculateCost("claude-sonnet-4-6-batch", {
+      input_tokens: 1000,
+      output_tokens: 500,
+    });
+
+    // input: 1000 * 1.50 / 1M = 0.0015
+    // output: 500 * 7.50 / 1M = 0.00375
+    expect(result.cost_usd).toBeCloseTo(0.00525, 6);
+    expect(result.cost_gbp).toBeCloseTo(0.00525 * USD_TO_GBP, 6);
+  });
 });

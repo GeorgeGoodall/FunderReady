@@ -18,11 +18,23 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     cache_write: 3.75,
     cache_read: 0.3,
   },
+  "claude-sonnet-4-6-batch": {
+    input: 1.5,
+    output: 7.5,
+    cache_write: 1.875,
+    cache_read: 0.15,
+  },
   "claude-haiku-4-5-20251001": {
     input: 0.8,
     output: 4.0,
     cache_write: 1.0,
     cache_read: 0.08,
+  },
+  "claude-haiku-4-5-20251001-batch": {
+    input: 0.4,
+    output: 2.0,
+    cache_write: 0.5,
+    cache_read: 0.04,
   },
   "gemini-2.5-flash-lite": {
     input: 0.075,
