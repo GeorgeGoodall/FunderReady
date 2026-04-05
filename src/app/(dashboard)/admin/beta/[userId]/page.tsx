@@ -51,7 +51,7 @@ export default async function AdminBetaUserPage({
   // Fetch applications with fund + organisation names
   const { data: rawApps } = await service
     .from("applications")
-    .select("id, title, status, review_count, created_at, fund_id, funds(name, organisations(name))")
+    .select("id, title, status, created_at, funds(name, organisations(name))")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -129,7 +129,7 @@ export default async function AdminBetaUserPage({
           <div className="space-y-3">
             {applications.map((app) => {
               const fund = app.funds as unknown as { name: string; organisations: { name: string } | null } | null;
-              const orgName = (fund?.organisations as { name: string } | null)?.name;
+              const orgName = fund?.organisations?.name;
               const appReviews = reviewsByAppId.get(app.id) ?? [];
 
               return (
