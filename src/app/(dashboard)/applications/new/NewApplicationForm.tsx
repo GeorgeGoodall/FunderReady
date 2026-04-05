@@ -73,6 +73,16 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
   // fundId query param auto-select
   const [fundIdLoading, setFundIdLoading] = useState(!!fundId);
 
+  // Intro panel (dismissible, persisted in localStorage)
+  const [introVisible, setIntroVisible] = useState(
+    () => localStorage.getItem("new-application-intro-dismissed") !== "true"
+  );
+
+  const dismissIntro = () => {
+    localStorage.setItem("new-application-intro-dismissed", "true");
+    setIntroVisible(false);
+  };
+
   // Shared helper: apply fund data (criteria/questions sets) from API response
   function applyFundData(data: Record<string, unknown>) {
     const csData = data.criteriaSet as { id: string; name: string; description?: string; criteria_json: unknown } | undefined;
@@ -381,49 +391,112 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
 
   return (
     <div className="space-y-6">
-      {/* Step indicator */}
-      <nav className="flex items-center gap-2">
-        {STEPS.map((s, i) => (
-          <div key={s.key} className="flex items-center gap-2">
-            {i > 0 && <div className="h-px w-8 bg-zinc-300 dark:bg-zinc-700" />}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => i < currentStepIndex && goToStep(s.key)}
-                disabled={i >= currentStepIndex}
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                  i < currentStepIndex
-                    ? "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
-                    : i === currentStepIndex
-                      ? "bg-blue-100 text-blue-700 ring-2 ring-blue-600 dark:bg-blue-900/30 dark:text-blue-400 cursor-default"
-                      : "bg-zinc-100 text-zinc-400 dark:bg-zinc-800 cursor-default"
-                }`}
+      {/* What you'll need intro panel */}
+      {introVisible && (
+        <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+            What you&apos;ll need
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Before you start, gather these three things from the fund&apos;s guidance document or website.
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                title: "Fund",
+                what: "The funder and programme you're applying to.",
+                where:
+                  'The fund\'s website, or the application guidance document (often called "Application Guidance" or "Applicant Information Pack").',
+              },
+              {
+                title: "Criteria",
+                what: "The scoring criteria the funder uses to evaluate bids.",
+                where:
+                  "The guidance document — look for a scoring rubric, assessment criteria, or a list of what the fund prioritises.",
+              },
+              {
+                title: "Questions",
+                what: "The specific questions on the application form.",
+                where:
+                  "The application form itself — usually a Word doc or PDF download from the fund's website.",
+              },
+            ].map(({ title, what, where }) => (
+              <div
+                key={title}
+                className="rounded-lg border border-zinc-100 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800"
               >
-                {i < currentStepIndex ? (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                  </svg>
-                ) : (
-                  i + 1
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => i < currentStepIndex && goToStep(s.key)}
-                disabled={i >= currentStepIndex}
-                className={`text-sm font-medium transition-colors ${
-                  i < currentStepIndex
-                    ? "text-zinc-900 dark:text-zinc-100 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
-                    : i === currentStepIndex
-                      ? "text-zinc-900 dark:text-zinc-100 cursor-default"
-                      : "text-zinc-400 dark:text-zinc-500 cursor-default"
-                }`}
-              >
-                {s.label}
-              </button>
-            </div>
+                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{title}</p>
+                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{what}</p>
+                <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                  <span className="font-medium">Find it:</span> {where}
+                </p>
+              </div>
+            ))}
           </div>
-        ))}
+          <button
+            type="button"
+            onClick={dismissIntro}
+            className="mt-5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            Got it, let&apos;s start →
+          </button>
+        </div>
+      )}
+
+      {/* Step indicator */}
+      <nav className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {STEPS.map((s, i) => (
+            <div key={s.key} className="flex items-center gap-2">
+              {i > 0 && <div className="h-px w-8 bg-zinc-300 dark:bg-zinc-700" />}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => i < currentStepIndex && goToStep(s.key)}
+                  disabled={i >= currentStepIndex}
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                    i < currentStepIndex
+                      ? "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+                      : i === currentStepIndex
+                        ? "bg-blue-100 text-blue-700 ring-2 ring-blue-600 dark:bg-blue-900/30 dark:text-blue-400 cursor-default"
+                        : "bg-zinc-100 text-zinc-400 dark:bg-zinc-800 cursor-default"
+                  }`}
+                >
+                  {i < currentStepIndex ? (
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                  ) : (
+                    i + 1
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => i < currentStepIndex && goToStep(s.key)}
+                  disabled={i >= currentStepIndex}
+                  className={`text-sm font-medium transition-colors ${
+                    i < currentStepIndex
+                      ? "text-zinc-900 dark:text-zinc-100 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
+                      : i === currentStepIndex
+                        ? "text-zinc-900 dark:text-zinc-100 cursor-default"
+                        : "text-zinc-400 dark:text-zinc-500 cursor-default"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setIntroVisible(true)}
+          aria-label="Show help"
+          title="What you'll need"
+          className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-300 text-xs font-bold text-zinc-500 transition-colors hover:border-zinc-400 hover:text-zinc-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-300"
+        >
+          ?
+        </button>
       </nav>
 
       {/* Error display */}
