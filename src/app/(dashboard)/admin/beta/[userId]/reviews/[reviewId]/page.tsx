@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import type { TabId } from "@/app/(dashboard)/applications/[id]/review/types";
 import { ApplicationReviewClient } from "@/app/(dashboard)/applications/[id]/review/ApplicationReviewClient";
+import { BreadcrumbLabels } from "@/components/Breadcrumbs";
 
 export const dynamic = "force-dynamic";
 
@@ -110,46 +111,49 @@ export default async function AdminReviewDetailPage({
     : "summary";
 
   return (
-    <div className="space-y-4">
-      {/* Admin nav */}
-      <div className="flex items-center gap-3">
-        <Link
-          href={`/admin/beta/${userId}`}
-          className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-        >
-          ← {userName}
-        </Link>
-        <span className="inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-          Admin view
-        </span>
-      </div>
+    <>
+      <BreadcrumbLabels labels={{ [reviewId]: application.title || "Untitled" }} />
+      <div className="space-y-4">
+        {/* Admin nav */}
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/admin/beta/${userId}`}
+            className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+          >
+            ← {userName}
+          </Link>
+          <span className="inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+            Admin view
+          </span>
+        </div>
 
-      <ApplicationReviewClient
-        application={application}
-        fund={fund}
-        questions={questions}
-        criteria={criteria}
-        answers={(answers ?? []).map((a) => ({
-          question_id: a.question_id,
-          answer_text: a.answer_text,
-          last_reviewed_text: a.last_reviewed_text,
-          is_disabled: a.is_disabled,
-        }))}
-        review={{
-          id: review.id,
-          review_number: review.review_number,
-          status: review.status,
-          progress: review.progress as Record<string, unknown> | null,
-          results: review.results as Record<string, unknown> | null,
-          error_message: review.error_message,
-          created_at: review.created_at,
-          is_draft: review.is_draft ?? false,
-        }}
-        isHistorical={isHistorical}
-        defaultTab={defaultTab}
-        initialFeedback={{}}
-        isAdminView={true}
-      />
-    </div>
+        <ApplicationReviewClient
+          application={application}
+          fund={fund}
+          questions={questions}
+          criteria={criteria}
+          answers={(answers ?? []).map((a) => ({
+            question_id: a.question_id,
+            answer_text: a.answer_text,
+            last_reviewed_text: a.last_reviewed_text,
+            is_disabled: a.is_disabled,
+          }))}
+          review={{
+            id: review.id,
+            review_number: review.review_number,
+            status: review.status,
+            progress: review.progress as Record<string, unknown> | null,
+            results: review.results as Record<string, unknown> | null,
+            error_message: review.error_message,
+            created_at: review.created_at,
+            is_draft: review.is_draft ?? false,
+          }}
+          isHistorical={isHistorical}
+          defaultTab={defaultTab}
+          initialFeedback={{}}
+          isAdminView={true}
+        />
+      </div>
+    </>
   );
 }
