@@ -103,6 +103,8 @@ export default async function AdminReviewDetailPage({
     }
   }
 
+  // isHistorical: admin always fetches a specific review by ID (no reviewNumber URL param),
+  // so we compare directly rather than checking requestedNumber !== null like the user-facing page.
   const isHistorical = review.review_number < application.review_count;
 
   const validTabs: TabId[] = ["summary", "answers", "cross-ref"];
@@ -112,7 +114,7 @@ export default async function AdminReviewDetailPage({
 
   return (
     <>
-      <BreadcrumbLabels labels={{ [reviewId]: application.title || "Untitled" }} />
+      <BreadcrumbLabels labels={{ [userId]: userName, [reviewId]: application.title || "Untitled" }} />
       <div className="space-y-4">
         {/* Admin nav */}
         <div className="flex items-center gap-3">
