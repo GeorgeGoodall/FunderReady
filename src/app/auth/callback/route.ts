@@ -32,10 +32,18 @@ export async function GET(request: Request) {
       }
     );
 
-    const { error } = code
-      ? await supabase.auth.exchangeCodeForSession(code)
-      : await supabase.auth.verifyOtp({ token_hash: token_hash!, type: type! });
+    if (code) {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (!error) {
+        return NextResponse.redirect(`${origin}${redirect}`);
+      }
+      // Email was already confirmed by Supabase before redirecting here —
+      // session creation failed only because the PKCE verifier cookie is
+      // missing (e.g. different browser). Let the user know and prompt login.
+      return NextResponse.redirect(`${origin}/login?message=email_confirmed`);
+    }
 
+    const { error } = await supabase.auth.verifyOtp({ token_hash: token_hash!, type: type! });
     if (!error) {
       return NextResponse.redirect(`${origin}${redirect}`);
     }

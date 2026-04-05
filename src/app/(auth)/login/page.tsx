@@ -21,6 +21,8 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") || "/dashboard";
+  const urlMessage = searchParams.get("message");
+  const urlError = searchParams.get("error");
 
   const supabase = createClient();
 
@@ -62,6 +64,18 @@ function LoginForm() {
             AI-powered bid review for grant writers
           </p>
         </div>
+
+        {urlMessage === "email_confirmed" && (
+          <div className="rounded-md bg-green-50 p-3 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-400">
+            Email confirmed! Sign in below to continue.
+          </div>
+        )}
+
+        {urlError === "auth_failed" && (
+          <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+            Authentication failed. Please try signing in or request a new confirmation email.
+          </div>
+        )}
 
         {error && (
           <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
