@@ -142,7 +142,7 @@ export function ApplicationReviewClient({
     return (
       <div className="space-y-4">
         <Header application={application} fund={fund} submittedAt={review?.created_at} />
-        <ReviewFailed review={review} application={application} />
+        <ReviewFailed review={review} application={application} isAdminView={isAdminView} />
       </div>
     );
   }
@@ -157,6 +157,7 @@ export function ApplicationReviewClient({
           cancellingReview={cancellingReview}
           showCancelConfirm={showCancelConfirm}
           onCancel={handleCancelReview}
+          isAdminView={isAdminView}
         />
       </div>
     );
