@@ -406,7 +406,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
                 title: "Fund",
                 what: "The funder and programme you're applying to.",
                 where:
-                  'The fund\'s website, or the application guidance document (often called "Application Guidance" or "Applicant Information Pack").',
+                  'It may already be in FunderReady — search first. If not, check the fund\'s website or application guidance document (often called "Application Guidance" or "Applicant Information Pack").',
               },
               {
                 title: "Criteria",
@@ -488,15 +488,17 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
             </div>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => setIntroVisible(true)}
-          aria-label="Show help"
-          title="What you'll need"
-          className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-300 text-xs font-bold text-zinc-500 transition-colors hover:border-zinc-400 hover:text-zinc-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-300"
-        >
-          ?
-        </button>
+        {!introVisible && (
+          <button
+            type="button"
+            onClick={() => setIntroVisible(true)}
+            aria-label="Show help"
+            title="What you'll need"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-300 text-xs font-bold text-zinc-500 transition-colors hover:border-zinc-400 hover:text-zinc-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-300"
+          >
+            ?
+          </button>
+        )}
       </nav>
 
       {/* Error display */}
