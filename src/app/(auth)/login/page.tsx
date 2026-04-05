@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { OAuthButtons } from "@/components/OAuthButtons";
 
 export default function LoginPage() {
   return (
@@ -73,22 +72,6 @@ function LoginForm() {
             {error}
           </div>
         )}
-
-        <OAuthButtons
-          redirectTo={`${window.location.origin}/auth/callback?redirect=${redirect}`}
-          onError={setError}
-        />
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-zinc-300 dark:border-zinc-700" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-zinc-500 dark:bg-black dark:text-zinc-400">
-              or
-            </span>
-          </div>
-        </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
