@@ -105,18 +105,18 @@ describe("NewApplicationForm — per-step hints", () => {
 
   beforeEach(async () => {
     vi.resetModules();
+    localStorage.clear();
+    // Dismiss intro so it doesn't interfere with hint tests
+    localStorage.setItem(LS_KEY, "true");
     React = await import("react");
     const rtl = await import("@testing-library/react");
     render = rtl.render;
     cleanup = rtl.cleanup;
     screen = rtl.screen;
-    // Dismiss intro so it doesn't interfere
-    localStorage.setItem("new-application-intro-dismissed", "true");
   });
 
   afterEach(() => {
     cleanup();
-    localStorage.clear();
   });
 
   async function renderForm(props = defaultProps) {
