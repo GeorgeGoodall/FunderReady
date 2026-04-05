@@ -75,7 +75,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
 
   // Intro panel (dismissible, persisted in localStorage)
   const [introVisible, setIntroVisible] = useState(
-    () => localStorage.getItem("new-application-intro-dismissed") !== "true"
+    () => typeof window !== "undefined" && localStorage.getItem("new-application-intro-dismissed") !== "true"
   );
 
   const dismissIntro = () => {
