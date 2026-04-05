@@ -45,11 +45,26 @@ export default async function DashboardPage() {
             </div>
             <h2 className="text-lg font-semibold">No applications yet</h2>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              Select a fund, fill out the application form, and get AI-powered feedback.
+              Here&apos;s how it works:
             </p>
+            <ol className="mt-6 mx-auto max-w-xs text-left space-y-3">
+              {[
+                "Find or add the fund you're applying to",
+                "Confirm the fund's scoring criteria and application questions",
+                "Fill out your answers in the application form",
+                "Submit for AI review and get scored feedback",
+              ].map((step, i) => (
+                <li key={i} className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                    {i + 1}
+                  </span>
+                  {step}
+                </li>
+              ))}
+            </ol>
             <Link
               href="/applications/new"
-              className="mt-6 inline-block rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              className="mt-8 inline-block rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
             >
               Start your first application
             </Link>
