@@ -144,6 +144,18 @@ export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewPro
         </SortableContext>
       </DndContext>
 
+      {questionsSet.questions.length >= 3 && questionsSet.questions.length < 30 && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={addQuestion}
+            className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            + Add question
+          </button>
+        </div>
+      )}
+
       {validationErrors.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/30 dark:bg-amber-900/10">
           <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Please fix the following:</p>
