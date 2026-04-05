@@ -80,9 +80,6 @@ export default async function Home() {
       {/* ── Hero ── */}
       <section className="bg-slate-900 px-6 py-24 text-center md:px-10 md:py-32">
         <div className="mx-auto max-w-2xl">
-          <span className="mb-6 inline-block rounded-full border border-slate-700 bg-slate-800 px-4 py-1.5 text-xs text-slate-400">
-            Built for UK charities and social enterprises
-          </span>
           <h1 className="mb-5 text-4xl font-extrabold tracking-tight text-slate-50 md:text-5xl lg:text-6xl">
             Submit your next bid
             <br className="hidden sm:block" /> knowing it&apos;s ready
