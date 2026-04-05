@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { CopyButton } from "@/components/CopyButton";
 import { GrantProButton } from "./GrantProButton";
@@ -139,10 +140,12 @@ export default async function AdminBetaPage() {
               {profiles.map((p) => (
                 <tr key={p.id} className="bg-white dark:bg-zinc-900">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                      {p.display_name || "—"}
-                    </p>
-                    <p className="text-xs text-zinc-500">{emailMap[p.id] ?? "—"}</p>
+                    <Link href={`/admin/beta/${p.id}`} className="group block">
+                      <p className="font-medium text-zinc-900 group-hover:underline dark:text-zinc-100">
+                        {p.display_name || "—"}
+                      </p>
+                      <p className="text-xs text-zinc-500">{emailMap[p.id] ?? "—"}</p>
+                    </Link>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">
                     {formatDate(p.created_at)}
