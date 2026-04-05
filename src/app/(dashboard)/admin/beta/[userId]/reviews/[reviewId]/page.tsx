@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import type { TabId } from "@/app/(dashboard)/applications/[id]/review/types";
 import { ApplicationReviewClient } from "@/app/(dashboard)/applications/[id]/review/ApplicationReviewClient";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +45,7 @@ export default async function AdminReviewDetailPage({
   if (!application) redirect(`/admin/beta/${userId}`);
 
   // Fetch fund + organisation
+  // No rejected filter — admin service client intentionally fetches regardless of fund state
   const { data: rawFund } = await service
     .from("funds")
     .select("id, name, organisation_id, organisations(id, name)")
@@ -74,6 +76,7 @@ export default async function AdminReviewDetailPage({
     priority?: number;
   }> = [];
   if (questionsSetId) {
+    // No rejected filter — admin should see questions as used at time of review
     const { data: qs } = await service
       .from("questions_sets")
       .select("questions_json")
@@ -88,6 +91,7 @@ export default async function AdminReviewDetailPage({
   const criteriaSetId = application.criteria_set_id;
   let criteria: Array<{ id: string; criterion: string }> = [];
   if (criteriaSetId) {
+    // No rejected filter — admin should see criteria as used at time of review
     const { data: cs } = await service
       .from("criteria_sets")
       .select("criteria_json")
@@ -100,8 +104,7 @@ export default async function AdminReviewDetailPage({
 
   const isHistorical = review.review_number < application.review_count;
 
-  const validTabs = ["summary", "answers", "cross-ref"] as const;
-  type TabId = (typeof validTabs)[number];
+  const validTabs: TabId[] = ["summary", "answers", "cross-ref"];
   const defaultTab: TabId = validTabs.includes(tabParam as TabId)
     ? (tabParam as TabId)
     : "summary";
