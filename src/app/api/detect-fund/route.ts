@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     if (tsQuery) {
       const { data: funds } = await supabase
         .from("funds")
-        .select("id, name, organisation_id, organisations(id, name), url, notes, created_at")
+        .select("id, name, organisation_id, organisations(id, name), url, notes, created_at, application_format")
         .textSearch("name", tsQuery)
         .eq("rejected", false)
         .order("created_at", { ascending: false })

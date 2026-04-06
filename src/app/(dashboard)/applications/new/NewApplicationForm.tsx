@@ -29,6 +29,7 @@ interface FundInfo {
   opens_at: string | null;
   closes_at: string | null;
   created_at: string;
+  application_format: "question_form" | "structured_doc" | "unstructured_doc";
 }
 
 type Step = "fund" | "criteria" | "questions" | "confirm";
@@ -132,6 +133,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
           opens_at: data.fund.opens_at ?? null,
           closes_at: data.fund.closes_at ?? null,
           created_at: data.fund.created_at,
+          application_format: (data.fund.application_format ?? "question_form") as "question_form" | "structured_doc" | "unstructured_doc",
         };
         if (cancelled) return;
 
@@ -324,6 +326,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
             notes: pendingNewFundData.notes,
             opens_at: detectedOpensAt ?? null,
             closes_at: detectedClosesAt ?? null,
+            application_format: pendingNewFundData.application_format,
           }),
         });
         if (!fundRes.ok) {

@@ -10,6 +10,7 @@ export interface NewFundData {
   url?: string;
   notes?: string;
   shared?: boolean;
+  application_format: "question_form" | "structured_doc" | "unstructured_doc";
 }
 
 interface NewFundFormProps {
@@ -23,6 +24,7 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
   const [url, setUrl] = useState("");
   const [notes, setNotes] = useState("");
   const [shared, setShared] = useState(false);
+  const [applicationFormat, setApplicationFormat] = useState<"question_form" | "structured_doc" | "unstructured_doc">("question_form");
 
   // Org state: either a selected existing org or a new org name
   const [selectedOrg, setSelectedOrg] = useState<OrgOption | null>(null);
@@ -48,6 +50,7 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
       url: url.trim() || undefined,
       notes: notes.trim() || undefined,
       shared,
+      application_format: applicationFormat,
     };
 
     if (selectedOrg) {
@@ -107,6 +110,48 @@ export function NewFundForm({ suggestedName = "", onSubmit, onCancel }: NewFundF
               />
             </div>
           )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+            Application format
+          </label>
+          <div className="space-y-2">
+            {(
+              [
+                {
+                  value: "question_form",
+                  label: "Question form",
+                  desc: "Applicants fill in defined questions directly in the app.",
+                },
+                {
+                  value: "structured_doc",
+                  label: "Structured document",
+                  desc: "Applicants write or upload a document with defined sections.",
+                },
+                {
+                  value: "unstructured_doc",
+                  label: "Unstructured document",
+                  desc: "Applicants submit a free-form letter, EOI, or proposal.",
+                },
+              ] as const
+            ).map(({ value, label, desc }) => (
+              <label key={value} className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="application_format"
+                  value={value}
+                  checked={applicationFormat === value}
+                  onChange={() => setApplicationFormat(value)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-zinc-900 dark:text-zinc-100">{label}</span>
+                  <span className="block text-xs text-zinc-500 dark:text-zinc-400">{desc}</span>
+                </span>
+              </label>
+            ))}
+          </div>
         </div>
 
         <div>
