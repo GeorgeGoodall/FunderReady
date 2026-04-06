@@ -37,17 +37,20 @@ export default async function ApplicationPage({
   // Fetch related data
   const { data: rawFund } = await supabase
     .from("funds")
-    .select("id, name, organisation_id, organisations(id, name), opens_at, closes_at")
+    .select("id, name, organisation_id, organisations(id, name), opens_at, closes_at, application_format")
     .eq("id", application.fund_id)
     .eq("rejected", false)
     .single();
 
   const fund = rawFund
     ? {
-        ...rawFund,
+        id: rawFund.id,
+        name: rawFund.name,
+        organisation_id: rawFund.organisation_id,
         organisation: (rawFund.organisations as unknown as { id: string; name: string } | null) ?? null,
         opens_at: rawFund.opens_at as string | null,
         closes_at: rawFund.closes_at as string | null,
+        application_format: (rawFund.application_format as string) ?? "question_form",
       }
     : null;
 

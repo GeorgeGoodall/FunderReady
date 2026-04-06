@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormField } from "@/components/FormField";
@@ -35,7 +35,7 @@ interface ApplicationData {
   status: string;
   review_count: number;
   fund_id: string;
-  questions_set_id: string;
+  questions_set_id: string | null;
 }
 
 interface AvailableQuestionsSet {
@@ -61,6 +61,7 @@ interface FundData {
   organisation: { id: string; name: string } | null;
   opens_at: string | null;
   closes_at: string | null;
+  application_format?: string;
 }
 
 interface QuestionsSetData {
@@ -138,7 +139,7 @@ export function ApplicationFormClient({
     handleSwapQuestionsSet,
   } = useQuestionsSetSwap(
     application.id,
-    application.questions_set_id,
+    application.questions_set_id ?? "",
     availableQuestionsSets,
     questionsSet?.created_at ?? null,
     saveAnswers,
@@ -154,6 +155,64 @@ export function ApplicationFormClient({
     setAnswerMap, setOptionsMap, setDisabledMap,
     dirtyRef, saveAnswers, setError
   );
+
+  // Derive application format
+  const applicationFormat = (fund?.application_format ?? "question_form") as
+    | "question_form"
+    | "structured_doc"
+    | "unstructured_doc";
+  const isUnstructuredDoc = applicationFormat === "unstructured_doc";
+
+  // Document content state for unstructured_doc forms
+  const documentAnswer = initialAnswers.find((a) => a.question_id === "document_content");
+  const [documentContent, setDocumentContent] = useState(documentAnswer?.answer_text ?? "");
+  const documentWordCount = documentContent.trim()
+    ? documentContent.trim().split(/\s+/).filter(Boolean).length
+    : 0;
+
+  // Auto-save document content for unstructured_doc
+  const documentSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const saveDocumentContent = useCallback(
+    async (text: string) => {
+      try {
+        await fetch(`/api/applications/${application.id}/answers`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            answers: [{ question_id: "document_content", answer_text: text }],
+          }),
+        });
+      } catch {
+        // silent — same pattern as auto-save
+      }
+    },
+    [application.id]
+  );
+
+  useEffect(() => {
+    if (!isUnstructuredDoc) return;
+    if (documentSaveTimerRef.current) clearTimeout(documentSaveTimerRef.current);
+    documentSaveTimerRef.current = setTimeout(() => {
+      saveDocumentContent(documentContent);
+    }, 1500);
+    return () => {
+      if (documentSaveTimerRef.current) clearTimeout(documentSaveTimerRef.current);
+    };
+  }, [documentContent, isUnstructuredDoc, saveDocumentContent]);
+
+  async function handleDocxUpload(file: File | undefined) {
+    if (!file) return;
+    try {
+      const mammoth = (await import("mammoth")).default;
+      const arrayBuffer = await file.arrayBuffer();
+      const { value } = await mammoth.extractRawText({ arrayBuffer });
+      const text = value.trim();
+      setDocumentContent(text);
+    } catch (err) {
+      console.error("Failed to parse docx:", err);
+    }
+  }
 
   const handleSubmitClick = async () => {
     await saveAnswers();
@@ -486,52 +545,83 @@ export function ApplicationFormClient({
         </details>
       )}
 
-      {/* Questions form */}
-      {sections.reduce<{ elements: React.ReactNode[]; counter: number }>(
-        (acc, section, si) => {
-          const sectionQuestions = section.questions.map((q, qi) => {
-            const num = acc.counter + qi + 1;
-            return (
-              <FormField
-                key={q.id}
-                question={q}
-                questionNumber={num}
-                value={answerMap[q.id] ?? ""}
-                selectedOptions={optionsMap[q.id]}
-                lastReviewedText={reviewedTextMap[q.id]}
-                isDisabled={disabledMap[q.id] ?? false}
-                onChange={(v) => handleChange(q.id, v)}
-                onOptionsChange={(opts) => handleOptionsChange(q.id, opts)}
-                onDisabledChange={(disabled) => handleDisabledChange(q.id, disabled)}
-                onBlur={handleBlur}
+      {/* Questions form / Document textarea */}
+      {isUnstructuredDoc ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-gray-900">Your document</h2>
+            <label className="inline-flex items-center gap-1.5 text-sm text-indigo-600 cursor-pointer hover:text-indigo-800 border border-indigo-200 rounded-md px-3 py-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Upload .docx
+              <input
+                type="file"
+                accept=".docx"
+                className="sr-only"
+                onChange={(e) => handleDocxUpload(e.target.files?.[0])}
               />
-            );
-          });
-          acc.elements.push(
-            <div key={si} className="space-y-4">
-              {section.label && (
-                <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-200">
-                  {section.label}
-                </h2>
-              )}
-              {sectionQuestions}
-            </div>
-          );
-          acc.counter += section.questions.length;
-          return acc;
-        },
-        { elements: [], counter: 0 }
-      ).elements}
-
-      {/* Overall word limit indicator */}
-      {questionsSet?.overall_word_limit && (
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <TotalWordCount
-            answerMap={answerMap}
-            disabledMap={disabledMap}
-            limit={questionsSet.overall_word_limit}
+            </label>
+          </div>
+          <textarea
+            className="w-full min-h-[400px] rounded-lg border border-gray-300 p-4 text-sm text-gray-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-y"
+            placeholder="Paste or type your document here, or upload a .docx file above…"
+            value={documentContent}
+            onChange={(e) => setDocumentContent(e.target.value)}
           />
+          <p className="text-xs text-gray-500">
+            {documentWordCount} word{documentWordCount !== 1 ? "s" : ""}
+          </p>
         </div>
+      ) : (
+        <>
+          {sections.reduce<{ elements: React.ReactNode[]; counter: number }>(
+            (acc, section, si) => {
+              const sectionQuestions = section.questions.map((q, qi) => {
+                const num = acc.counter + qi + 1;
+                return (
+                  <FormField
+                    key={q.id}
+                    question={q}
+                    questionNumber={num}
+                    value={answerMap[q.id] ?? ""}
+                    selectedOptions={optionsMap[q.id]}
+                    lastReviewedText={reviewedTextMap[q.id]}
+                    isDisabled={disabledMap[q.id] ?? false}
+                    onChange={(v) => handleChange(q.id, v)}
+                    onOptionsChange={(opts) => handleOptionsChange(q.id, opts)}
+                    onDisabledChange={(disabled) => handleDisabledChange(q.id, disabled)}
+                    onBlur={handleBlur}
+                  />
+                );
+              });
+              acc.elements.push(
+                <div key={si} className="space-y-4">
+                  {section.label && (
+                    <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-200">
+                      {section.label}
+                    </h2>
+                  )}
+                  {sectionQuestions}
+                </div>
+              );
+              acc.counter += section.questions.length;
+              return acc;
+            },
+            { elements: [], counter: 0 }
+          ).elements}
+
+          {/* Overall word limit indicator */}
+          {questionsSet?.overall_word_limit && (
+            <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+              <TotalWordCount
+                answerMap={answerMap}
+                disabledMap={disabledMap}
+                limit={questionsSet.overall_word_limit}
+              />
+            </div>
+          )}
+        </>
       )}
 
       {/* Actions */}
