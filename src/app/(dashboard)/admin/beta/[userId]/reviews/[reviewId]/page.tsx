@@ -30,7 +30,7 @@ export default async function AdminReviewDetailPage({
   // Fetch the review directly by ID
   const { data: review } = await service
     .from("application_reviews")
-    .select("id, review_number, status, progress, results, error_message, questions_set_id, created_at, is_draft, application_id")
+    .select("id, review_number, status, progress, results, error_message, questions_set_id, created_at, is_draft, application_id, credits_charged")
     .eq("id", reviewId)
     .single();
 
@@ -149,6 +149,7 @@ export default async function AdminReviewDetailPage({
             error_message: review.error_message,
             created_at: review.created_at,
             is_draft: review.is_draft ?? false,
+            credits_charged: review.credits_charged ?? 0,
           }}
           isHistorical={isHistorical}
           defaultTab={defaultTab}
