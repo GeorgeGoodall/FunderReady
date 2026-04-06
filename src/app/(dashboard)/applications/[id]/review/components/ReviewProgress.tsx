@@ -7,6 +7,7 @@ interface ReviewProgressProps {
   cancellingReview: boolean;
   showCancelConfirm: boolean;
   onCancel: () => void;
+  isAdminView?: boolean;
 }
 
 export function ReviewProgress({
@@ -14,6 +15,7 @@ export function ReviewProgress({
   cancellingReview,
   showCancelConfirm,
   onCancel,
+  isAdminView = false,
 }: ReviewProgressProps) {
   const currentIndex = PIPELINE_STEPS.findIndex((s) => s.key === review.status);
   const progress = review.progress as Record<string, unknown> | null;
@@ -59,31 +61,33 @@ export function ReviewProgress({
         })}
       </div>
 
-      <div className="mt-6 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-        {review.status === "pending" ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={cancellingReview}
-            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            {cancellingReview
-              ? "Cancelling..."
-              : showCancelConfirm
-                ? "Are you sure? Click to confirm"
-                : "Cancel review"}
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled
-            title="Reviews can't be cancelled once started"
-            className="cursor-not-allowed rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-400 opacity-50 dark:border-zinc-800 dark:text-zinc-600"
-          >
-            Cancel review
-          </button>
-        )}
-      </div>
+      {!isAdminView && (
+        <div className="mt-6 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+          {review.status === "pending" ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={cancellingReview}
+              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              {cancellingReview
+                ? "Cancelling..."
+                : showCancelConfirm
+                  ? "Are you sure? Click to confirm"
+                  : "Cancel review"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title="Reviews can't be cancelled once started"
+              className="cursor-not-allowed rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-400 opacity-50 dark:border-zinc-800 dark:text-zinc-600"
+            >
+              Cancel review
+            </button>
+          )}
+        </div>
+      )}
     </ReviewCard>
   );
 }

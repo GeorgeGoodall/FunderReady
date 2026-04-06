@@ -103,7 +103,7 @@ export function AnswerFeedbackCard({
                   <li key={i} className="flex items-start gap-2 text-xs text-zinc-700 dark:text-zinc-300">
                     <span className="text-green-500">+</span>
                     <span className="flex-1">{s}</span>
-                    {reviewId && applicationId && (
+                    {reviewId && applicationId && onFeedbackChange && (
                       <FeedbackButton
                         reviewId={reviewId}
                         applicationId={applicationId}
@@ -128,7 +128,7 @@ export function AnswerFeedbackCard({
                   <li key={i} className="flex items-start gap-2 text-xs text-zinc-700 dark:text-zinc-300">
                     <span className="text-red-500">-</span>
                     <span className="flex-1">{s}</span>
-                    {reviewId && applicationId && (
+                    {reviewId && applicationId && onFeedbackChange && (
                       <FeedbackButton
                         reviewId={reviewId}
                         applicationId={applicationId}

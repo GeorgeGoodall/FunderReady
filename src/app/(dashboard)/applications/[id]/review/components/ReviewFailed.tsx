@@ -4,9 +4,10 @@ import { ReviewCard } from "./ReviewCard";
 interface ReviewFailedProps {
   review: { error_message: string | null };
   application: { id: string };
+  isAdminView?: boolean;
 }
 
-export function ReviewFailed({ review, application }: ReviewFailedProps) {
+export function ReviewFailed({ review, application, isAdminView = false }: ReviewFailedProps) {
   return (
     <>
       <ReviewCard variant="error">
@@ -15,12 +16,14 @@ export function ReviewFailed({ review, application }: ReviewFailedProps) {
           {review.error_message ?? "An unexpected error occurred."}
         </p>
       </ReviewCard>
-      <Link
-        href={`/applications/${application.id}`}
-        className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-      >
-        Edit &amp; Retry
-      </Link>
+      {!isAdminView && (
+        <Link
+          href={`/applications/${application.id}`}
+          className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        >
+          Edit &amp; Retry
+        </Link>
+      )}
     </>
   );
 }

@@ -50,6 +50,7 @@ export function ApplicationReviewClient({
   isHistorical = false,
   defaultTab = "summary",
   initialFeedback = {},
+  isAdminView = false,
 }: ApplicationReviewClientProps) {
   const router = useRouter();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -141,7 +142,7 @@ export function ApplicationReviewClient({
     return (
       <div className="space-y-4">
         <Header application={application} fund={fund} submittedAt={review?.created_at} creditsUsed={review.credits_charged || undefined} />
-        <ReviewFailed review={review} application={application} />
+        <ReviewFailed review={review} application={application} isAdminView={isAdminView} />
       </div>
     );
   }
@@ -156,6 +157,7 @@ export function ApplicationReviewClient({
           cancellingReview={cancellingReview}
           showCancelConfirm={showCancelConfirm}
           onCancel={handleCancelReview}
+          isAdminView={isAdminView}
         />
       </div>
     );
@@ -228,17 +230,21 @@ export function ApplicationReviewClient({
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-300">
             <span>
               You are viewing Review #{review.review_number} (historical).{" "}
-              <Link
-                href={`/applications/${application.id}/review`}
-                className="font-medium underline underline-offset-2"
-              >
-                View latest review
-              </Link>
+              {!isAdminView && (
+                <Link
+                  href={`/applications/${application.id}/review`}
+                  className="font-medium underline underline-offset-2"
+                >
+                  View latest review
+                </Link>
+              )}
             </span>
-            <NewReviewButton
-              applicationId={application.id}
-              className="rounded-lg border border-amber-400 bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-200 disabled:opacity-60 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40"
-            />
+            {!isAdminView && (
+              <NewReviewButton
+                applicationId={application.id}
+                className="rounded-lg border border-amber-400 bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-200 disabled:opacity-60 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40"
+              />
+            )}
           </div>
         </FadeInSection>
       )}
@@ -260,8 +266,8 @@ export function ApplicationReviewClient({
               questionMap={questionMap}
               criteriaMap={criteriaMap}
               reviewId={review.id}
-              feedbackMap={feedbackMap}
-              onFeedbackChange={handleFeedbackChange}
+              feedbackMap={isAdminView ? undefined : feedbackMap}
+              onFeedbackChange={isAdminView ? undefined : handleFeedbackChange}
               isDraft={review?.is_draft ?? false}
             />
           )}
@@ -275,8 +281,8 @@ export function ApplicationReviewClient({
               disabledQuestionIds={disabledQuestionIds}
               reviewId={review.id}
               applicationId={application.id}
-              feedbackMap={feedbackMap}
-              onFeedbackChange={handleFeedbackChange}
+              feedbackMap={isAdminView ? undefined : feedbackMap}
+              onFeedbackChange={isAdminView ? undefined : handleFeedbackChange}
             />
           )}
 
@@ -287,44 +293,46 @@ export function ApplicationReviewClient({
               criteriaMap={criteriaMap}
               reviewId={review.id}
               applicationId={application.id}
-              feedbackMap={feedbackMap}
-              onFeedbackChange={handleFeedbackChange}
+              feedbackMap={isAdminView ? undefined : feedbackMap}
+              onFeedbackChange={isAdminView ? undefined : handleFeedbackChange}
             />
           )}
         </div>
       </FadeInSection>
 
-      <FadeInSection delay={200}>
-        {/* Actions */}
-        <div className="flex flex-wrap items-center gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-          <Link
-            href={`/applications/${application.id}`}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            Edit Current Draft
-          </Link>
-          {isHistorical && (
-            <NewReviewButton
-              applicationId={application.id}
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            />
-          )}
-          {application.review_count > 1 && (
+      {!isAdminView && (
+        <FadeInSection delay={200}>
+          {/* Actions */}
+          <div className="flex flex-wrap items-center gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
             <Link
-              href={`/applications/${application.id}/history`}
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              href={`/applications/${application.id}`}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
             >
-              Review History
+              Edit Current Draft
             </Link>
-          )}
-          <Link
-            href="/dashboard"
-            className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-          >
-            Back to Dashboard
-          </Link>
-        </div>
-      </FadeInSection>
+            {isHistorical && (
+              <NewReviewButton
+                applicationId={application.id}
+                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              />
+            )}
+            {application.review_count > 1 && (
+              <Link
+                href={`/applications/${application.id}/history`}
+                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Review History
+              </Link>
+            )}
+            <Link
+              href="/dashboard"
+              className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
+        </FadeInSection>
+      )}
     </div>
   );
 }
