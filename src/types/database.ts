@@ -391,7 +391,7 @@ export type Database = {
       }
       funds: {
         Row: {
-          application_format: string
+          application_format: 'question_form' | 'structured_doc' | 'unstructured_doc'
           approved: boolean
           closes_at: string | null
           created_at: string
@@ -409,7 +409,7 @@ export type Database = {
           url: string | null
         }
         Insert: {
-          application_format?: string
+          application_format?: 'question_form' | 'structured_doc' | 'unstructured_doc'
           approved?: boolean
           closes_at?: string | null
           created_at?: string
@@ -427,7 +427,7 @@ export type Database = {
           url?: string | null
         }
         Update: {
-          application_format?: string
+          application_format?: 'question_form' | 'structured_doc' | 'unstructured_doc'
           approved?: boolean
           closes_at?: string | null
           created_at?: string
