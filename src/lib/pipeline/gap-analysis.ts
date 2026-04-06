@@ -14,7 +14,7 @@ Do not produce contradiction, inconsistency, repetition, or resolved_weakness fi
 The input is a single free-form document, not a structured set of questions.`;
 
 export function buildGapAnalysisPrompt(
-  answerAnalyses: AnswerAnalysis[],
+  answerAnalysis: AnswerAnalysis | null,
   criteria: Criterion[]
 ): { systemPrompt: string; userPrompt: string } {
   const criteriaList = criteria
@@ -22,19 +22,18 @@ export function buildGapAnalysisPrompt(
     .join("\n");
 
   // Summarise criteria relevance from the answer analysis
-  const analysis = answerAnalyses[0];
-  const relevanceSummary = analysis
-    ? analysis.criteria_relevance
+  const relevanceSummary = answerAnalysis
+    ? answerAnalysis.criteria_relevance
         .map((r) => `- Criterion ${r.criterion_id}: ${r.relevance}`)
         .join("\n")
     : "No analysis available.";
 
   const weaknessesSummary =
-    analysis?.weaknesses?.length
-      ? `\nDocument weaknesses identified:\n${analysis.weaknesses.map((w) => `- ${w}`).join("\n")}`
+    answerAnalysis?.weaknesses?.length
+      ? `\nDocument weaknesses identified:\n${answerAnalysis.weaknesses.map((w) => `- ${w}`).join("\n")}`
       : "";
 
-  const userPrompt = `Scoring criteria:\n${criteriaList}\n\nCriteria coverage analysis:\n${relevanceSummary}${weaknessesSummary}\n\nIdentify missing_criterion and gap findings only. Return your analysis as a cross-reference object with findings, overall_coherence, and a summary.`;
+  const userPrompt = `Scoring criteria:\n${criteriaList}\n\nCriteria coverage analysis:\n${relevanceSummary}${weaknessesSummary}\n\nIdentify missing_criterion and gap findings only. Return your analysis as a JSON object with:\n- findings: array of objects, each with: type (one of "missing_criterion" or "gap"), description (string), sections_involved (array of criterion IDs), severity ("low" | "medium" | "high"), confidence ("low" | "medium" | "high")\n- overall_coherence: one of "strong", "adequate", or "weak"\n- summary: a brief string summary of the key gaps found`;
 
   return { systemPrompt: GAP_ANALYSIS_SYSTEM_PROMPT, userPrompt };
 }

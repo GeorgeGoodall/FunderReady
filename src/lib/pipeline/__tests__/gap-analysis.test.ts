@@ -22,28 +22,36 @@ const criteria = [
 describe("buildGapAnalysisPrompt", () => {
   it("returns systemPrompt and userPrompt strings", () => {
     const { systemPrompt, userPrompt } = buildGapAnalysisPrompt(
-      [mockAnalysis],
+      mockAnalysis,
       criteria
     );
     expect(typeof systemPrompt).toBe("string");
     expect(typeof userPrompt).toBe("string");
     expect(systemPrompt.length).toBeGreaterThan(50);
+    expect(userPrompt.length).toBeGreaterThan(50);
   });
 
   it("includes document instruction in systemPrompt", () => {
-    const { systemPrompt } = buildGapAnalysisPrompt([mockAnalysis], criteria);
+    const { systemPrompt } = buildGapAnalysisPrompt(mockAnalysis, criteria);
     expect(systemPrompt.toLowerCase()).toContain("document");
   });
 
   it("includes criteria in userPrompt", () => {
-    const { userPrompt } = buildGapAnalysisPrompt([mockAnalysis], criteria);
+    const { userPrompt } = buildGapAnalysisPrompt(mockAnalysis, criteria);
     expect(userPrompt).toContain("Community benefit");
     expect(userPrompt).toContain("Financial sustainability");
   });
 
   it("mentions missing_criterion and gap finding types in systemPrompt", () => {
-    const { systemPrompt } = buildGapAnalysisPrompt([mockAnalysis], criteria);
+    const { systemPrompt } = buildGapAnalysisPrompt(mockAnalysis, criteria);
     expect(systemPrompt).toContain("missing_criterion");
     expect(systemPrompt).toContain("gap");
+  });
+
+  it("handles null analysis gracefully", () => {
+    const { systemPrompt, userPrompt } = buildGapAnalysisPrompt(null, criteria);
+    expect(typeof systemPrompt).toBe("string");
+    expect(typeof userPrompt).toBe("string");
+    expect(userPrompt).toContain("No analysis available");
   });
 });
