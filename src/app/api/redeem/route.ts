@@ -57,10 +57,14 @@ export async function POST(request: Request) {
   }
 
   // Grant credits
-  await service.rpc("increment_purchased_credits", {
+  const { error: rpcError } = await service.rpc("increment_purchased_credits", {
     p_user_id: user.id,
     p_credits: link.credits,
   });
+
+  if (rpcError) {
+    return NextResponse.json({ error: "Failed to grant credits" }, { status: 500 });
+  }
 
   return NextResponse.json({ credits: link.credits });
 }
