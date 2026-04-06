@@ -19,6 +19,7 @@ function SignupForm() {
 
   const betaRef = process.env.NEXT_PUBLIC_BETA_REF;
   const isBeta = !!betaRef && searchParams.get("ref") === betaRef;
+  const code = searchParams.get("code");
 
   const supabase = createClient();
 
@@ -43,7 +44,9 @@ function SignupForm() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: code
+          ? `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(`/redeem?code=${code}`)}`
+          : `${window.location.origin}/auth/callback`,
         data: isBeta ? { is_beta: true } : undefined,
       },
     });
@@ -93,6 +96,12 @@ function SignupForm() {
           <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
             <strong>Beta access:</strong> As a beta participant you&apos;ll get free access to all
             features while we build out the platform.
+          </div>
+        )}
+
+        {code && !isBeta && (
+          <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300">
+            <strong>Free credits waiting!</strong> Create an account to claim your gifted credits.
           </div>
         )}
 
@@ -176,7 +185,10 @@ function SignupForm() {
 
         <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+          <Link
+            href={code ? `/login?redirect=${encodeURIComponent(`/redeem?code=${code}`)}` : "/login"}
+            className="font-medium text-blue-600 hover:text-blue-500"
+          >
             Sign in
           </Link>
         </p>
