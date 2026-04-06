@@ -49,7 +49,7 @@ export default async function AdminReviewDetailPage({
   // No rejected filter — admin service client intentionally fetches regardless of fund state
   const { data: rawFund } = await service
     .from("funds")
-    .select("id, name, organisation_id, organisations(id, name)")
+    .select("id, name, organisation_id, organisations(id, name), application_format")
     .eq("id", application.fund_id)
     .single();
 
@@ -60,6 +60,10 @@ export default async function AdminReviewDetailPage({
           (rawFund.organisations as unknown as { id: string; name: string } | null) ?? null,
       }
     : null;
+
+  const applicationFormat = (
+    (rawFund as { application_format?: string } | null)?.application_format ?? "question_form"
+  ) as "question_form" | "structured_doc" | "unstructured_doc";
 
   // Fetch answers
   const { data: answers } = await service
@@ -132,6 +136,7 @@ export default async function AdminReviewDetailPage({
         <ApplicationReviewClient
           application={application}
           fund={fund}
+          applicationFormat={applicationFormat}
           questions={questions}
           criteria={criteria}
           answers={(answers ?? []).map((a) => ({

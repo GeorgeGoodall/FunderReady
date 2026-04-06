@@ -51,7 +51,7 @@ export default async function ApplicationReviewPage({
   // Fetch answers for outdated detection
   const { data: answers } = await supabase
     .from("application_answers")
-    .select("question_id, answer_text, last_reviewed_text")
+    .select("question_id, answer_text, last_reviewed_text, is_disabled")
     .eq("application_id", id);
 
   // Fetch specific review if reviewNumber param is provided, otherwise latest
@@ -131,6 +131,7 @@ export default async function ApplicationReviewPage({
           question_id: a.question_id,
           answer_text: a.answer_text,
           last_reviewed_text: a.last_reviewed_text,
+          is_disabled: a.is_disabled,
         }))}
         review={review ? {
           id: review.id,
