@@ -4,10 +4,12 @@ export function Header({
   application,
   fund,
   submittedAt,
+  creditsUsed,
 }: {
   application: { title: string | null };
   fund: { name: string; organisation: { id: string; name: string } | null } | null;
   submittedAt?: string | null;
+  creditsUsed?: number;
 }) {
   return (
     <div>
@@ -28,8 +30,8 @@ export function Header({
             {new Date(submittedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
           </span>
         )}
-        {submittedAt && (
-          <span className="text-xs text-zinc-400 dark:text-zinc-600">· 1 credit</span>
+        {submittedAt && creditsUsed !== undefined && (
+          <span className="text-xs text-zinc-400 dark:text-zinc-600">· {creditsUsed} {creditsUsed === 1 ? "credit" : "credits"}</span>
         )}
       </div>
     </div>
