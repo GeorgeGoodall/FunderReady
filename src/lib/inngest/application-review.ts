@@ -43,6 +43,7 @@ import {
   StructureAssignmentSchema,
   buildStructureAssignmentPrompt,
   type AssignedSection,
+  type StructureAssignment,
 } from "@/lib/pipeline/structure-assignment";
 import { buildGapAnalysisPrompt } from "@/lib/pipeline/gap-analysis";
 
@@ -469,6 +470,11 @@ export const applicationReviewRequested = inngest.createFunction(
         | "structured_doc"
         | "unstructured_doc";
 
+      const VALID_FORMATS = ["question_form", "structured_doc", "unstructured_doc"] as const;
+      if (!VALID_FORMATS.includes(applicationFormat as (typeof VALID_FORMATS)[number])) {
+        throw new NonRetriableError(`Unknown application_format: ${applicationFormat}`);
+      }
+
       // Load questions (only for non-unstructured_doc formats)
       let questions: Array<{
         id: string;
@@ -596,37 +602,42 @@ export const applicationReviewRequested = inngest.createFunction(
     let answerContexts: AnswerContext[] = [];
 
     if (isUnstructuredDoc && !isShortDoc) {
-      // Long unstructured doc: run structure assignment to split into sections
-      const { systemPrompt: structSystemPrompt, userPrompt: structUserPrompt } =
-        buildStructureAssignmentPrompt(enabledAnswers[0].answer_text, criteria);
-      const { result: structure, usage: structUsageData } = await inferWithClaude(
-        step,
-        "structure-assignment",
-        {
-          prompt: structUserPrompt,
-          systemPrompt: structSystemPrompt,
-          schema: StructureAssignmentSchema,
+      if (enabledAnswers.length === 0) {
+        answerContexts = [];
+      } else {
+        // Long unstructured doc: run structure assignment to split into sections
+        const { systemPrompt: structSystemPrompt, userPrompt: structUserPrompt } =
+          buildStructureAssignmentPrompt(enabledAnswers[0].answer_text, criteria);
+        const { result: structure, usage: structUsageData } = await inferWithClaude(
+          step,
+          "structure-assignment",
+          {
+            prompt: structUserPrompt,
+            systemPrompt: structSystemPrompt,
+            schema: StructureAssignmentSchema,
+            model: MODEL,
+            maxTokens: 4096,
+            temperature: 0,
+          }
+        );
+
+        structureUsage = {
+          applicationReviewId: reviewId,
+          userId,
+          pipelineStep: "structure_assignment",
           model: MODEL,
-          maxTokens: 4096,
-          temperature: 0,
-        }
-      );
+          usage: structUsageData,
+          isRetry: false,
+        };
 
-      structureUsage = {
-        applicationReviewId: reviewId,
-        userId,
-        pipelineStep: "structure_assignment",
-        model: MODEL,
-        usage: structUsageData,
-        isRetry: false,
-      };
-
-      answerContexts = (structure as { sections: AssignedSection[] }).sections.map((s) => ({
-        question_id: s.id,
-        question_text: s.title,
-        answer_text: s.content,
-        field_type: "text_long" as const,
-      }));
+        const typedStructure = structure as StructureAssignment;
+        answerContexts = typedStructure.sections.map((s) => ({
+          question_id: s.id,
+          question_text: s.title,
+          answer_text: s.content,
+          field_type: "text_long" as const,
+        }));
+      }
     } else if (isUnstructuredDoc && isShortDoc) {
       // Short unstructured doc: whole document as one answer context
       answerContexts = [
