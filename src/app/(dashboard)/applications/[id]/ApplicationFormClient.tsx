@@ -109,6 +109,8 @@ export function ApplicationFormClient({
   } | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [draftReviewMode, setDraftReviewMode] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const extractFileInputRef = useRef<HTMLInputElement>(null);
 
   // Parse questions from the questions set
   const questions: Question[] = Array.isArray(questionsSet?.questions_json)
@@ -204,6 +206,50 @@ export function ApplicationFormClient({
     }, 1500);
     return () => clearTimeout(timer);
   }, [documentContent, isUnstructuredDoc, saveDocumentContent]);
+
+  async function handleExtractAnswers(file: File | undefined) {
+    if (!file) return;
+    setExtracting(true);
+    setError("");
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < uint8.length; i++) {
+        binary += String.fromCharCode(uint8[i]);
+      }
+      const base64 = btoa(binary);
+      const res = await fetch(`/api/applications/${application.id}/extract-answers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: base64, contentType: "docx_base64" }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to extract answers from document");
+        return;
+      }
+      const data = await res.json();
+      const extracted: Array<{ question_id: string; answer_text: string }> = data.answers ?? [];
+      setAnswerMap((prev) => {
+        const next = { ...prev };
+        for (const a of extracted) {
+          if (a.answer_text) {
+            next[a.question_id] = a.answer_text;
+          }
+        }
+        return next;
+      });
+      dirtyRef.current = true;
+    } catch {
+      setError("Failed to extract answers. Please try again.");
+    } finally {
+      setExtracting(false);
+      if (extractFileInputRef.current) {
+        extractFileInputRef.current.value = "";
+      }
+    }
+  }
 
   async function handleDocxUpload(file: File | undefined) {
     if (!file) return;
@@ -579,6 +625,29 @@ export function ApplicationFormClient({
         </div>
       ) : (
         <>
+          {/* Upload answers from document (question_form / structured_doc only) */}
+          {(isDraft || isReviewed) && (
+            <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <p className="flex-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Have a document with your answers? Upload it to auto-populate the form.
+              </p>
+              <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${extracting ? "cursor-not-allowed border-zinc-200 text-zinc-400" : "border-indigo-300 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-900/20"}`}>
+                {extracting ? "Extracting..." : "Upload answers from document"}
+                <input
+                  ref={extractFileInputRef}
+                  type="file"
+                  accept=".docx"
+                  className="sr-only"
+                  disabled={extracting}
+                  onChange={(e) => handleExtractAnswers(e.target.files?.[0])}
+                />
+              </label>
+            </div>
+          )}
+
           {sections.reduce<{ elements: React.ReactNode[]; counter: number }>(
             (acc, section, si) => {
               const sectionQuestions = section.questions.map((q, qi) => {
