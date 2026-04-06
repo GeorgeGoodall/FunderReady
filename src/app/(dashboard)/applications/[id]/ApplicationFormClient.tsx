@@ -171,7 +171,7 @@ export function ApplicationFormClient({
     : 0;
 
   // Auto-save document content for unstructured_doc
-  const documentSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasInitializedRef = useRef(false);
 
   const saveDocumentContent = useCallback(
     async (text: string) => {
@@ -192,19 +192,23 @@ export function ApplicationFormClient({
 
   useEffect(() => {
     if (!isUnstructuredDoc) return;
-    if (documentSaveTimerRef.current) clearTimeout(documentSaveTimerRef.current);
-    documentSaveTimerRef.current = setTimeout(() => {
+
+    // Skip the first effect run (data just loaded from server)
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      return;
+    }
+
+    const timer = setTimeout(() => {
       saveDocumentContent(documentContent);
     }, 1500);
-    return () => {
-      if (documentSaveTimerRef.current) clearTimeout(documentSaveTimerRef.current);
-    };
+    return () => clearTimeout(timer);
   }, [documentContent, isUnstructuredDoc, saveDocumentContent]);
 
   async function handleDocxUpload(file: File | undefined) {
     if (!file) return;
     try {
-      const mammoth = (await import("mammoth")).default;
+      const mammoth = await import("mammoth");
       const arrayBuffer = await file.arrayBuffer();
       const { value } = await mammoth.extractRawText({ arrayBuffer });
       const text = value.trim();

@@ -54,12 +54,15 @@ export default async function ApplicationPage({
       }
     : null;
 
-  const { data: questionsSet } = await supabase
-    .from("questions_sets")
-    .select("id, questions_json, overall_word_limit, created_at, approved")
-    .eq("id", application.questions_set_id)
-    .eq("rejected", false)
-    .single();
+  const questionsSet = application.questions_set_id
+    ? await supabase
+        .from("questions_sets")
+        .select("id, questions_json, overall_word_limit, created_at, approved")
+        .eq("id", application.questions_set_id)
+        .eq("rejected", false)
+        .single()
+        .then(({ data }) => data)
+    : null;
 
   const { data: criteriaSet } = await supabase
     .from("criteria_sets")
