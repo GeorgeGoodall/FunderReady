@@ -5,7 +5,7 @@ import mammoth from "mammoth";
 import { z } from "zod";
 
 const RequestSchema = z.object({
-  content: z.string().min(1),
+  content: z.string().min(1).max(14_000_000), // ~10 MB docx
   contentType: z.enum(["docx_base64", "plain_text"]),
 });
 
@@ -50,11 +50,16 @@ export async function POST(
     .eq("id", application.questions_set_id)
     .single();
 
-  if (!questionsSet?.questions_json || !Array.isArray(questionsSet.questions_json)) {
+  if (!questionsSet?.questions_json) {
     return NextResponse.json({ error: "Questions not found" }, { status: 404 });
   }
 
-  const questions = questionsSet.questions_json as Array<{ id: string; question: string }>;
+  const QuestionItemSchema = z.object({ id: z.string(), question: z.string() });
+  const questionsParseResult = z.array(QuestionItemSchema).safeParse(questionsSet.questions_json);
+  if (!questionsParseResult.success) {
+    return NextResponse.json({ error: "Questions data is malformed" }, { status: 500 });
+  }
+  const questions = questionsParseResult.data;
 
   // Parse request body
   let body: unknown;
@@ -72,21 +77,25 @@ export async function POST(
     );
   }
 
-  // Extract plain text from docx if needed
-  let documentText: string;
-  if (parsed.data.contentType === "docx_base64") {
-    const buffer = Buffer.from(parsed.data.content, "base64");
-    const { value } = await mammoth.extractRawText({ buffer });
-    documentText = value.trim();
-  } else {
-    documentText = parsed.data.content;
+  // Extract plain text from docx if needed, then run AI extraction
+  try {
+    let documentText: string;
+    if (parsed.data.contentType === "docx_base64") {
+      const buffer = Buffer.from(parsed.data.content, "base64");
+      const { value } = await mammoth.extractRawText({ buffer });
+      documentText = value.trim();
+    } else {
+      documentText = parsed.data.content;
+    }
+
+    if (!documentText.trim()) {
+      return NextResponse.json({ error: "Document is empty" }, { status: 400 });
+    }
+
+    const extractedAnswers = await extractAnswersFromDocument(documentText, questions);
+    return NextResponse.json({ answers: extractedAnswers });
+  } catch (err) {
+    console.error("[extract-answers] error:", err);
+    return NextResponse.json({ error: "Failed to extract answers from document" }, { status: 500 });
   }
-
-  if (!documentText.trim()) {
-    return NextResponse.json({ error: "Document is empty" }, { status: 400 });
-  }
-
-  const extractedAnswers = await extractAnswersFromDocument(documentText, questions);
-
-  return NextResponse.json({ answers: extractedAnswers });
 }

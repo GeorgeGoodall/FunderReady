@@ -214,9 +214,10 @@ export function ApplicationFormClient({
     try {
       const arrayBuffer = await file.arrayBuffer();
       const uint8 = new Uint8Array(arrayBuffer);
+      const CHUNK = 8192;
       let binary = "";
-      for (let i = 0; i < uint8.length; i++) {
-        binary += String.fromCharCode(uint8[i]);
+      for (let i = 0; i < uint8.length; i += CHUNK) {
+        binary += String.fromCharCode(...uint8.subarray(i, i + CHUNK));
       }
       const base64 = btoa(binary);
       const res = await fetch(`/api/applications/${application.id}/extract-answers`, {
