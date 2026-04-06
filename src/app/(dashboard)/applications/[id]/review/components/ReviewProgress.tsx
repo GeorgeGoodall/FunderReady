@@ -25,7 +25,8 @@ export function ReviewProgress({
   return (
     <ReviewCard variant="neutral">
       <h2 className="font-semibold">Review in progress</h2>
-      <p className="mt-1 text-sm text-zinc-500">This page updates automatically.</p>
+      <p className="mt-1 text-sm text-zinc-500">This page updates automatically — no need to keep it open.</p>
+      <p className="mt-1 text-sm text-zinc-500">Reviews can take 10–30 minutes, so feel free to go make a cuppa and come back when you&apos;re ready.</p>
 
       <div className="mt-6 space-y-3">
         {PIPELINE_STEPS.map((step, i) => {
