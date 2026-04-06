@@ -43,8 +43,8 @@ export async function GET(_request: Request) {
           emailMap[u.id] = u.email ?? "";
         }
       }
-    } catch {
-      // Non-fatal — emails stay empty
+    } catch (err) {
+      console.error("Failed to resolve redeemed_by emails:", err);
     }
   }
 
@@ -72,6 +72,16 @@ export async function POST(request: Request) {
       { error: "credits must be an integer between 1 and 100" },
       { status: 400 }
     );
+  }
+
+  if (expiresAt !== undefined) {
+    const parsed = new Date(expiresAt);
+    if (isNaN(parsed.getTime())) {
+      return NextResponse.json(
+        { error: "expires_at must be a valid ISO date string" },
+        { status: 400 }
+      );
+    }
   }
 
   const code = randomBytes(16).toString("hex");
