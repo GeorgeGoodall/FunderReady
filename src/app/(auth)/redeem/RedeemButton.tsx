@@ -27,7 +27,8 @@ export function RedeemButton({ code, credits }: Props) {
         setError(data.error ?? "Failed to claim credits");
         return;
       }
-      router.push(`/dashboard?gifted=${credits}`);
+      const data = await res.json();
+      router.push(`/dashboard?gifted=${data.credits}`);
     } catch {
       setError("Network error — please try again");
     } finally {

@@ -24,6 +24,7 @@ function LoginForm() {
   const urlMessage = searchParams.get("message");
   const urlError = searchParams.get("error");
   const hasGift = !!searchParams.get("redirect")?.includes("/redeem?code=");
+  const giftCode = searchParams.get("redirect")?.match(/\/redeem\?code=([^&]+)/)?.[1] ?? null;
 
   const supabase = createClient();
 
@@ -126,7 +127,10 @@ function LoginForm() {
 
         <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="font-medium text-blue-600 hover:text-blue-500">
+          <Link
+            href={giftCode ? `/signup?code=${giftCode}` : "/signup"}
+            className="font-medium text-blue-600 hover:text-blue-500"
+          >
             Sign up
           </Link>
         </p>
