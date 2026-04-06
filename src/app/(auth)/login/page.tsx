@@ -23,6 +23,8 @@ function LoginForm() {
   const redirect = searchParams.get("redirect") || "/dashboard";
   const urlMessage = searchParams.get("message");
   const urlError = searchParams.get("error");
+  const hasGift = !!searchParams.get("redirect")?.includes("/redeem?code=");
+  const giftCode = searchParams.get("redirect")?.match(/\/redeem\?code=([^&]+)/)?.[1] ?? null;
 
   const supabase = createClient();
 
@@ -64,6 +66,12 @@ function LoginForm() {
         {urlError === "auth_failed" && (
           <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
             Authentication failed. Please try signing in or request a new confirmation email.
+          </div>
+        )}
+
+        {hasGift && (
+          <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300">
+            <strong>Free credits waiting!</strong> Sign in to claim your gifted credits.
           </div>
         )}
 
@@ -119,7 +127,10 @@ function LoginForm() {
 
         <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="font-medium text-blue-600 hover:text-blue-500">
+          <Link
+            href={giftCode ? `/signup?code=${giftCode}` : "/signup"}
+            className="font-medium text-blue-600 hover:text-blue-500"
+          >
             Sign up
           </Link>
         </p>

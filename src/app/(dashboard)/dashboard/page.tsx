@@ -3,13 +3,20 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ApplicationsList } from "./ApplicationsList";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ gifted?: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
+
+  const { gifted } = await searchParams;
+  const giftedCount = gifted ? parseInt(gifted, 10) : null;
 
   // Fetch applications
   const { data: applications } = await supabase
@@ -22,6 +29,12 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-10">
+      {giftedCount && giftedCount > 0 && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300">
+          <strong>{giftedCount} {giftedCount === 1 ? "credit has" : "credits have"} been added to your account.</strong>{" "}
+          Start a new application to use them.
+        </div>
+      )}
       {/* Applications section */}
       <div>
         <h1 className="text-2xl font-bold">Your Applications</h1>
