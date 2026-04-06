@@ -232,7 +232,7 @@ export type Database = {
           criteria_set_id: string
           fund_id: string
           id: string
-          questions_set_id: string
+          questions_set_id: string | null
           review_count: number
           status: string
           title: string | null
@@ -244,7 +244,7 @@ export type Database = {
           criteria_set_id: string
           fund_id: string
           id?: string
-          questions_set_id: string
+          questions_set_id?: string | null
           review_count?: number
           status?: string
           title?: string | null
@@ -256,7 +256,7 @@ export type Database = {
           criteria_set_id?: string
           fund_id?: string
           id?: string
-          questions_set_id?: string
+          questions_set_id?: string | null
           review_count?: number
           status?: string
           title?: string | null
@@ -391,6 +391,7 @@ export type Database = {
       }
       funds: {
         Row: {
+          application_format: string
           approved: boolean
           closes_at: string | null
           created_at: string
@@ -408,6 +409,7 @@ export type Database = {
           url: string | null
         }
         Insert: {
+          application_format?: string
           approved?: boolean
           closes_at?: string | null
           created_at?: string
@@ -425,6 +427,7 @@ export type Database = {
           url?: string | null
         }
         Update: {
+          application_format?: string
           approved?: boolean
           closes_at?: string | null
           created_at?: string
