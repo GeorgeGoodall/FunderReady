@@ -61,7 +61,7 @@ export interface ApplicationReviewClientProps {
     error_message: string | null;
     created_at: string;
     is_draft: boolean;
-    total_cost_usd?: number | null;
+    credits_charged?: number | null;
   } | null;
   isHistorical?: boolean;
   defaultTab?: TabId;
