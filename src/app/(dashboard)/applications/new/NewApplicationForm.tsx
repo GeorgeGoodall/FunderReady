@@ -34,13 +34,6 @@ interface FundInfo {
 
 type Step = "fund" | "criteria" | "questions" | "confirm";
 
-const STEPS: { key: Step; label: string }[] = [
-  { key: "fund", label: "Fund" },
-  { key: "criteria", label: "Criteria" },
-  { key: "questions", label: "Questions" },
-  { key: "confirm", label: "Create" },
-];
-
 export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicationFormProps) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("fund");
@@ -83,6 +76,28 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
     localStorage.setItem("new-application-intro-dismissed", "true");
     setIntroVisible(false);
   };
+
+  // Derive application format from selected or pending fund
+  const applicationFormat =
+    (selectedFund?.application_format ??
+      pendingNewFundData?.application_format ??
+      "question_form") as "question_form" | "structured_doc" | "unstructured_doc";
+
+  const isUnstructuredDoc = applicationFormat === "unstructured_doc";
+  const itemLabel = applicationFormat === "structured_doc" ? "Section" : "Question";
+
+  const STEPS: { key: Step; label: string }[] = isUnstructuredDoc
+    ? [
+        { key: "fund", label: "Fund" },
+        { key: "criteria", label: "Criteria" },
+        { key: "confirm", label: "Create" },
+      ]
+    : [
+        { key: "fund", label: "Fund" },
+        { key: "criteria", label: "Criteria" },
+        { key: "questions", label: applicationFormat === "structured_doc" ? "Sections" : "Questions" },
+        { key: "confirm", label: "Create" },
+      ];
 
   // Shared helper: apply fund data (criteria/questions sets) from API response
   function applyFundData(data: Record<string, unknown>) {
@@ -151,10 +166,11 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
           // Non-fatal
         }
 
-        if (criteriaLoaded && questionsLoaded) {
+        const fundIsUnstructured = fund.application_format === "unstructured_doc";
+        if (criteriaLoaded && (questionsLoaded || fundIsUnstructured)) {
           setStep("confirm");
         } else if (criteriaLoaded) {
-          setStep("questions");
+          setStep(fundIsUnstructured ? "confirm" : "questions");
         } else {
           setStep("criteria");
         }
@@ -201,10 +217,11 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
       // Non-fatal
     }
 
-    if (criteriaLoaded && questionsLoaded) {
+    const fundIsUnstructured = fund.application_format === "unstructured_doc";
+    if (criteriaLoaded && (questionsLoaded || fundIsUnstructured)) {
       setStep("confirm");
     } else if (criteriaLoaded) {
-      setStep("questions");
+      setStep(fundIsUnstructured ? "confirm" : "questions");
     } else {
       setStep("criteria");
     }
@@ -286,7 +303,8 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
   };
 
   const handleCreateApplication = async () => {
-    if (!criteriaSet || !questionsSet) return;
+    if (!criteriaSet) return;
+    if (!isUnstructuredDoc && !questionsSet) return;
     setSubmitting(true);
     setError("");
 
@@ -345,26 +363,28 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
       }
 
       const savedCriteriaSetId = await saveCriteriaSetsIfNeeded(fund.id);
-      const savedQuestionsSetId = await saveQuestionsSetsIfNeeded(fund.id);
+      const savedQuestionsSetId = isUnstructuredDoc ? null : await saveQuestionsSetsIfNeeded(fund.id);
 
       if (!savedCriteriaSetId) {
         setError("Failed to save criteria set");
         return;
       }
-      if (!savedQuestionsSetId) {
+      if (!isUnstructuredDoc && !savedQuestionsSetId) {
         setError("Questions are required for form-based applications");
         return;
       }
 
+      const body = {
+        fundId: fund.id,
+        criteriaSetId: savedCriteriaSetId,
+        ...(isUnstructuredDoc ? {} : { questionsSetId: savedQuestionsSetId! }),
+        ...(title.trim() && { title: title.trim() }),
+      };
+
       const res = await fetch("/api/applications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fundId: fund.id,
-          criteriaSetId: savedCriteriaSetId,
-          questionsSetId: savedQuestionsSetId,
-          ...(title.trim() && { title: title.trim() }),
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -606,7 +626,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStep("questions")}
+                  onClick={() => setStep(isUnstructuredDoc ? "confirm" : "questions")}
                   disabled={criteriaSet.criteria.some((c) => !c.criterion.trim())}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -642,7 +662,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
 
           {!questionsSet ? (
             <>
-              <QuestionsInput onParsed={setQuestionsSet} />
+              <QuestionsInput onParsed={setQuestionsSet} itemLabel={itemLabel} />
               <button
                 type="button"
                 onClick={() => goToStep("criteria")}
@@ -653,7 +673,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
             </>
           ) : (
             <>
-              <QuestionsPreview questionsSet={questionsSet} onChange={handleQuestionsChange} />
+              <QuestionsPreview questionsSet={questionsSet} onChange={handleQuestionsChange} itemLabel={itemLabel} />
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -771,7 +791,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => setStep("questions")}
+              onClick={() => setStep(isUnstructuredDoc ? "criteria" : "questions")}
               className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               &larr; Back
@@ -779,7 +799,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
             <button
               type="button"
               onClick={handleCreateApplication}
-              disabled={submitting || !questionsSet}
+              disabled={submitting || (!isUnstructuredDoc && !questionsSet)}
               className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? "Creating..." : "Create Application"}
