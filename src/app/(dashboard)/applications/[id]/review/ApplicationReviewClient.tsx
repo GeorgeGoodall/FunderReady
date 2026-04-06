@@ -7,7 +7,6 @@ import type { ApplicationReviewClientProps, TabId } from "./types";
 import { parseReviewResults } from "./types";
 import { GOOD_SCORES } from "./constants";
 import { Header } from "./components/Header";
-import { COST_PER_CREDIT_USD } from "@/lib/stripe/plans";
 import { TabBar } from "./components/TabBar";
 import { SummaryTab } from "./components/SummaryTab";
 import { AnswersTab } from "./components/AnswersTab";
@@ -142,7 +141,7 @@ export function ApplicationReviewClient({
   if (review.status === "failed") {
     return (
       <div className="space-y-4">
-        <Header application={application} fund={fund} submittedAt={review?.created_at} creditsUsed={review.total_cost_usd ? Math.ceil(review.total_cost_usd / COST_PER_CREDIT_USD) : undefined} />
+        <Header application={application} fund={fund} submittedAt={review?.created_at} creditsUsed={review.credits_charged || undefined} />
         <ReviewFailed review={review} application={application} isAdminView={isAdminView} />
       </div>
     );
@@ -152,7 +151,7 @@ export function ApplicationReviewClient({
   if (isInProgress) {
     return (
       <div className="space-y-6">
-        <Header application={application} fund={fund} submittedAt={review?.created_at} creditsUsed={review.total_cost_usd ? Math.ceil(review.total_cost_usd / COST_PER_CREDIT_USD) : undefined} />
+        <Header application={application} fund={fund} submittedAt={review?.created_at} creditsUsed={review.credits_charged || undefined} />
         <ReviewProgress
           review={review}
           cancellingReview={cancellingReview}
@@ -169,7 +168,7 @@ export function ApplicationReviewClient({
   if (!results?.scoring) {
     return (
       <div className="space-y-4">
-        <Header application={application} fund={fund} submittedAt={review?.created_at} creditsUsed={review.total_cost_usd ? Math.ceil(review.total_cost_usd / COST_PER_CREDIT_USD) : undefined} />
+        <Header application={application} fund={fund} submittedAt={review?.created_at} creditsUsed={review.credits_charged || undefined} />
         <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-sm text-zinc-500">Review completed but results are unavailable.</p>
         </div>
@@ -213,7 +212,7 @@ export function ApplicationReviewClient({
   return (
     <div className="space-y-6">
       <FadeInSection delay={0}>
-        <Header application={application} fund={fund} submittedAt={review?.created_at} creditsUsed={review.total_cost_usd ? Math.ceil(review.total_cost_usd / COST_PER_CREDIT_USD) : undefined} />
+        <Header application={application} fund={fund} submittedAt={review?.created_at} creditsUsed={review.credits_charged || undefined} />
       </FadeInSection>
 
       <FadeInSection delay={50}>
