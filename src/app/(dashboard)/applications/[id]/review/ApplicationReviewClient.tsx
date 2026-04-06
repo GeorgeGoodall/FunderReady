@@ -16,6 +16,7 @@ import { ReviewFailed } from "./components/ReviewFailed";
 import { ReviewProgress } from "./components/ReviewProgress";
 import { useAnimateOnView } from "./hooks/useAnimateOnView";
 import { ANIMATE_ON_VIEW_THRESHOLD } from "./constants";
+import { getFormatLabels } from "@/lib/format-terminology";
 
 function FadeInSection({
   children,
@@ -43,6 +44,7 @@ function FadeInSection({
 export function ApplicationReviewClient({
   application,
   fund,
+  applicationFormat,
   questions,
   criteria,
   answers,
@@ -118,6 +120,13 @@ export function ApplicationReviewClient({
     for (const c of criteria) map.set(c.id, c.criterion);
     return map;
   }, [criteria]);
+
+  const labels = getFormatLabels(applicationFormat);
+  const isShortDoc =
+    applicationFormat === "unstructured_doc" &&
+    answers.length === 1 &&
+    answers[0]?.question_id === "document_content" &&
+    (answers[0]?.answer_text?.trim().split(/\s+/).filter(Boolean).length ?? 0) <= 500;
 
   // No review yet
   if (!review) {
@@ -205,8 +214,8 @@ export function ApplicationReviewClient({
 
   const tabs = [
     { id: "summary" as TabId, label: "Summary" },
-    { id: "answers" as TabId, label: "Answers", badge: answersNeedAttention },
-    { id: "cross-ref" as TabId, label: "Cross-Reference", badge: crossRefCount },
+    { id: "answers" as TabId, label: labels.items, badge: answersNeedAttention },
+    { id: "cross-ref" as TabId, label: isShortDoc ? "Gap Analysis" : "Cross-Reference", badge: crossRefCount },
   ];
 
   return (

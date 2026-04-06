@@ -34,7 +34,7 @@ export default async function ApplicationReviewPage({
   // Fetch fund
   const { data: rawFund } = await supabase
     .from("funds")
-    .select("id, name, organisation_id, organisations(id, name)")
+    .select("id, name, organisation_id, organisations(id, name), application_format")
     .eq("id", application.fund_id)
     .eq("rejected", false)
     .single();
@@ -42,6 +42,11 @@ export default async function ApplicationReviewPage({
   const fund = rawFund
     ? { ...rawFund, organisation: (rawFund.organisations as unknown as { id: string; name: string } | null) ?? null }
     : null;
+
+  const applicationFormat = ((rawFund as { application_format?: string } | null)?.application_format ?? "question_form") as
+    | "question_form"
+    | "structured_doc"
+    | "unstructured_doc";
 
   // Fetch answers for outdated detection
   const { data: answers } = await supabase
@@ -119,6 +124,7 @@ export default async function ApplicationReviewPage({
       <ApplicationReviewClient
         application={application}
         fund={fund}
+        applicationFormat={applicationFormat}
         questions={questions}
         criteria={criteria}
         answers={(answers ?? []).map((a) => ({
