@@ -115,6 +115,7 @@ describe("POST /api/applications", () => {
   };
 
   const validServiceMocks = {
+    funds: { data: { id: FUND_ID, application_format: "question_form" }, error: null },
     criteria_sets: { data: { id: CRITERIA_SET_ID, fund_id: FUND_ID }, error: null },
     questions_sets: {
       data: {
@@ -169,6 +170,7 @@ describe("POST /api/applications", () => {
     authenticatedUser();
     mockServiceFrom.mockImplementation(
       tableDispatch({
+        funds: validServiceMocks.funds,
         criteria_sets: {
           data: { id: CRITERIA_SET_ID, fund_id: "wrong-fund-id" },
           error: null,
@@ -192,6 +194,7 @@ describe("POST /api/applications", () => {
     authenticatedUser();
     mockServiceFrom.mockImplementation(
       tableDispatch({
+        funds: validServiceMocks.funds,
         criteria_sets: { data: null, error: null },
         questions_sets: validServiceMocks.questions_sets,
       })
@@ -211,6 +214,7 @@ describe("POST /api/applications", () => {
     authenticatedUser();
     mockServiceFrom.mockImplementation(
       tableDispatch({
+        funds: validServiceMocks.funds,
         criteria_sets: validServiceMocks.criteria_sets,
         questions_sets: {
           data: { id: QUESTIONS_SET_ID, fund_id: "wrong-fund-id", questions_json: [] },
@@ -274,6 +278,7 @@ describe("POST /api/applications", () => {
     authenticatedUser();
     const insertSpy = vi.fn(() => chainMock({ data: null, error: null }));
     mockServiceFrom.mockImplementation((table: string) => {
+      if (table === "funds") return chainMock(validServiceMocks.funds);
       if (table === "criteria_sets") return chainMock(validServiceMocks.criteria_sets);
       if (table === "questions_sets") return chainMock(validServiceMocks.questions_sets);
       if (table === "application_answers") {

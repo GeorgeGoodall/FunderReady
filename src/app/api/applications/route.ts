@@ -30,7 +30,20 @@ export async function POST(request: Request) {
   const { fundId, criteriaSetId, questionsSetId, title } = parsed.data;
   const serviceClient = createServiceClient();
 
-  // Validate that criteria set belongs to the fund
+  // Load fund to get application_format
+  const { data: fund } = await serviceClient
+    .from("funds")
+    .select("id, application_format")
+    .eq("id", fundId)
+    .single();
+
+  if (!fund) {
+    return NextResponse.json({ error: "Fund not found" }, { status: 400 });
+  }
+
+  const applicationFormat = (fund.application_format as string) ?? "question_form";
+
+  // Validate criteria set belongs to this fund
   const { data: criteriaSet } = await serviceClient
     .from("criteria_sets")
     .select("id, fund_id")
@@ -45,19 +58,41 @@ export async function POST(request: Request) {
     );
   }
 
-  // Validate that questions set belongs to the fund
-  const { data: questionsSet } = await serviceClient
-    .from("questions_sets")
-    .select("id, fund_id, questions_json")
-    .eq("id", questionsSetId)
-    .eq("rejected", false)
-    .single();
+  // Validate questions set (required for question_form and structured_doc, absent for unstructured_doc)
+  let questionsJson: Array<{ id: string; field_type?: string }> = [];
 
-  if (!questionsSet || questionsSet.fund_id !== fundId) {
-    return NextResponse.json(
-      { error: "Invalid questions set for this fund" },
-      { status: 400 }
-    );
+  if (applicationFormat === "unstructured_doc") {
+    if (questionsSetId) {
+      return NextResponse.json(
+        { error: "unstructured_doc funds do not use a questions set" },
+        { status: 400 }
+      );
+    }
+  } else {
+    if (!questionsSetId) {
+      return NextResponse.json(
+        { error: "questionsSetId is required for this fund format" },
+        { status: 400 }
+      );
+    }
+
+    const { data: questionsSet } = await serviceClient
+      .from("questions_sets")
+      .select("id, fund_id, questions_json")
+      .eq("id", questionsSetId)
+      .eq("rejected", false)
+      .single();
+
+    if (!questionsSet || questionsSet.fund_id !== fundId) {
+      return NextResponse.json(
+        { error: "Invalid questions set for this fund" },
+        { status: 400 }
+      );
+    }
+
+    questionsJson = Array.isArray(questionsSet.questions_json)
+      ? (questionsSet.questions_json as Array<{ id: string; field_type?: string }>)
+      : [];
   }
 
   // Create the application
@@ -67,7 +102,7 @@ export async function POST(request: Request) {
       user_id: user.id,
       fund_id: fundId,
       criteria_set_id: criteriaSetId,
-      questions_set_id: questionsSetId,
+      questions_set_id: questionsSetId ?? null,
       title: title ?? null,
       status: "draft",
     })
@@ -82,19 +117,33 @@ export async function POST(request: Request) {
     );
   }
 
-  // Pre-populate answer rows from questions set
-  const questions = Array.isArray(questionsSet.questions_json)
-    ? (questionsSet.questions_json as Array<{ id: string; field_type?: string }>)
-    : [];
+  // Pre-populate answer rows
+  let answerRows: Array<{
+    application_id: string;
+    question_id: string;
+    answer_text: string;
+    field_type: string;
+  }>;
 
-  if (questions.length > 0) {
-    const answerRows = questions.map((q) => ({
+  if (applicationFormat === "unstructured_doc") {
+    answerRows = [
+      {
+        application_id: application.id,
+        question_id: "document_content",
+        answer_text: "",
+        field_type: "text_long",
+      },
+    ];
+  } else {
+    answerRows = questionsJson.map((q) => ({
       application_id: application.id,
       question_id: q.id,
       answer_text: "",
       field_type: q.field_type ?? "text_long",
     }));
+  }
 
+  if (answerRows.length > 0) {
     const { error: answersError } = await serviceClient
       .from("application_answers")
       .insert(answerRows);

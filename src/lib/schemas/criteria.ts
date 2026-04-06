@@ -178,7 +178,7 @@ export type ExtendedQuestion = z.infer<typeof ExtendedQuestionSchema>;
 export const CreateApplicationRequestSchema = z.object({
   fundId: z.string().uuid(),
   criteriaSetId: z.string().uuid(),
-  questionsSetId: z.string().uuid(),
+  questionsSetId: z.string().uuid().optional(),
   title: z.string().optional(),
 });
 
