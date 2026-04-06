@@ -63,6 +63,7 @@ export function GiftLinkForm() {
               max={100}
               value={credits}
               onChange={(e) => setCredits(Number(e.target.value))}
+              onFocus={(e) => e.target.select()}
               required
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900"
             />
@@ -76,6 +77,7 @@ export function GiftLinkForm() {
               type="date"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
+              min={new Date().toISOString().split("T")[0]}
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900"
             />
           </div>

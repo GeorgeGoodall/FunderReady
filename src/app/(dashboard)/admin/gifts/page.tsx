@@ -6,7 +6,9 @@ export const dynamic = "force-dynamic";
 
 function formatDate(iso: string) {
   const d = new Date(iso);
-  return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+  const date = `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+  const time = `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+  return `${date} ${time}`;
 }
 
 function StatusPill({ status }: { status: "active" | "used" | "expired" }) {
