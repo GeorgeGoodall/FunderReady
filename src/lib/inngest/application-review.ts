@@ -39,6 +39,12 @@ import type { Criterion } from "@/lib/pipeline/prompt-templates";
 import type { ImprovementAppendixItem } from "@/lib/pipeline/schemas";
 import { calculateCost } from "@/lib/ai/pricing";
 import { z } from "zod";
+import {
+  StructureAssignmentSchema,
+  buildStructureAssignmentPrompt,
+  type AssignedSection,
+} from "@/lib/pipeline/structure-assignment";
+import { buildGapAnalysisPrompt } from "@/lib/pipeline/gap-analysis";
 
 // ---------------------------------------------------------------------------
 // Model
@@ -376,6 +382,14 @@ export function annotateResolvedWeaknesses(
 }
 
 // ---------------------------------------------------------------------------
+// Word count helper
+// ---------------------------------------------------------------------------
+
+export function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+// ---------------------------------------------------------------------------
 // Pipeline function
 // ---------------------------------------------------------------------------
 
@@ -443,16 +457,43 @@ export const applicationReviewRequested = inngest.createFunction(
         throw new NonRetriableError("Criteria set not found or empty");
       }
 
-      // Load questions
-      const { data: questionsSet } = await supabase
-        .from("questions_sets")
-        .select("questions_json, overall_word_limit")
-        .eq("id", app.questions_set_id)
-        .eq("rejected", false)
+      // Load fund to get application_format
+      const { data: fundData } = await supabase
+        .from("funds")
+        .select("application_format")
+        .eq("id", app.fund_id)
         .single();
 
-      if (!questionsSet?.questions_json) {
-        throw new NonRetriableError("Questions set not found or empty");
+      const applicationFormat = (fundData?.application_format ?? "question_form") as
+        | "question_form"
+        | "structured_doc"
+        | "unstructured_doc";
+
+      // Load questions (only for non-unstructured_doc formats)
+      let questions: Array<{
+        id: string;
+        question: string;
+        word_count_min?: number;
+        word_count_max?: number;
+        guidance?: string;
+        priority?: number;
+        field_type?: string;
+      }> = [];
+      let overallWordLimit: number | undefined;
+
+      if (applicationFormat !== "unstructured_doc") {
+        const { data: questionsSet } = await supabase
+          .from("questions_sets")
+          .select("questions_json, overall_word_limit")
+          .eq("id", app.questions_set_id!)
+          .eq("rejected", false)
+          .single();
+
+        if (!questionsSet?.questions_json) {
+          throw new NonRetriableError("Questions set not found or empty");
+        }
+        questions = questionsSet.questions_json as typeof questions;
+        overallWordLimit = questionsSet.overall_word_limit ?? undefined;
       }
 
       // Load previous completed review (for feedback evolution)
@@ -480,16 +521,6 @@ export const applicationReviewRequested = inngest.createFunction(
 
       // Split into enabled (non-disabled, non-empty) and disabled
       const enabledAnswers = filterEnabledAnswers(allAnswers);
-
-      const questions = questionsSet.questions_json as unknown as Array<{
-        id: string;
-        question: string;
-        word_count_min?: number;
-        word_count_max?: number;
-        guidance?: string;
-        priority?: number;
-        field_type?: string;
-      }>;
 
       // Build disabled questions metadata list
       const disabledAnswerIds = new Set(
@@ -534,11 +565,19 @@ export const applicationReviewRequested = inngest.createFunction(
           )
         : {} as Record<string, AnswerAnalysis>;
 
+      // Compute document word count for unstructured_doc applications
+      const documentWordCount =
+        applicationFormat === "unstructured_doc"
+          ? countWords(enabledAnswers[0]?.answer_text ?? "")
+          : 0;
+
       return {
         title: app.title,
         criteria: criteriaSet.criteria_json as unknown as Criterion[],
         questions,
-        overallWordLimit: questionsSet.overall_word_limit ?? undefined,
+        overallWordLimit,
+        applicationFormat,
+        documentWordCount,
         enabledAnswers,
         disabledQuestions,
         previousReview: previousReviewContext,
@@ -547,24 +586,74 @@ export const applicationReviewRequested = inngest.createFunction(
       };
     });
 
-    const { criteria, questions, enabledAnswers, disabledQuestions, overallWordLimit, previousReview, answerChanges, reusableAnalyses } = appData;
+    const { criteria, questions, enabledAnswers, disabledQuestions, overallWordLimit, previousReview, answerChanges, reusableAnalyses, applicationFormat, documentWordCount } = appData;
 
-    // Build answer contexts from enabled answers only
-    const answerContexts: AnswerContext[] = [];
-    for (const a of enabledAnswers) {
-      const q = questions.find((q) => q.id === a.question_id);
-      if (!q) continue;
-      answerContexts.push({
-        question_id: a.question_id,
-        question_text: q.question,
-        answer_text: a.answer_text,
-        selected_options: a.selected_options ?? undefined,
-        field_type: a.field_type ?? q.field_type,
-        guidance: q.guidance,
-        word_count_min: q.word_count_min,
-        word_count_max: q.word_count_max,
-        priority: q.priority,
-      });
+    const isUnstructuredDoc = applicationFormat === "unstructured_doc";
+    const isShortDoc = isUnstructuredDoc && documentWordCount <= 500;
+
+    // Build answer contexts — format-aware branching
+    let structureUsage: LogAiUsageParams | null = null;
+    let answerContexts: AnswerContext[] = [];
+
+    if (isUnstructuredDoc && !isShortDoc) {
+      // Long unstructured doc: run structure assignment to split into sections
+      const { systemPrompt: structSystemPrompt, userPrompt: structUserPrompt } =
+        buildStructureAssignmentPrompt(enabledAnswers[0].answer_text, criteria);
+      const { result: structure, usage: structUsageData } = await inferWithClaude(
+        step,
+        "structure-assignment",
+        {
+          prompt: structUserPrompt,
+          systemPrompt: structSystemPrompt,
+          schema: StructureAssignmentSchema,
+          model: MODEL,
+          maxTokens: 4096,
+          temperature: 0,
+        }
+      );
+
+      structureUsage = {
+        applicationReviewId: reviewId,
+        userId,
+        pipelineStep: "structure_assignment",
+        model: MODEL,
+        usage: structUsageData,
+        isRetry: false,
+      };
+
+      answerContexts = (structure as { sections: AssignedSection[] }).sections.map((s) => ({
+        question_id: s.id,
+        question_text: s.title,
+        answer_text: s.content,
+        field_type: "text_long" as const,
+      }));
+    } else if (isUnstructuredDoc && isShortDoc) {
+      // Short unstructured doc: whole document as one answer context
+      answerContexts = [
+        {
+          question_id: "document_content",
+          question_text: "Document",
+          answer_text: enabledAnswers[0]?.answer_text ?? "",
+          field_type: "text_long" as const,
+        },
+      ];
+    } else {
+      // question_form / structured_doc: build from questions + answers
+      for (const a of enabledAnswers) {
+        const q = questions.find((q) => q.id === a.question_id);
+        if (!q) continue;
+        answerContexts.push({
+          question_id: a.question_id,
+          question_text: q.question,
+          answer_text: a.answer_text,
+          selected_options: a.selected_options ?? undefined,
+          field_type: a.field_type ?? q.field_type,
+          guidance: q.guidance,
+          word_count_min: q.word_count_min,
+          word_count_max: q.word_count_max,
+          priority: q.priority,
+        });
+      }
     }
 
     if (answerContexts.length === 0) {
@@ -579,171 +668,264 @@ export const applicationReviewRequested = inngest.createFunction(
     }
 
     // Split contexts into fresh (need Claude) and reusable (unchanged from previous review)
+    // For unstructured_doc, sections are runtime-assigned so caching doesn't apply.
     // Pure computation — safe to run in function body on every replay
     const freshContexts: AnswerContext[] = [];
     const reusedAnalyses: AnswerAnalysis[] = [];
-    for (const ctx of answerContexts) {
-      const cached = reusableAnalyses[ctx.question_id];
-      if (cached) {
-        reusedAnalyses.push(cached);
-      } else {
-        freshContexts.push(ctx);
+
+    if (!isUnstructuredDoc) {
+      for (const ctx of answerContexts) {
+        const cached = reusableAnalyses[ctx.question_id];
+        if (cached) {
+          reusedAnalyses.push(cached);
+        } else {
+          freshContexts.push(ctx);
+        }
       }
+    } else {
+      freshContexts.push(...answerContexts);
     }
 
     const answerSystemPrompt = buildAnswerAnalysisSystemPrompt(criteria);
 
     // -----------------------------------------------------------------------
-    // Steps 2a–2e: Answer analysis via Anthropic Batch API
+    // Steps 2a–2e: Answer analysis
+    // For unstructured_doc: sequential inferWithClaude calls (few sections)
+    // For question_form / structured_doc: Anthropic Batch API
     // -----------------------------------------------------------------------
     const answerUsageEvents: LogAiUsageParams[] = [];
     let allFreshAnalyses: AnswerAnalysis[] = [];
 
     if (freshContexts.length > 0) {
-      // Step 2a: Submit batch
-      const { batchId } = await step.run("submit-answer-batch", async () => {
-        const requests: AnswerBatchRequest[] = freshContexts.map((ctx) => {
+      if (isUnstructuredDoc) {
+        // Sequential analysis for unstructured doc sections
+        for (const ctx of freshContexts) {
+          const { result, usage } = await inferWithClaude(
+            step,
+            `answer-analysis-${ctx.question_id}`,
+            {
+              prompt: buildAnswerAnalysisPrompt(ctx, null, isDraft),
+              systemPrompt: answerSystemPrompt,
+              schema: LenientAnswerAnalysisSchema,
+              model: MODEL,
+              maxTokens: 12288,
+              temperature: 0,
+            }
+          );
+          allFreshAnalyses.push({ ...result, question_id: ctx.question_id });
+          answerUsageEvents.push({
+            applicationReviewId: reviewId,
+            userId,
+            pipelineStep: "answer_analysis",
+            model: MODEL,
+            usage,
+            isRetry: false,
+          });
+        }
+      } else {
+        // Step 2a: Submit batch
+        const { batchId } = await step.run("submit-answer-batch", async () => {
+          const requests: AnswerBatchRequest[] = freshContexts.map((ctx) => {
+            const prevCtx = previousReview
+              ? formatPreviousAnswerContext(
+                  ctx.question_id,
+                  previousReview.results,
+                  answerChanges[ctx.question_id] ?? false,
+                  previousReview.review_number + 1
+                )
+              : null;
+            return {
+              questionId: ctx.question_id,
+              systemPrompt: answerSystemPrompt,
+              userPrompt: buildAnswerAnalysisPrompt(ctx, prevCtx, isDraft),
+            };
+          });
+          const result = await submitAnswerBatch(requests, MODEL, 12288, LenientAnswerAnalysisSchema, 0);
+          await updateAppReviewProgress(reviewId, "analysing", {
+            batch_submitted: Date.now(),
+          });
+          return result;
+        });
+
+        // Steps 2b: Poll every 30s until batch is complete (max 40 attempts = 20 min)
+        let pollAttempt = 0;
+        while (true) {
+          await step.sleep(`poll-wait-${pollAttempt}`, "30s");
+          const { done } = await step.run(`poll-batch-${pollAttempt}`, async () => {
+            return pollBatch(batchId);
+          });
+          if (done) break;
+          pollAttempt++;
+          if (pollAttempt >= 40) {
+            throw new NonRetriableError("Answer batch polling timeout after 20 minutes");
+          }
+        }
+
+        // Step 2c: Parse batch results
+        const batchResults = await step.run("parse-batch-results", async () => {
+          return parseBatchResults(batchId, LenientAnswerAnalysisSchema);
+        });
+
+        // Collect successful analyses and usage
+        for (const success of batchResults.successes) {
+          allFreshAnalyses.push({ ...success.analysis, question_id: success.questionId });
+          answerUsageEvents.push({
+            applicationReviewId: reviewId,
+            userId,
+            pipelineStep: "answer_analysis",
+            model: MODEL + "-batch",
+            usage: success.usage,
+            isRetry: false,
+          });
+        }
+
+        // Step 2d: Real-time fallback for any failed batch answers
+        for (const questionId of batchResults.failures) {
+          const ctx = freshContexts.find((c) => c.question_id === questionId);
+          if (!ctx) continue;
           const prevCtx = previousReview
             ? formatPreviousAnswerContext(
-                ctx.question_id,
+                questionId,
                 previousReview.results,
-                answerChanges[ctx.question_id] ?? false,
+                answerChanges[questionId] ?? false,
                 previousReview.review_number + 1
               )
             : null;
-          return {
-            questionId: ctx.question_id,
-            systemPrompt: answerSystemPrompt,
-            userPrompt: buildAnswerAnalysisPrompt(ctx, prevCtx, isDraft),
-          };
-        });
-        const result = await submitAnswerBatch(requests, MODEL, 12288, LenientAnswerAnalysisSchema, 0);
-        await updateAppReviewProgress(reviewId, "analysing", {
-          batch_submitted: Date.now(),
-        });
-        return result;
-      });
-
-      // Steps 2b: Poll every 30s until batch is complete (max 40 attempts = 20 min)
-      let pollAttempt = 0;
-      while (true) {
-        await step.sleep(`poll-wait-${pollAttempt}`, "30s");
-        const { done } = await step.run(`poll-batch-${pollAttempt}`, async () => {
-          return pollBatch(batchId);
-        });
-        if (done) break;
-        pollAttempt++;
-        if (pollAttempt >= 40) {
-          throw new NonRetriableError("Answer batch polling timeout after 20 minutes");
-        }
-      }
-
-      // Step 2c: Parse batch results
-      const batchResults = await step.run("parse-batch-results", async () => {
-        return parseBatchResults(batchId, LenientAnswerAnalysisSchema);
-      });
-
-      // Collect successful analyses and usage
-      for (const success of batchResults.successes) {
-        allFreshAnalyses.push({ ...success.analysis, question_id: success.questionId });
-        answerUsageEvents.push({
-          applicationReviewId: reviewId,
-          userId,
-          pipelineStep: "answer_analysis",
-          model: MODEL + "-batch",
-          usage: success.usage,
-          isRetry: false,
-        });
-      }
-
-      // Step 2d: Real-time fallback for any failed batch answers
-      for (const questionId of batchResults.failures) {
-        const ctx = freshContexts.find((c) => c.question_id === questionId);
-        if (!ctx) continue;
-        const prevCtx = previousReview
-          ? formatPreviousAnswerContext(
-              questionId,
-              previousReview.results,
-              answerChanges[questionId] ?? false,
-              previousReview.review_number + 1
-            )
-          : null;
-        const { result, usage } = await inferWithClaude(
-          step,
-          `retry-answer-${questionId}`,
-          {
-            prompt: buildAnswerAnalysisPrompt(ctx, prevCtx, isDraft),
-            systemPrompt: answerSystemPrompt,
-            schema: LenientAnswerAnalysisSchema,
+          const { result, usage } = await inferWithClaude(
+            step,
+            `retry-answer-${questionId}`,
+            {
+              prompt: buildAnswerAnalysisPrompt(ctx, prevCtx, isDraft),
+              systemPrompt: answerSystemPrompt,
+              schema: LenientAnswerAnalysisSchema,
+              model: MODEL,
+              maxTokens: 12288,
+              temperature: 0,
+            }
+          );
+          allFreshAnalyses.push({ ...result, question_id: questionId });
+          answerUsageEvents.push({
+            applicationReviewId: reviewId,
+            userId,
+            pipelineStep: "answer_analysis",
             model: MODEL,
-            maxTokens: 12288,
-            temperature: 0,
-          }
-        );
-        allFreshAnalyses.push({ ...result, question_id: questionId });
-        answerUsageEvents.push({
-          applicationReviewId: reviewId,
-          userId,
-          pipelineStep: "answer_analysis",
-          model: MODEL,
-          usage,
-          isRetry: true,
-        });
+            usage,
+            isRetry: true,
+          });
+        }
       }
     }
 
     const answerAnalyses: AnswerAnalysis[] = [...reusedAnalyses, ...allFreshAnalyses];
 
-    // -----------------------------------------------------------------------
-    // Step 3: Cross-reference
-    // -----------------------------------------------------------------------
-    await step.run("cross-reference-started", async () => {
-      await updateAppReviewProgress(reviewId, "cross_referencing", {
-        crossref_started: Date.now(),
-      });
-      return { status: "Cross-referencing answers against criteria" };
-    });
+    // Build question list for cross-reference and scoring prompts.
+    // For unstructured_doc, questions is empty — use answerContexts as the question list.
+    const questionList = isUnstructuredDoc
+      ? answerContexts.map((ctx) => ({ id: ctx.question_id, question: ctx.question_text }))
+      : questions.map((q) => ({ id: q.id, question: q.question }));
 
-    const { systemPrompt: crossRefSystemPrompt, userPrompt: crossRefUserPrompt } =
-      buildApplicationCrossReferencePrompt(
-        answerAnalyses,
-        questions.map((q) => ({ id: q.id, question: q.question })),
-        criteria,
-        disabledQuestions,
-        enabledAnswers.map((a) => ({
-          question_id: a.question_id,
-          answer_text: formatAnswerForCrossRef(a),
-        })),
-        isDraft
+    // -----------------------------------------------------------------------
+    // Step 3: Cross-reference / Gap analysis
+    // -----------------------------------------------------------------------
+    let crossReference: CrossReference;
+    let crossRefUsage: LogAiUsageParams;
+
+    if (isShortDoc) {
+      // Gap analysis replaces cross-reference for short docs
+      await step.run("gap-analysis-started", async () => {
+        await updateAppReviewProgress(reviewId, "cross_referencing", {
+          crossref_started: Date.now(),
+        });
+        return { status: "Analysing document against criteria" };
+      });
+
+      const { systemPrompt: gapSystemPrompt, userPrompt: gapUserPrompt } =
+        buildGapAnalysisPrompt(answerAnalyses[0] ?? null, criteria);
+
+      const { result: gapResult, usage: gapUsageData } = await inferWithClaude(
+        step,
+        "gap-analysis",
+        {
+          prompt: gapUserPrompt,
+          systemPrompt: gapSystemPrompt,
+          schema: CrossReferenceSchema,
+          model: "claude-haiku-4-5-20251001",
+          maxTokens: 4096,
+          temperature: 0,
+        }
       );
 
-    const { result: crossReference, usage: crossRefUsageData } = await inferWithClaude(
-      step,
-      "cross-reference",
-      {
-        prompt: crossRefUserPrompt,
-        systemPrompt: crossRefSystemPrompt,
-        schema: CrossReferenceSchema,
-        model: MODEL,
-        maxTokens: 16384,
-        temperature: 0,
-      }
-    );
+      crossReference = gapResult;
+      crossRefUsage = {
+        applicationReviewId: reviewId,
+        userId,
+        pipelineStep: "gap_analysis",
+        model: "claude-haiku-4-5-20251001",
+        usage: gapUsageData,
+        isRetry: false,
+      };
 
-    const crossRefUsage: LogAiUsageParams = {
-      applicationReviewId: reviewId,
-      userId,
-      pipelineStep: "cross_reference",
-      model: MODEL,
-      usage: crossRefUsageData,
-      isRetry: false,
-    };
-
-    await step.run("cross-reference-progress", async () => {
-      await updateAppReviewProgress(reviewId, "cross_referencing", {
-        crossref_completed: Date.now(),
+      await step.run("gap-analysis-progress", async () => {
+        await updateAppReviewProgress(reviewId, "cross_referencing", {
+          crossref_completed: Date.now(),
+        });
       });
-    });
+    } else {
+      // Full cross-reference for question_form, structured_doc, and long unstructured_doc
+      await step.run("cross-reference-started", async () => {
+        await updateAppReviewProgress(reviewId, "cross_referencing", {
+          crossref_started: Date.now(),
+        });
+        return { status: "Cross-referencing answers against criteria" };
+      });
+
+      const { systemPrompt: crossRefSystemPrompt, userPrompt: crossRefUserPrompt } =
+        buildApplicationCrossReferencePrompt(
+          answerAnalyses,
+          questionList,
+          criteria,
+          disabledQuestions,
+          isUnstructuredDoc
+            ? answerContexts.map((ctx) => ({
+                question_id: ctx.question_id,
+                answer_text: ctx.answer_text,
+              }))
+            : enabledAnswers.map((a) => ({
+                question_id: a.question_id,
+                answer_text: formatAnswerForCrossRef(a),
+              })),
+          isDraft
+        );
+
+      const { result: crossReferenceResult, usage: crossRefUsageData } = await inferWithClaude(
+        step,
+        "cross-reference",
+        {
+          prompt: crossRefUserPrompt,
+          systemPrompt: crossRefSystemPrompt,
+          schema: CrossReferenceSchema,
+          model: MODEL,
+          maxTokens: 16384,
+          temperature: 0,
+        }
+      );
+
+      crossReference = crossReferenceResult;
+      crossRefUsage = {
+        applicationReviewId: reviewId,
+        userId,
+        pipelineStep: "cross_reference",
+        model: MODEL,
+        usage: crossRefUsageData,
+        isRetry: false,
+      };
+
+      await step.run("cross-reference-progress", async () => {
+        await updateAppReviewProgress(reviewId, "cross_referencing", {
+          crossref_completed: Date.now(),
+        });
+      });
+    }
 
     // -----------------------------------------------------------------------
     // Compute gap_criteria server-side (no AI call)
@@ -793,7 +975,7 @@ export const applicationReviewRequested = inngest.createFunction(
     } = buildApplicationScoringPrompt(
       answerAnalyses,
       crossReferenceWithGaps,
-      questions.map((q) => ({ id: q.id, question: q.question })),
+      questionList,
       criteria,
       overallWordLimit,
       disabledQuestions,
@@ -849,6 +1031,7 @@ export const applicationReviewRequested = inngest.createFunction(
       // Aggregate usage from all pipeline steps
       const allUsageEvents = [
         ...answerUsageEvents,
+        ...(structureUsage ? [structureUsage] : []),
         crossRefUsage,
         scoringUsage,
       ];
