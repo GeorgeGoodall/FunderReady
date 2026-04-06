@@ -4,11 +4,11 @@ import type { Criterion } from "./prompt-templates";
 export const AssignedSectionSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
-  content: z.string(),
+  content: z.string().min(1),
 });
 
 export const StructureAssignmentSchema = z.object({
-  sections: z.array(AssignedSectionSchema).min(1).max(20),
+  sections: z.array(AssignedSectionSchema).min(2).max(10),
 });
 
 export type StructureAssignment = z.infer<typeof StructureAssignmentSchema>;

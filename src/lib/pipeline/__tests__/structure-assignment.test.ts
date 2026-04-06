@@ -26,6 +26,22 @@ describe("StructureAssignmentSchema", () => {
       })
     ).toThrow();
   });
+
+  it("rejects a single-section response (minimum is 2)", () => {
+    expect(() =>
+      StructureAssignmentSchema.parse({
+        sections: [{ id: "s1", title: "Overview", content: "Some content" }],
+      })
+    ).toThrow();
+  });
+
+  it("rejects section with empty content", () => {
+    expect(() =>
+      StructureAssignmentSchema.parse({
+        sections: [{ id: "s1", title: "Overview", content: "" }],
+      })
+    ).toThrow();
+  });
 });
 
 describe("buildStructureAssignmentPrompt", () => {
