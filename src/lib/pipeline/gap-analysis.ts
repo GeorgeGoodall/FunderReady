@@ -11,7 +11,28 @@ Only produce findings of these two types:
 
 Do not produce contradiction, inconsistency, repetition, or resolved_weakness findings — those require multiple documents to compare.
 
-The input is a single free-form document, not a structured set of questions.`;
+The input is a single free-form document, not a structured set of questions.
+
+You MUST respond with a JSON object in exactly this format:
+{
+  "findings": [
+    {
+      "type": "missing_criterion",
+      "description": "The document does not address...",
+      "sections_involved": ["c1"],
+      "severity": "high",
+      "confidence": "high"
+    }
+  ],
+  "overall_coherence": "adequate",
+  "summary": "The document covers X well but is missing Y and Z."
+}
+
+Rules:
+- findings: array of gap/missing_criterion objects (may be empty if no gaps found)
+- overall_coherence: MUST be exactly one of: "strong", "adequate", or "weak"
+- summary: a single sentence summarising the key gaps
+- Do not add any fields beyond those shown above`;
 
 export function buildGapAnalysisPrompt(
   answerAnalysis: AnswerAnalysis | null,
@@ -33,7 +54,7 @@ export function buildGapAnalysisPrompt(
       ? `\nDocument weaknesses identified:\n${answerAnalysis.weaknesses.map((w) => `- ${w}`).join("\n")}`
       : "";
 
-  const userPrompt = `Scoring criteria:\n${criteriaList}\n\nCriteria coverage analysis:\n${relevanceSummary}${weaknessesSummary}\n\nIdentify missing_criterion and gap findings only. Return your analysis as a JSON object with:\n- findings: array of objects, each with: type (one of "missing_criterion" or "gap"), description (string), sections_involved (array of criterion IDs), severity ("low" | "medium" | "high"), confidence ("low" | "medium" | "high")\n- overall_coherence: one of "strong", "adequate", or "weak"\n- summary: a brief string summary of the key gaps found`;
+  const userPrompt = `Scoring criteria:\n${criteriaList}\n\nCriteria coverage analysis:\n${relevanceSummary}${weaknessesSummary}\n\nIdentify missing_criterion and gap findings for the criteria above. Return the JSON object as specified.`;
 
   return { systemPrompt: GAP_ANALYSIS_SYSTEM_PROMPT, userPrompt };
 }
