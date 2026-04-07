@@ -157,3 +157,91 @@ describe("PATCH /api/account/profile", () => {
     expect(res.status).toBe(500);
   });
 });
+
+// =====================================================================
+// PATCH /api/account/password
+// =====================================================================
+
+describe("PATCH /api/account/password", () => {
+  async function importRoute() {
+    const mod = await import("../password/route");
+    return mod.PATCH;
+  }
+
+  it("returns 401 when not authenticated", async () => {
+    unauthenticatedUser();
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/password", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "newpass123" }),
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 400 for password shorter than 8 characters", async () => {
+    authenticatedUser();
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/password", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "short" }),
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for missing password", async () => {
+    authenticatedUser();
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/password", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for malformed JSON body", async () => {
+    authenticatedUser();
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/password", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "not-json{",
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 200 on success", async () => {
+    authenticatedUser();
+    mockAuthUpdateUser.mockResolvedValue({ data: {}, error: null });
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/password", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "newPassword123!" }),
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 400 when Supabase rejects password (e.g. same as current)", async () => {
+    authenticatedUser();
+    mockAuthUpdateUser.mockResolvedValue({
+      data: null,
+      error: { message: "New password should be different from the old password." },
+    });
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/password", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "sameOldPassword1!" }),
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+  });
+});
