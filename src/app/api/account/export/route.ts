@@ -12,36 +12,49 @@ export async function GET() {
   }
 
   const service = createServiceClient();
+  const now = new Date();
 
   // Gather auth identity (email, created_at, last_sign_in_at)
   const { data: authData } = await service.auth.admin.getUserById(user.id);
 
-  const [
-    { data: profile },
-    { data: organisations },
-    { data: funds },
-    { data: criteriaSets },
-    { data: questionsSets },
-    { data: applications },
-    { data: answers },
-    { data: reviews },
-    { data: feedback },
-    { data: usage },
-  ] = await Promise.all([
-    service.from("profiles").select("*").eq("id", user.id),
-    service.from("organisations").select("*").eq("created_by", user.id).order("created_at"),
-    service.from("funds").select("*").eq("created_by", user.id).order("created_at"),
-    service.from("criteria_sets").select("*").eq("created_by", user.id).order("created_at"),
-    service.from("questions_sets").select("*").eq("created_by", user.id).order("created_at"),
-    service.from("applications").select("*").eq("user_id", user.id).order("created_at"),
-    service.from("application_answers").select("*").eq("user_id", user.id).order("updated_at"),
-    service.from("application_reviews").select("*").eq("user_id", user.id).order("created_at"),
-    service.from("review_feedback").select("*").eq("user_id", user.id).order("created_at"),
-    service.from("usage").select("*").eq("user_id", user.id).order("period"),
-  ]);
+  let profile, organisations, funds, criteriaSets, questionsSets,
+      applications, answers, reviews, feedback, usage, purchases;
+
+  try {
+    ([
+      { data: profile },
+      { data: organisations },
+      { data: funds },
+      { data: criteriaSets },
+      { data: questionsSets },
+      { data: applications },
+      { data: answers },
+      { data: reviews },
+      { data: feedback },
+      { data: usage },
+      { data: purchases },
+    ] = await Promise.all([
+      service.from("profiles").select("*").eq("id", user.id),
+      service.from("organisations").select("*").eq("created_by", user.id).order("created_at"),
+      service.from("funds").select("*").eq("created_by", user.id).order("created_at"),
+      service.from("criteria_sets").select("*").eq("created_by", user.id).order("created_at"),
+      service.from("questions_sets").select("*").eq("created_by", user.id).order("created_at"),
+      service.from("applications").select("*").eq("user_id", user.id).order("created_at"),
+      // NOTE: application_answers has no user_id column — this query returns [] silently.
+      // TODO: fix with a join via applications (tracked in FutureEnhancementNotes.md)
+      service.from("application_answers").select("*").eq("user_id", user.id).order("updated_at"),
+      service.from("application_reviews").select("*").eq("user_id", user.id).order("created_at"),
+      service.from("review_feedback").select("*").eq("user_id", user.id).order("created_at"),
+      service.from("usage").select("*").eq("user_id", user.id).order("period"),
+      service.from("review_purchases").select("*").eq("user_id", user.id).order("created_at"),
+    ]));
+  } catch (err) {
+    console.error("[export] failed to fetch data:", err);
+    return NextResponse.json({ error: "Failed to export data" }, { status: 500 });
+  }
 
   const exportPayload = {
-    exported_at: new Date().toISOString(),
+    exported_at: now.toISOString(),
     account: {
       id: user.id,
       email: authData?.user?.email ?? null,
@@ -58,9 +71,10 @@ export async function GET() {
     application_reviews: reviews ?? [],
     review_feedback: feedback ?? [],
     usage: usage ?? [],
+    review_purchases: purchases ?? [],
   };
 
-  const filename = `funderready-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+  const filename = `funderready-data-export-${now.toISOString().slice(0, 10)}.json`;
 
   return new NextResponse(JSON.stringify(exportPayload, null, 2), {
     status: 200,
