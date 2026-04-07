@@ -716,6 +716,14 @@ export const applicationReviewRequested = inngest.createFunction(
     if (freshContexts.length > 0) {
       if (isUnstructuredDoc) {
         // Sequential analysis for unstructured doc sections
+        await step.run("analysing-progress", async () => {
+          await updateAppReviewProgress(reviewId, "analysing", {
+            analysing_started: Date.now(),
+            answers_total: freshContexts.length,
+            answers_completed: 0,
+          });
+        });
+
         for (const ctx of freshContexts) {
           const { result, usage } = await inferWithClaude(
             step,
