@@ -111,6 +111,8 @@ export function ApplicationFormClient({
   const [draftReviewMode, setDraftReviewMode] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const extractFileInputRef = useRef<HTMLInputElement>(null);
+  const [docxUploading, setDocxUploading] = useState(false);
+  const docxFileInputRef = useRef<HTMLInputElement>(null);
 
   // Parse questions from the questions set
   const questions: Question[] = Array.isArray(questionsSet?.questions_json)
@@ -254,14 +256,27 @@ export function ApplicationFormClient({
 
   async function handleDocxUpload(file: File | undefined) {
     if (!file) return;
+    setDocxUploading(true);
+    setError("");
+    // Reset input so the same file can be re-selected if needed
+    if (docxFileInputRef.current) docxFileInputRef.current.value = "";
     try {
-      const mammoth = await import("mammoth");
+      const mod = await import("mammoth");
+      // Dynamic CJS imports in Next.js can land on .default
+      const mammoth = (mod as unknown as { default?: typeof mod }).default ?? mod;
       const arrayBuffer = await file.arrayBuffer();
       const { value } = await mammoth.extractRawText({ arrayBuffer });
       const text = value.trim();
+      if (!text) {
+        setError("The .docx file appears to be empty or could not be read.");
+        return;
+      }
       setDocumentContent(text);
     } catch (err) {
       console.error("Failed to parse docx:", err);
+      setError("Failed to read the .docx file. Please try again or paste the text directly.");
+    } finally {
+      setDocxUploading(false);
     }
   }
 
@@ -601,15 +616,24 @@ export function ApplicationFormClient({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Your document</h2>
-            <label className="inline-flex items-center gap-1.5 text-sm text-indigo-600 cursor-pointer hover:text-indigo-800 border border-indigo-200 rounded-md px-3 py-1.5">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              Upload .docx
+            <label className={`inline-flex items-center gap-1.5 text-sm border rounded-md px-3 py-1.5 transition-colors ${docxUploading ? "cursor-not-allowed border-zinc-200 text-zinc-400" : "cursor-pointer text-indigo-600 hover:text-indigo-800 border-indigo-200"}`}>
+              {docxUploading ? (
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+              )}
+              {docxUploading ? "Parsing…" : "Upload .docx"}
               <input
+                ref={docxFileInputRef}
                 type="file"
                 accept=".docx"
                 className="sr-only"
+                disabled={docxUploading}
                 onChange={(e) => handleDocxUpload(e.target.files?.[0])}
               />
             </label>
