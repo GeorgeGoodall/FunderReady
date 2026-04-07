@@ -336,3 +336,77 @@ describe("PATCH /api/account/email", () => {
     expect(res.status).toBe(400);
   });
 });
+
+// =====================================================================
+// GET /api/account/export
+// =====================================================================
+
+// Thenable chain for export queries (called via Promise.all, no .single())
+function exportChainMock(resolvedValue: unknown) {
+  const p = Promise.resolve(resolvedValue);
+  const chain: Record<string, unknown> = {};
+  chain.select = vi.fn(() => chain);
+  chain.eq = vi.fn(() => chain);
+  chain.order = vi.fn(() => chain);
+  chain.limit = vi.fn(() => chain);
+  chain.single = vi.fn(() => p);
+  // Make the chain itself awaitable (Supabase query builder is a PromiseLike)
+  (chain as Record<string, unknown>).then = (
+    resolve: (v: unknown) => void,
+    reject?: (e: unknown) => void
+  ) => p.then(resolve, reject);
+  return chain;
+}
+
+describe("GET /api/account/export", () => {
+  async function importRoute() {
+    const mod = await import("../export/route");
+    return mod.GET;
+  }
+
+  it("returns 401 when not authenticated", async () => {
+    unauthenticatedUser();
+    const GET = await importRoute();
+    const req = new Request("http://localhost/api/account/export");
+    const res = await GET(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 200 with JSON file download and correct headers", async () => {
+    authenticatedUser("user-export");
+    mockServiceAuthAdmin.mockResolvedValue({
+      data: { user: { id: "user-export", email: "test@example.com", created_at: "2026-01-01T00:00:00Z", last_sign_in_at: "2026-04-01T00:00:00Z" } },
+      error: null,
+    });
+
+    const tableData: Record<string, unknown[]> = {
+      profiles: [{ id: "user-export", display_name: "Test User", subscription_tier: "pro" }],
+      organisations: [{ id: "org-1", name: "Test Org" }],
+      funds: [{ id: "fund-1", name: "Test Fund" }],
+      criteria_sets: [],
+      questions_sets: [],
+      applications: [{ id: "app-1", title: "My Application" }],
+      application_answers: [],
+      application_reviews: [],
+      review_feedback: [],
+      usage: [{ period: "2026-04", reviews_used: 2 }],
+    };
+
+    mockFrom.mockImplementation((table: string) =>
+      exportChainMock({ data: tableData[table] ?? [], error: null })
+    );
+
+    const GET = await importRoute();
+    const req = new Request("http://localhost/api/account/export");
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-disposition")).toMatch(/attachment/);
+    expect(res.headers.get("content-type")).toMatch(/application\/json/);
+
+    const body = await res.json();
+    expect(body).toHaveProperty("exported_at");
+    expect(body).toHaveProperty("account");
+    expect(body).toHaveProperty("applications");
+    expect(body.applications).toHaveLength(1);
+  });
+});
