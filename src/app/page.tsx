@@ -213,7 +213,7 @@ export default async function Home() {
               {
                 icon: "🔍",
                 title: "Three-stage review catches more",
-                body: "Most AI tools review each answer in isolation. FunderReady runs three dedicated stages — analysing each answer in depth, cross-referencing answers against each other to catch gaps and inconsistencies, then scoring. More stages means less slips through.",
+                body: "Three dedicated stages \u2014 per-answer analysis, cross-referencing, and scoring \u2014 catch gaps a single-pass review misses.",
               },
               {
                 icon: "🤝",
