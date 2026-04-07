@@ -129,7 +129,13 @@ function nodeToMarkdownText(node: Node): string {
 
   const inner = Array.from(el.childNodes).map(nodeToMarkdownText).join("");
 
-  if (["p", "div", "h1", "h2", "h3", "h4", "h5", "h6"].includes(tag)) {
+  const headingLevel: Record<string, string> = {
+    h1: "#", h2: "##", h3: "###", h4: "####", h5: "#####", h6: "######",
+  };
+  if (headingLevel[tag]) {
+    return inner.trim() ? `${headingLevel[tag]} ${inner.trim()}\n\n` : "";
+  }
+  if (tag === "p" || tag === "div") {
     return inner.trim() ? inner.trimEnd() + "\n\n" : "";
   }
   if (tag === "li") return inner.trimEnd() + "\n";
@@ -272,18 +278,23 @@ export function ApplicationFormClient({
     setExtracting(true);
     setError("");
     try {
+      // Parse the docx client-side — avoids base64-encoding a binary blob,
+      // sending a large JSON payload, and re-parsing on the server.
+      const mod = await import("mammoth");
+      const mammoth = (mod as unknown as { default?: typeof mod }).default ?? mod;
       const arrayBuffer = await file.arrayBuffer();
-      const uint8 = new Uint8Array(arrayBuffer);
-      const CHUNK = 8192;
-      let binary = "";
-      for (let i = 0; i < uint8.length; i += CHUNK) {
-        binary += String.fromCharCode(...uint8.subarray(i, i + CHUNK));
+      const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
+      const documentText = htmlToMarkdownText(html);
+
+      if (!documentText.trim()) {
+        setError("The .docx file appears to be empty or could not be read.");
+        return;
       }
-      const base64 = btoa(binary);
+
       const res = await fetch(`/api/applications/${application.id}/extract-answers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: base64, contentType: "docx_base64" }),
+        body: JSON.stringify({ content: documentText, contentType: "plain_text" }),
       });
       if (!res.ok) {
         const data = await res.json();
