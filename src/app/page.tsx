@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "FunderReady — AI bid review for UK charities",
+  title: "FunderReady: AI bid review",
   description:
     "FunderReady reviews your answers against the funder's real criteria, so you know exactly where you stand before you submit.",
 };
