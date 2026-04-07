@@ -41,10 +41,15 @@ export function AnswersTab({
     return fb && !GOOD_SCORES.has(fb.answer_score);
   }).length;
 
+  const visibleCount = questions.filter(
+    (q) => !disabledQuestionIds.has(q.id) && answerFeedback[q.id]
+  ).length;
+  const isSingleItem = visibleCount === 1;
+
   return (
     <div className="space-y-4">
-      {/* Filter toggle */}
-      <div className="flex items-center gap-2">
+      {/* Filter toggle — hidden when there is only one item */}
+      <div className={`flex items-center gap-2 ${isSingleItem ? "hidden" : ""}`}>
         <button
           type="button"
           onClick={() => setFilter("all")}
@@ -107,6 +112,7 @@ export function AnswersTab({
             answer={answer?.last_reviewed_text ?? answer?.answer_text ?? ""}
             feedback={feedback}
             isOutdated={isOutdated}
+            alwaysExpanded={isSingleItem}
             reviewId={reviewId}
             applicationId={applicationId}
             feedbackMap={feedbackMap}
