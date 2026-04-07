@@ -715,7 +715,8 @@ export const applicationReviewRequested = inngest.createFunction(
 
     if (freshContexts.length > 0) {
       if (isUnstructuredDoc) {
-        // Sequential analysis for unstructured doc sections
+        // Sequential analysis for unstructured doc sections — one step per section
+        // so we can show per-section progress (unlike the batch path for question_form)
         await step.run("analysing-progress", async () => {
           await updateAppReviewProgress(reviewId, "analysing", {
             analysing_started: Date.now(),
@@ -724,6 +725,7 @@ export const applicationReviewRequested = inngest.createFunction(
           });
         });
 
+        let sectionsCompleted = 0;
         for (const ctx of freshContexts) {
           const { result, usage } = await inferWithClaude(
             step,
@@ -745,6 +747,13 @@ export const applicationReviewRequested = inngest.createFunction(
             model: MODEL,
             usage,
             isRetry: false,
+          });
+          sectionsCompleted++;
+          await step.run(`analysing-progress-${ctx.question_id}`, async () => {
+            await updateAppReviewProgress(reviewId, "analysing", {
+              answers_completed: sectionsCompleted,
+              answers_total: freshContexts.length,
+            });
           });
         }
       } else {
