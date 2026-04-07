@@ -186,7 +186,7 @@ export function ApplicationReviewClient({
     );
   }
 
-  const { scoring, answer_feedback, cross_reference, projected_score, gap_count, disabled_questions } = results;
+  const { scoring, answer_feedback, cross_reference, projected_score, gap_count, disabled_questions, answer_contexts } = results;
   const gapCriteria = cross_reference?.gap_criteria ?? [];
 
   // Build outdated map (only for enabled questions)
@@ -205,14 +205,31 @@ export function ApplicationReviewClient({
   );
 
   // For unstructured_doc, questions is [] (no questions set) — build synthetic
-  // question entries from answer_feedback keys so AnswersTab can render feedback
+  // question entries from answer_contexts (section titles) or answer_feedback keys
   const displayQuestions =
     questions.length > 0
       ? questions
-      : Object.keys(answer_feedback ?? {}).map((key) => ({
-          id: key,
-          question: labels.item,
-        }));
+      : Object.keys(answer_feedback ?? {}).map((key) => {
+          const ctx = answer_contexts?.find((ac) => ac.question_id === key);
+          return { id: key, question: ctx?.question_text ?? labels.item };
+        });
+
+  // For unstructured_doc, application_answers only has the raw document row.
+  // Merge in section content from answer_contexts so AnswersTab can display each section.
+  const displayAnswers =
+    answer_contexts && answer_contexts.length > 0
+      ? [
+          ...answers,
+          ...answer_contexts
+            .filter((ac) => !answers.some((a) => a.question_id === ac.question_id))
+            .map((ac) => ({
+              question_id: ac.question_id,
+              answer_text: ac.answer_text,
+              last_reviewed_text: null as string | null,
+              is_disabled: null as boolean | null,
+            })),
+        ]
+      : answers;
 
   // Compute badge counts
   const answersNeedAttention = displayQuestions.filter((q) => {
@@ -295,7 +312,7 @@ export function ApplicationReviewClient({
           {activeTab === "answers" && (
             <AnswersTab
               questions={displayQuestions}
-              answers={answers}
+              answers={displayAnswers}
               answerFeedback={answer_feedback}
               outdatedMap={outdatedMap}
               disabledQuestionIds={disabledQuestionIds}

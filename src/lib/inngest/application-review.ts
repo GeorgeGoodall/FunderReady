@@ -1112,6 +1112,15 @@ export const applicationReviewRequested = inngest.createFunction(
               selected_options: a.selected_options ?? null,
             })),
             disabled_answer_ids: disabledQuestions.map((q) => q.question_id),
+            // For unstructured_doc: persist section titles + content so the
+            // review UI can display them (application_answers only has the raw document)
+            ...(isUnstructuredDoc && {
+              answer_contexts: answerContexts.map((ac) => ({
+                question_id: ac.question_id,
+                question_text: ac.question_text,
+                answer_text: ac.answer_text,
+              })),
+            }),
           },
         })
         .eq("id", reviewId);

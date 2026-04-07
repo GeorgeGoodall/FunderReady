@@ -29,6 +29,7 @@ const ReviewResultsSchema = z.object({
   gap_count: z.number().optional(),
   total_criteria_count: z.number().optional(),
   disabled_questions: z.array(z.object({ question_id: z.string(), question_text: z.string() })).optional(),
+  answer_contexts: z.array(z.object({ question_id: z.string(), question_text: z.string(), answer_text: z.string() })).optional(),
 });
 
 export interface ReviewResults {
@@ -39,6 +40,7 @@ export interface ReviewResults {
   gap_count?: number;
   total_criteria_count?: number;
   disabled_questions?: Array<{ question_id: string; question_text: string }>;
+  answer_contexts?: Array<{ question_id: string; question_text: string; answer_text: string }>;
 }
 
 export interface ApplicationReviewClientProps {
