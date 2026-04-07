@@ -34,6 +34,13 @@ interface FundInfo {
 
 type Step = "fund" | "criteria" | "questions" | "confirm";
 
+function generateDefaultTitle(fundName: string): string {
+  const now = new Date();
+  const month = now.toLocaleString("en-GB", { month: "long" });
+  const year = now.getFullYear();
+  return `${fundName} — ${month} ${year}`;
+}
+
 export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicationFormProps) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("fund");
@@ -153,6 +160,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
         if (cancelled) return;
 
         setSelectedFund(fund);
+        setTitle((prev) => prev || generateDefaultTitle(fund.name));
         setError("");
 
         let criteriaLoaded = false;
@@ -200,6 +208,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
 
   const handleFundSelected = async (fund: FundInfo) => {
     setSelectedFund(fund);
+    setTitle((prev) => prev || generateDefaultTitle(fund.name));
     setError("");
 
     let criteriaLoaded = false;
@@ -229,6 +238,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
 
   const handleNewFundData = (data: NewFundData) => {
     setPendingNewFundData(data);
+    setTitle((prev) => prev || generateDefaultTitle(data.name));
     setCreatingFund(false);
     setStep("criteria");
   };
@@ -378,7 +388,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
         fundId: fund.id,
         criteriaSetId: savedCriteriaSetId,
         ...(isUnstructuredDoc ? {} : { questionsSetId: savedQuestionsSetId! }),
-        ...(title.trim() && { title: title.trim() }),
+        title: title.trim() || generateDefaultTitle(fund.name),
       };
 
       const res = await fetch("/api/applications", {
@@ -776,13 +786,13 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
 
             <div className="mt-4">
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Application title (optional)
+                Application title
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Community Centre Renovation 2026"
+                placeholder={`e.g. ${selectedFund?.name ?? pendingNewFundData?.name ?? "Community Centre Fund"} — April 2026`}
                 className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800"
               />
             </div>
