@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { callClaude } from "./anthropic";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "claude-sonnet-4-6";
 
 const ExtractAnswersResponseSchema = z.object({
   answers: z.array(
