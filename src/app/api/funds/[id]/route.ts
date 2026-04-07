@@ -60,7 +60,7 @@ export async function GET(
   // Fetch fund
   const { data: fund, error: fundError } = await supabase
     .from("funds")
-    .select("id, name, organisation_id, organisations(id, name, url, description), url, notes, opens_at, closes_at, created_by, created_at")
+    .select("id, name, organisation_id, organisations(id, name, url, description), url, notes, opens_at, closes_at, created_by, created_at, application_format")
     .eq("id", id)
     .eq("rejected", false)
     .single();

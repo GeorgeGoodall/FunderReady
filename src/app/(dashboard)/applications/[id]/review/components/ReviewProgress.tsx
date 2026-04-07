@@ -1,9 +1,10 @@
 import { ReviewCard } from "./ReviewCard";
 import { safeNumber } from "../types";
-import { PIPELINE_STEPS } from "../constants";
+import { getPipelineSteps } from "../constants";
 
 interface ReviewProgressProps {
   review: { status: string; progress: unknown };
+  applicationFormat?: string;
   cancellingReview: boolean;
   showCancelConfirm: boolean;
   onCancel: () => void;
@@ -12,12 +13,14 @@ interface ReviewProgressProps {
 
 export function ReviewProgress({
   review,
+  applicationFormat,
   cancellingReview,
   showCancelConfirm,
   onCancel,
   isAdminView = false,
 }: ReviewProgressProps) {
-  const currentIndex = PIPELINE_STEPS.findIndex((s) => s.key === review.status);
+  const pipelineSteps = getPipelineSteps(applicationFormat);
+  const currentIndex = pipelineSteps.findIndex((s) => s.key === review.status);
   const progress = review.progress as Record<string, unknown> | null;
   const answersCompleted = safeNumber(progress?.answers_completed);
   const answersTotal = safeNumber(progress?.answers_total);
@@ -29,7 +32,7 @@ export function ReviewProgress({
       <p className="mt-1 text-sm text-zinc-500">Reviews can take 10–30 minutes, so feel free to go make a cuppa and come back when you&apos;re ready.</p>
 
       <div className="mt-6 space-y-3">
-        {PIPELINE_STEPS.map((step, i) => {
+        {pipelineSteps.map((step, i) => {
           const isCurrent = i === currentIndex;
           const isDone = i < currentIndex;
           const isPending = i > currentIndex;

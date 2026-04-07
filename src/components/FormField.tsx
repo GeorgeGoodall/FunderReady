@@ -149,7 +149,7 @@ export function FormField({
 
         {fieldType === "date" && (
           <DatePicker
-            selected={value ? new Date(value + "T00:00:00") : null}
+            selected={value ? (() => { const d = new Date(value + "T00:00:00"); return isNaN(d.getTime()) ? null : d; })() : null}
             onChange={(date: Date | null) => {
               if (!date) { onChange(""); return; }
               const y = date.getFullYear();
@@ -170,8 +170,8 @@ export function FormField({
             selected={(() => {
               if (!value) return null;
               const [h, m] = value.split(":").map(Number);
-              const d = new Date(2000, 0, 1, h, m, 0, 0);
-              return d;
+              if (isNaN(h) || isNaN(m)) return null;
+              return new Date(2000, 0, 1, h, m, 0, 0);
             })()}
             onChange={(date: Date | null) => {
               if (!date) { onChange(""); return; }

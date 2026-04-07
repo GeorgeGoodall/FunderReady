@@ -7,6 +7,7 @@ interface Fund {
   opens_at: string | null;
   closes_at: string | null;
   created_at: string;
+  application_format: "question_form" | "structured_doc" | "unstructured_doc";
 }
 
 interface FundSearchResultsProps {

@@ -17,6 +17,7 @@ export type {
 } from "@/lib/pipeline/schemas";
 
 import type { ApplicationScoring, CrossReference, AnswerAnalysis } from "@/lib/pipeline/schemas";
+import type { ApplicationFormat } from "@/lib/format-terminology";
 import { ApplicationScoringSchema } from "@/lib/pipeline/schemas";
 import { z } from "zod";
 
@@ -28,6 +29,7 @@ const ReviewResultsSchema = z.object({
   gap_count: z.number().optional(),
   total_criteria_count: z.number().optional(),
   disabled_questions: z.array(z.object({ question_id: z.string(), question_text: z.string() })).optional(),
+  answer_contexts: z.array(z.object({ question_id: z.string(), question_text: z.string(), answer_text: z.string() })).optional(),
 });
 
 export interface ReviewResults {
@@ -38,6 +40,7 @@ export interface ReviewResults {
   gap_count?: number;
   total_criteria_count?: number;
   disabled_questions?: Array<{ question_id: string; question_text: string }>;
+  answer_contexts?: Array<{ question_id: string; question_text: string; answer_text: string }>;
 }
 
 export interface ApplicationReviewClientProps {
@@ -49,6 +52,7 @@ export interface ApplicationReviewClientProps {
     fund_id: string;
   };
   fund: { id: string; name: string; organisation: { id: string; name: string } | null } | null;
+  applicationFormat: ApplicationFormat;
   questions: Array<{ id: string; question: string; guidance?: string; word_count_max?: number; priority?: number }>;
   criteria: Array<{ id: string; criterion: string }>;
   answers: Array<{ question_id: string; answer_text: string; last_reviewed_text: string | null; is_disabled?: boolean | null }>;

@@ -129,6 +129,7 @@ export const FundSchema = z.object({
   opens_at: z.string().datetime().optional().nullable(),
   closes_at: z.string().datetime().optional().nullable(),
   shared: z.boolean().optional().default(false),
+  application_format: z.enum(["question_form", "structured_doc", "unstructured_doc"]).default("question_form"),
 });
 
 export type Fund = z.infer<typeof FundSchema>;
@@ -177,7 +178,7 @@ export type ExtendedQuestion = z.infer<typeof ExtendedQuestionSchema>;
 export const CreateApplicationRequestSchema = z.object({
   fundId: z.string().uuid(),
   criteriaSetId: z.string().uuid(),
-  questionsSetId: z.string().uuid(),
+  questionsSetId: z.string().uuid().optional(),
   title: z.string().optional(),
 });
 

@@ -34,7 +34,7 @@ export default async function ApplicationReviewPage({
   // Fetch fund
   const { data: rawFund } = await supabase
     .from("funds")
-    .select("id, name, organisation_id, organisations(id, name)")
+    .select("id, name, organisation_id, organisations(id, name), application_format")
     .eq("id", application.fund_id)
     .eq("rejected", false)
     .single();
@@ -43,10 +43,15 @@ export default async function ApplicationReviewPage({
     ? { ...rawFund, organisation: (rawFund.organisations as unknown as { id: string; name: string } | null) ?? null }
     : null;
 
+  const applicationFormat = ((rawFund as { application_format?: string } | null)?.application_format ?? "question_form") as
+    | "question_form"
+    | "structured_doc"
+    | "unstructured_doc";
+
   // Fetch answers for outdated detection
   const { data: answers } = await supabase
     .from("application_answers")
-    .select("question_id, answer_text, last_reviewed_text")
+    .select("question_id, answer_text, last_reviewed_text, is_disabled")
     .eq("application_id", id);
 
   // Fetch specific review if reviewNumber param is provided, otherwise latest
@@ -119,12 +124,14 @@ export default async function ApplicationReviewPage({
       <ApplicationReviewClient
         application={application}
         fund={fund}
+        applicationFormat={applicationFormat}
         questions={questions}
         criteria={criteria}
         answers={(answers ?? []).map((a) => ({
           question_id: a.question_id,
           answer_text: a.answer_text,
           last_reviewed_text: a.last_reviewed_text,
+          is_disabled: a.is_disabled,
         }))}
         review={review ? {
           id: review.id,

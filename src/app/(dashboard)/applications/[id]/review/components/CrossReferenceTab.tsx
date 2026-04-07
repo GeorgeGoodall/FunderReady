@@ -212,7 +212,7 @@ export function CrossReferenceTab({
             </span>
           </h3>
           <p className="mb-3 text-xs text-zinc-500">
-            These criteria have no coverage in your enabled answers. If applicable, re-enable or fill in the related questions and re-submit.
+            These criteria have no coverage in your application. If applicable, add content addressing them and re-submit.
           </p>
           <div className="space-y-3">
             {gapCriteria.map((gap) => (

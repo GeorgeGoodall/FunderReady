@@ -13,6 +13,7 @@ interface Fund {
   opens_at: string | null;
   closes_at: string | null;
   created_at: string;
+  application_format: "question_form" | "structured_doc" | "unstructured_doc";
 }
 
 interface FundDetectionProps {
@@ -58,7 +59,11 @@ export function FundDetection({
           const raw = data.matchedFund;
           if (raw) {
             // Normalise API shape: Supabase returns { organisations: {...} }
-            setMatchedFund({ ...raw, organisation: raw.organisations ?? null });
+            setMatchedFund({
+              ...raw,
+              organisation: raw.organisations ?? null,
+              application_format: raw.application_format ?? "question_form",
+            });
           }
           if (data.detectedName) {
             setSearchQuery(data.detectedName);
@@ -94,6 +99,7 @@ export function FundDetection({
         const funds = (data.funds ?? []).map((f: Fund & { organisations?: { id: string; name: string } | null }) => ({
           ...f,
           organisation: f.organisations ?? null,
+          application_format: (f.application_format ?? "question_form") as "question_form" | "structured_doc" | "unstructured_doc",
         }));
         setSearchResults(funds);
       }

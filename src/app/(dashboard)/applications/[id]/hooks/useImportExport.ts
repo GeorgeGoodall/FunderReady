@@ -21,7 +21,7 @@ interface Question {
 interface ApplicationData {
   id: string;
   title: string | null;
-  questions_set_id: string;
+  questions_set_id: string | null;
 }
 
 interface FundData {
@@ -80,7 +80,7 @@ export function useImportExport(
       answerMap,
       optionsMap,
       disabledMap,
-      questionsSetId: application.questions_set_id,
+      questionsSetId: application.questions_set_id ?? "",
     };
 
     if (format === "docx") {
@@ -147,7 +147,7 @@ export function useImportExport(
         const arrayBuffer = await file.arrayBuffer();
         const { parseDocx } = await import("@/lib/docx-import");
         const parsed = await parseDocx(arrayBuffer, questions);
-        const validated = validateImportMetadata(parsed, application.id, application.questions_set_id);
+        const validated = validateImportMetadata(parsed, application.id, application.questions_set_id ?? "");
         setImportResult(validated);
       } catch (err) {
         console.error("Docx import failed:", err);
@@ -159,7 +159,7 @@ export function useImportExport(
       reader.onload = () => {
         const content = reader.result as string;
         const parsed = parseMarkdown(content, questions);
-        const validated = validateImportMetadata(parsed, application.id, application.questions_set_id);
+        const validated = validateImportMetadata(parsed, application.id, application.questions_set_id ?? "");
         setImportResult(validated);
       };
       reader.readAsText(file);

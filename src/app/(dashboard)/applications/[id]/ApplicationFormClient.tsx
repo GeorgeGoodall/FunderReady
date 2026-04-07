@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormField } from "@/components/FormField";
@@ -35,7 +35,7 @@ interface ApplicationData {
   status: string;
   review_count: number;
   fund_id: string;
-  questions_set_id: string;
+  questions_set_id: string | null;
 }
 
 interface AvailableQuestionsSet {
@@ -61,6 +61,7 @@ interface FundData {
   organisation: { id: string; name: string } | null;
   opens_at: string | null;
   closes_at: string | null;
+  application_format?: string;
 }
 
 interface QuestionsSetData {
@@ -83,6 +84,70 @@ interface ApplicationFormClientProps {
   questionsSet: QuestionsSetData | null;
   availableQuestionsSets?: AvailableQuestionsSet[];
   criteriaSet?: CriteriaSetData | null;
+}
+
+// ---------------------------------------------------------------------------
+// Converts a mammoth HTML string to plain text, preserving tables as
+// GitHub-flavoured markdown tables and collapsing other HTML to text.
+// Runs client-side using the browser's built-in DOMParser.
+// ---------------------------------------------------------------------------
+function tableToMarkdown(table: Element): string {
+  const rows = Array.from(table.querySelectorAll("tr"));
+  if (rows.length === 0) return "";
+
+  const tableData = rows.map((row) =>
+    Array.from(row.querySelectorAll("td, th")).map((cell) =>
+      (cell.textContent ?? "").trim().replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ")
+    )
+  );
+
+  const maxCols = Math.max(...tableData.map((r) => r.length));
+  const padded = tableData.map((row) => {
+    const r = [...row];
+    while (r.length < maxCols) r.push("");
+    return r;
+  });
+
+  const separator = Array(maxCols).fill("---");
+  const lines = padded.flatMap((row, i) => {
+    const line = "| " + row.join(" | ") + " |";
+    return i === 0 ? [line, "| " + separator.join(" | ") + " |"] : [line];
+  });
+
+  return lines.join("\n");
+}
+
+function nodeToMarkdownText(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
+  if (node.nodeType !== Node.ELEMENT_NODE) return "";
+
+  const el = node as Element;
+  const tag = el.tagName.toLowerCase();
+
+  if (tag === "table") return tableToMarkdown(el) + "\n\n";
+  if (tag === "br") return "\n";
+
+  const inner = Array.from(el.childNodes).map(nodeToMarkdownText).join("");
+
+  const headingLevel: Record<string, string> = {
+    h1: "#", h2: "##", h3: "###", h4: "####", h5: "#####", h6: "######",
+  };
+  if (headingLevel[tag]) {
+    return inner.trim() ? `${headingLevel[tag]} ${inner.trim()}\n\n` : "";
+  }
+  if (tag === "p" || tag === "div") {
+    return inner.trim() ? inner.trimEnd() + "\n\n" : "";
+  }
+  if (tag === "li") return inner.trimEnd() + "\n";
+
+  return inner;
+}
+
+function htmlToMarkdownText(html: string): string {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return nodeToMarkdownText(doc.body)
+    .replace(/\n{3,}/g, "\n\n") // collapse excessive blank lines
+    .trim();
 }
 
 export function ApplicationFormClient({
@@ -108,6 +173,10 @@ export function ApplicationFormClient({
   } | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [draftReviewMode, setDraftReviewMode] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const extractFileInputRef = useRef<HTMLInputElement>(null);
+  const [docxUploading, setDocxUploading] = useState(false);
+  const docxFileInputRef = useRef<HTMLInputElement>(null);
 
   // Parse questions from the questions set
   const questions: Question[] = Array.isArray(questionsSet?.questions_json)
@@ -138,7 +207,7 @@ export function ApplicationFormClient({
     handleSwapQuestionsSet,
   } = useQuestionsSetSwap(
     application.id,
-    application.questions_set_id,
+    application.questions_set_id ?? "",
     availableQuestionsSets,
     questionsSet?.created_at ?? null,
     saveAnswers,
@@ -154,6 +223,140 @@ export function ApplicationFormClient({
     setAnswerMap, setOptionsMap, setDisabledMap,
     dirtyRef, saveAnswers, setError
   );
+
+  // Derive application format
+  const applicationFormat = (fund?.application_format ?? "question_form") as
+    | "question_form"
+    | "structured_doc"
+    | "unstructured_doc";
+  const isUnstructuredDoc = applicationFormat === "unstructured_doc";
+
+  // Document content state for unstructured_doc forms
+  const documentAnswer = initialAnswers.find((a) => a.question_id === "document_content");
+  const [documentContent, setDocumentContent] = useState(documentAnswer?.answer_text ?? "");
+  const documentWordCount = documentContent.trim()
+    ? documentContent.trim().split(/\s+/).filter(Boolean).length
+    : 0;
+
+  // Auto-save document content for unstructured_doc
+  const hasInitializedRef = useRef(false);
+
+  const saveDocumentContent = useCallback(
+    async (text: string) => {
+      try {
+        await fetch(`/api/applications/${application.id}/answers`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            answers: [{ question_id: "document_content", answer_text: text }],
+          }),
+        });
+      } catch {
+        // silent — same pattern as auto-save
+      }
+    },
+    [application.id]
+  );
+
+  useEffect(() => {
+    if (!isUnstructuredDoc) return;
+
+    // Skip the first effect run (data just loaded from server)
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      saveDocumentContent(documentContent);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [documentContent, isUnstructuredDoc, saveDocumentContent]);
+
+  async function handleExtractAnswers(file: File | undefined) {
+    if (!file) return;
+    setExtracting(true);
+    setError("");
+    try {
+      // Parse the docx client-side — avoids base64-encoding a binary blob,
+      // sending a large JSON payload, and re-parsing on the server.
+      const mod = await import("mammoth");
+      const mammoth = (mod as unknown as { default?: typeof mod }).default ?? mod;
+      const arrayBuffer = await file.arrayBuffer();
+      const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
+      const documentText = htmlToMarkdownText(html);
+
+      if (!documentText.trim()) {
+        setError("The .docx file appears to be empty or could not be read.");
+        return;
+      }
+
+      const res = await fetch(`/api/applications/${application.id}/extract-answers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: documentText, contentType: "plain_text" }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to extract answers from document");
+        return;
+      }
+      const data = await res.json();
+      const extracted: Array<{ question_id: string; answer_text: string; selected_options?: string[] }> = data.answers ?? [];
+      setAnswerMap((prev) => {
+        const next = { ...prev };
+        for (const a of extracted) {
+          if (a.answer_text) {
+            next[a.question_id] = a.answer_text;
+          }
+        }
+        return next;
+      });
+      setOptionsMap((prev) => {
+        const next = { ...prev };
+        for (const a of extracted) {
+          if (a.selected_options && a.selected_options.length > 0) {
+            next[a.question_id] = a.selected_options;
+          }
+        }
+        return next;
+      });
+      dirtyRef.current = true;
+    } catch {
+      setError("Failed to extract answers. Please try again.");
+    } finally {
+      setExtracting(false);
+      if (extractFileInputRef.current) {
+        extractFileInputRef.current.value = "";
+      }
+    }
+  }
+
+  async function handleDocxUpload(file: File | undefined) {
+    if (!file) return;
+    setDocxUploading(true);
+    setError("");
+    // Reset input so the same file can be re-selected if needed
+    if (docxFileInputRef.current) docxFileInputRef.current.value = "";
+    try {
+      const mod = await import("mammoth");
+      // Dynamic CJS imports in Next.js can land on .default
+      const mammoth = (mod as unknown as { default?: typeof mod }).default ?? mod;
+      const arrayBuffer = await file.arrayBuffer();
+      const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
+      const text = htmlToMarkdownText(html);
+      if (!text) {
+        setError("The .docx file appears to be empty or could not be read.");
+        return;
+      }
+      setDocumentContent(text);
+    } catch (err) {
+      console.error("Failed to parse docx:", err);
+      setError("Failed to read the .docx file. Please try again or paste the text directly.");
+    } finally {
+      setDocxUploading(false);
+    }
+  }
 
   const handleSubmitClick = async () => {
     await saveAnswers();
@@ -486,52 +689,115 @@ export function ApplicationFormClient({
         </details>
       )}
 
-      {/* Questions form */}
-      {sections.reduce<{ elements: React.ReactNode[]; counter: number }>(
-        (acc, section, si) => {
-          const sectionQuestions = section.questions.map((q, qi) => {
-            const num = acc.counter + qi + 1;
-            return (
-              <FormField
-                key={q.id}
-                question={q}
-                questionNumber={num}
-                value={answerMap[q.id] ?? ""}
-                selectedOptions={optionsMap[q.id]}
-                lastReviewedText={reviewedTextMap[q.id]}
-                isDisabled={disabledMap[q.id] ?? false}
-                onChange={(v) => handleChange(q.id, v)}
-                onOptionsChange={(opts) => handleOptionsChange(q.id, opts)}
-                onDisabledChange={(disabled) => handleDisabledChange(q.id, disabled)}
-                onBlur={handleBlur}
-              />
-            );
-          });
-          acc.elements.push(
-            <div key={si} className="space-y-4">
-              {section.label && (
-                <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-200">
-                  {section.label}
-                </h2>
+      {/* Questions form / Document textarea */}
+      {isUnstructuredDoc ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Your document</h2>
+            <label className={`inline-flex items-center gap-1.5 text-sm border rounded-md px-3 py-1.5 transition-colors ${docxUploading ? "cursor-not-allowed border-zinc-200 text-zinc-400" : "cursor-pointer text-indigo-600 hover:text-indigo-800 border-indigo-200"}`}>
+              {docxUploading ? (
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
               )}
-              {sectionQuestions}
-            </div>
-          );
-          acc.counter += section.questions.length;
-          return acc;
-        },
-        { elements: [], counter: 0 }
-      ).elements}
-
-      {/* Overall word limit indicator */}
-      {questionsSet?.overall_word_limit && (
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <TotalWordCount
-            answerMap={answerMap}
-            disabledMap={disabledMap}
-            limit={questionsSet.overall_word_limit}
+              {docxUploading ? "Parsing…" : "Upload .docx"}
+              <input
+                ref={docxFileInputRef}
+                type="file"
+                accept=".docx"
+                className="sr-only"
+                disabled={docxUploading}
+                onChange={(e) => handleDocxUpload(e.target.files?.[0])}
+              />
+            </label>
+          </div>
+          <textarea
+            className="w-full min-h-[400px] resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+            placeholder="Paste or type your document here, or upload a .docx file above…"
+            value={documentContent}
+            onChange={(e) => setDocumentContent(e.target.value)}
           />
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            {documentWordCount} word{documentWordCount !== 1 ? "s" : ""}
+          </p>
         </div>
+      ) : (
+        <>
+          {/* Upload answers from document (question_form / structured_doc only) */}
+          {(isDraft || isReviewed) && (
+            <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <p className="flex-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Have a document with your answers? Upload it to auto-populate the form.
+              </p>
+              <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${extracting ? "cursor-not-allowed border-zinc-200 text-zinc-400" : "border-indigo-300 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-900/20"}`}>
+                {extracting ? "Extracting..." : "Upload answers from document"}
+                <input
+                  ref={extractFileInputRef}
+                  type="file"
+                  accept=".docx"
+                  className="sr-only"
+                  disabled={extracting}
+                  onChange={(e) => handleExtractAnswers(e.target.files?.[0])}
+                />
+              </label>
+            </div>
+          )}
+
+          {sections.reduce<{ elements: React.ReactNode[]; counter: number }>(
+            (acc, section, si) => {
+              const sectionQuestions = section.questions.map((q, qi) => {
+                const num = acc.counter + qi + 1;
+                return (
+                  <FormField
+                    key={q.id}
+                    question={q}
+                    questionNumber={num}
+                    value={answerMap[q.id] ?? ""}
+                    selectedOptions={optionsMap[q.id]}
+                    lastReviewedText={reviewedTextMap[q.id]}
+                    isDisabled={disabledMap[q.id] ?? false}
+                    onChange={(v) => handleChange(q.id, v)}
+                    onOptionsChange={(opts) => handleOptionsChange(q.id, opts)}
+                    onDisabledChange={(disabled) => handleDisabledChange(q.id, disabled)}
+                    onBlur={handleBlur}
+                  />
+                );
+              });
+              acc.elements.push(
+                <div key={si} className="space-y-4">
+                  {section.label && (
+                    <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-200">
+                      {section.label}
+                    </h2>
+                  )}
+                  {sectionQuestions}
+                </div>
+              );
+              acc.counter += section.questions.length;
+              return acc;
+            },
+            { elements: [], counter: 0 }
+          ).elements}
+
+          {/* Overall word limit indicator */}
+          {questionsSet?.overall_word_limit && (
+            <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+              <TotalWordCount
+                answerMap={answerMap}
+                disabledMap={disabledMap}
+                limit={questionsSet.overall_word_limit}
+              />
+            </div>
+          )}
+        </>
       )}
 
       {/* Actions */}

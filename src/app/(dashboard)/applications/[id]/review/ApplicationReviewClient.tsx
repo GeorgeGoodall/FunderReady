@@ -16,6 +16,7 @@ import { ReviewFailed } from "./components/ReviewFailed";
 import { ReviewProgress } from "./components/ReviewProgress";
 import { useAnimateOnView } from "./hooks/useAnimateOnView";
 import { ANIMATE_ON_VIEW_THRESHOLD } from "./constants";
+import { getFormatLabels } from "@/lib/format-terminology";
 
 function FadeInSection({
   children,
@@ -43,6 +44,7 @@ function FadeInSection({
 export function ApplicationReviewClient({
   application,
   fund,
+  applicationFormat,
   questions,
   criteria,
   answers,
@@ -119,6 +121,13 @@ export function ApplicationReviewClient({
     return map;
   }, [criteria]);
 
+  const labels = getFormatLabels(applicationFormat);
+  const isShortDoc =
+    applicationFormat === "unstructured_doc" &&
+    answers.length === 1 &&
+    answers[0]?.question_id === "document_content" &&
+    (answers[0]?.answer_text?.trim().split(/\s+/).filter(Boolean).length ?? 0) <= 500;
+
   // No review yet
   if (!review) {
     return (
@@ -154,6 +163,7 @@ export function ApplicationReviewClient({
         <Header application={application} fund={fund} submittedAt={review?.created_at} creditsUsed={review.credits_charged || undefined} />
         <ReviewProgress
           review={review}
+          applicationFormat={applicationFormat}
           cancellingReview={cancellingReview}
           showCancelConfirm={showCancelConfirm}
           onCancel={handleCancelReview}
@@ -176,7 +186,7 @@ export function ApplicationReviewClient({
     );
   }
 
-  const { scoring, answer_feedback, cross_reference, projected_score, gap_count, disabled_questions } = results;
+  const { scoring, answer_feedback, cross_reference, projected_score, gap_count, disabled_questions, answer_contexts } = results;
   const gapCriteria = cross_reference?.gap_criteria ?? [];
 
   // Build outdated map (only for enabled questions)
@@ -194,8 +204,35 @@ export function ApplicationReviewClient({
     (disabled_questions ?? []).map((q) => q.question_id)
   );
 
+  // For unstructured_doc, questions is [] (no questions set) — build synthetic
+  // question entries from answer_contexts (section titles) or answer_feedback keys
+  const displayQuestions =
+    questions.length > 0
+      ? questions
+      : Object.keys(answer_feedback ?? {}).map((key) => {
+          const ctx = answer_contexts?.find((ac) => ac.question_id === key);
+          return { id: key, question: ctx?.question_text ?? labels.item };
+        });
+
+  // For unstructured_doc, application_answers only has the raw document row.
+  // Merge in section content from answer_contexts so AnswersTab can display each section.
+  const displayAnswers =
+    answer_contexts && answer_contexts.length > 0
+      ? [
+          ...answers,
+          ...answer_contexts
+            .filter((ac) => !answers.some((a) => a.question_id === ac.question_id))
+            .map((ac) => ({
+              question_id: ac.question_id,
+              answer_text: ac.answer_text,
+              last_reviewed_text: null as string | null,
+              is_disabled: null as boolean | null,
+            })),
+        ]
+      : answers;
+
   // Compute badge counts
-  const answersNeedAttention = questions.filter((q) => {
+  const answersNeedAttention = displayQuestions.filter((q) => {
     if (disabledQuestionIds.has(q.id)) return false;
     const fb = answer_feedback?.[q.id];
     return fb && !GOOD_SCORES.has(fb.answer_score);
@@ -205,8 +242,8 @@ export function ApplicationReviewClient({
 
   const tabs = [
     { id: "summary" as TabId, label: "Summary" },
-    { id: "answers" as TabId, label: "Answers", badge: answersNeedAttention },
-    { id: "cross-ref" as TabId, label: "Cross-Reference", badge: crossRefCount },
+    { id: "answers" as TabId, label: labels.items, badge: answersNeedAttention },
+    { id: "cross-ref" as TabId, label: isShortDoc ? "Gap Analysis" : "Cross-Reference", badge: crossRefCount },
   ];
 
   return (
@@ -274,8 +311,8 @@ export function ApplicationReviewClient({
 
           {activeTab === "answers" && (
             <AnswersTab
-              questions={questions}
-              answers={answers}
+              questions={displayQuestions}
+              answers={displayAnswers}
               answerFeedback={answer_feedback}
               outdatedMap={outdatedMap}
               disabledQuestionIds={disabledQuestionIds}

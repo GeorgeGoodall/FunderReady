@@ -14,6 +14,7 @@ interface AnswerFeedbackCardProps {
   feedback: AnswerAnalysis;
   isOutdated: boolean;
   defaultExpanded?: boolean;
+  alwaysExpanded?: boolean;
   reviewId?: string;
   applicationId?: string;
   feedbackMap?: Record<string, "up" | "down">;
@@ -27,55 +28,69 @@ export function AnswerFeedbackCard({
   feedback,
   isOutdated,
   defaultExpanded = false,
+  alwaysExpanded = false,
   reviewId,
   applicationId,
   feedbackMap,
   onFeedbackChange,
 }: AnswerFeedbackCardProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [expanded, setExpanded] = useState(defaultExpanded || alwaysExpanded);
+  const isExpanded = alwaysExpanded || expanded;
+
+  const headerContent = (
+    <div className="flex-1">
+      <div className="flex items-center gap-3">
+        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${SCORE_COLOURS[feedback.answer_score] ?? ""}`}>
+          {feedback.answer_score}
+        </span>
+        {isOutdated && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+            Changed since review
+          </span>
+        )}
+        {question.priority !== undefined && question.priority >= 4 && (
+          <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+            Priority {question.priority}/5
+          </span>
+        )}
+        {question.priority !== undefined && question.priority <= 2 && (
+          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
+            Lower priority
+          </span>
+        )}
+      </div>
+      {!alwaysExpanded && (
+        <p className="mt-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <span className="text-zinc-400 dark:text-zinc-500">{questionNumber}.</span> {question.question}
+        </p>
+      )}
+    </div>
+  );
 
   return (
     <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
       {/* Header */}
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between px-5 py-3 text-left"
-      >
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${SCORE_COLOURS[feedback.answer_score] ?? ""}`}>
-              {feedback.answer_score}
-            </span>
-            {isOutdated && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                Changed since review
-              </span>
-            )}
-            {question.priority !== undefined && question.priority >= 4 && (
-              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                Priority {question.priority}/5
-              </span>
-            )}
-            {question.priority !== undefined && question.priority <= 2 && (
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
-                Lower priority
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            <span className="text-zinc-400 dark:text-zinc-500">{questionNumber}.</span> {question.question}
-          </p>
+      {alwaysExpanded ? (
+        <div className="flex w-full items-center px-5 py-3">
+          {headerContent}
         </div>
-        <svg
-          className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${expanded ? "rotate-180" : ""}`}
-          fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
+      ) : (
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="flex w-full items-center justify-between px-5 py-3 text-left"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-        </svg>
-      </button>
+          {headerContent}
+          <svg
+            className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${expanded ? "rotate-180" : ""}`}
+            fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+      )}
 
-      {expanded && (
+      {isExpanded && (
         <div className="border-t border-zinc-100 px-5 py-4 dark:border-zinc-800">
           {/* Answer text with highlights */}
           <div className="mb-4">

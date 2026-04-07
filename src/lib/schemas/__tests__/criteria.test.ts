@@ -359,12 +359,12 @@ describe("CreateApplicationRequestSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects missing questionsSetId", () => {
+  it("accepts missing questionsSetId (optional — format-based validation is done in the API handler)", () => {
     const result = CreateApplicationRequestSchema.safeParse({
       fundId: "550e8400-e29b-41d4-a716-446655440000",
       criteriaSetId: "660e8400-e29b-41d4-a716-446655440000",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 });
 

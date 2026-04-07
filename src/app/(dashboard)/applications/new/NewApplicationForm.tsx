@@ -29,16 +29,10 @@ interface FundInfo {
   opens_at: string | null;
   closes_at: string | null;
   created_at: string;
+  application_format: "question_form" | "structured_doc" | "unstructured_doc";
 }
 
 type Step = "fund" | "criteria" | "questions" | "confirm";
-
-const STEPS: { key: Step; label: string }[] = [
-  { key: "fund", label: "Fund" },
-  { key: "criteria", label: "Criteria" },
-  { key: "questions", label: "Questions" },
-  { key: "confirm", label: "Create" },
-];
 
 export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicationFormProps) {
   const router = useRouter();
@@ -82,6 +76,28 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
     localStorage.setItem("new-application-intro-dismissed", "true");
     setIntroVisible(false);
   };
+
+  // Derive application format from selected or pending fund
+  const applicationFormat =
+    (selectedFund?.application_format ??
+      pendingNewFundData?.application_format ??
+      "question_form") as "question_form" | "structured_doc" | "unstructured_doc";
+
+  const isUnstructuredDoc = applicationFormat === "unstructured_doc";
+  const itemLabel = applicationFormat === "structured_doc" ? "Section" : "Question";
+
+  const STEPS: { key: Step; label: string }[] = isUnstructuredDoc
+    ? [
+        { key: "fund", label: "Fund" },
+        { key: "criteria", label: "Criteria" },
+        { key: "confirm", label: "Create" },
+      ]
+    : [
+        { key: "fund", label: "Fund" },
+        { key: "criteria", label: "Criteria" },
+        { key: "questions", label: applicationFormat === "structured_doc" ? "Sections" : "Questions" },
+        { key: "confirm", label: "Create" },
+      ];
 
   // Shared helper: apply fund data (criteria/questions sets) from API response
   function applyFundData(data: Record<string, unknown>) {
@@ -132,6 +148,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
           opens_at: data.fund.opens_at ?? null,
           closes_at: data.fund.closes_at ?? null,
           created_at: data.fund.created_at,
+          application_format: (data.fund.application_format ?? "question_form") as "question_form" | "structured_doc" | "unstructured_doc",
         };
         if (cancelled) return;
 
@@ -149,10 +166,11 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
           // Non-fatal
         }
 
-        if (criteriaLoaded && questionsLoaded) {
+        const fundIsUnstructured = fund.application_format === "unstructured_doc";
+        if (criteriaLoaded && (questionsLoaded || fundIsUnstructured)) {
           setStep("confirm");
         } else if (criteriaLoaded) {
-          setStep("questions");
+          setStep(fundIsUnstructured ? "confirm" : "questions");
         } else {
           setStep("criteria");
         }
@@ -199,10 +217,11 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
       // Non-fatal
     }
 
-    if (criteriaLoaded && questionsLoaded) {
+    const fundIsUnstructured = fund.application_format === "unstructured_doc";
+    if (criteriaLoaded && (questionsLoaded || fundIsUnstructured)) {
       setStep("confirm");
     } else if (criteriaLoaded) {
-      setStep("questions");
+      setStep(fundIsUnstructured ? "confirm" : "questions");
     } else {
       setStep("criteria");
     }
@@ -284,7 +303,8 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
   };
 
   const handleCreateApplication = async () => {
-    if (!criteriaSet || !questionsSet) return;
+    if (!criteriaSet) return;
+    if (!isUnstructuredDoc && !questionsSet) return;
     setSubmitting(true);
     setError("");
 
@@ -324,6 +344,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
             notes: pendingNewFundData.notes,
             opens_at: detectedOpensAt ?? null,
             closes_at: detectedClosesAt ?? null,
+            application_format: pendingNewFundData.application_format,
           }),
         });
         if (!fundRes.ok) {
@@ -342,26 +363,28 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
       }
 
       const savedCriteriaSetId = await saveCriteriaSetsIfNeeded(fund.id);
-      const savedQuestionsSetId = await saveQuestionsSetsIfNeeded(fund.id);
+      const savedQuestionsSetId = isUnstructuredDoc ? null : await saveQuestionsSetsIfNeeded(fund.id);
 
       if (!savedCriteriaSetId) {
         setError("Failed to save criteria set");
         return;
       }
-      if (!savedQuestionsSetId) {
+      if (!isUnstructuredDoc && !savedQuestionsSetId) {
         setError("Questions are required for form-based applications");
         return;
       }
 
+      const body = {
+        fundId: fund.id,
+        criteriaSetId: savedCriteriaSetId,
+        ...(isUnstructuredDoc ? {} : { questionsSetId: savedQuestionsSetId! }),
+        ...(title.trim() && { title: title.trim() }),
+      };
+
       const res = await fetch("/api/applications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fundId: fund.id,
-          criteriaSetId: savedCriteriaSetId,
-          questionsSetId: savedQuestionsSetId,
-          ...(title.trim() && { title: title.trim() }),
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -398,7 +421,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
             What you&apos;ll need
           </h2>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Many funds are already set up in FunderReady. You may only need the fund name — criteria and questions are often pre-loaded.
+            Many funds are already set up in FunderReady. You may only need the fund name — criteria and application content are often pre-loaded.
           </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             {[
@@ -417,11 +440,11 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
                   "The guidance document — look for a scoring rubric, assessment criteria, or a list of what the fund prioritises.",
               },
               {
-                title: "Questions",
+                title: "Questions / Sections",
                 badge: "if not pre-loaded",
-                what: "The specific questions on the application form.",
+                what: "The questions, section prompts, or structure of the written response (depending on the fund's format).",
                 where:
-                  "The application form itself — usually a Word doc or PDF download from the fund's website.",
+                  "The application form or guidance document — usually a Word doc or PDF download from the fund's website.",
               },
             ].map(({ title: cardTitle, badge, what, where }) => (
               <div
@@ -603,7 +626,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStep("questions")}
+                  onClick={() => setStep(isUnstructuredDoc ? "confirm" : "questions")}
                   disabled={criteriaSet.criteria.some((c) => !c.criterion.trim())}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -626,20 +649,20 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
       {step === "questions" && (
         <div className="space-y-6">
           <p className="rounded-lg border border-zinc-100 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-            Paste the application questions from the fund&apos;s form — the AI will extract them. You can also enter them manually.
+            Paste the fund&apos;s application {itemLabel.toLowerCase()}s — the AI will extract them. You can also enter them manually.
           </p>
 
           {questionsPreLoaded && questionsSet && !questionsEdited && (
             <div className="rounded-lg border border-green-100 bg-green-50 p-3 dark:border-green-900/30 dark:bg-green-900/10">
               <p className="text-sm text-green-800 dark:text-green-300">
-                Questions pre-loaded from <strong>{selectedFund?.name}</strong>. You can edit below or continue.
+                {itemLabel}s pre-loaded from <strong>{selectedFund?.name}</strong>. You can edit below or continue.
               </p>
             </div>
           )}
 
           {!questionsSet ? (
             <>
-              <QuestionsInput onParsed={setQuestionsSet} />
+              <QuestionsInput onParsed={setQuestionsSet} itemLabel={itemLabel} />
               <button
                 type="button"
                 onClick={() => goToStep("criteria")}
@@ -650,7 +673,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
             </>
           ) : (
             <>
-              <QuestionsPreview questionsSet={questionsSet} onChange={handleQuestionsChange} />
+              <QuestionsPreview questionsSet={questionsSet} onChange={handleQuestionsChange} itemLabel={itemLabel} />
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -768,7 +791,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => setStep("questions")}
+              onClick={() => setStep(isUnstructuredDoc ? "criteria" : "questions")}
               className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               &larr; Back
@@ -776,7 +799,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
             <button
               type="button"
               onClick={handleCreateApplication}
-              disabled={submitting || !questionsSet}
+              disabled={submitting || (!isUnstructuredDoc && !questionsSet)}
               className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? "Creating..." : "Create Application"}

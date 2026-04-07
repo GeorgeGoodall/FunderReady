@@ -44,6 +44,7 @@ export function NewFundPageClient() {
           url: data.url,
           notes: data.notes,
           shared: data.shared ?? false,
+          application_format: data.application_format,
         }),
       });
 

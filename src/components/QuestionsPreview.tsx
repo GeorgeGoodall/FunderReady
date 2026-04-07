@@ -19,6 +19,7 @@ import { SortableQuestionCard } from "./questions/SortableQuestionCard";
 interface QuestionsPreviewProps {
   questionsSet: QuestionsSet;
   onChange: (updated: QuestionsSet) => void;
+  itemLabel?: string;
 }
 
 export function validateQuestionsSet(qs: QuestionsSet): string[] {
@@ -44,7 +45,7 @@ export function validateQuestionsSet(qs: QuestionsSet): string[] {
   return errors;
 }
 
-export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewProps) {
+export function QuestionsPreview({ questionsSet, onChange, itemLabel = "Question" }: QuestionsPreviewProps) {
   const sensors = useSensors(useSensor(PointerSensor));
   const validationErrors = validateQuestionsSet(questionsSet);
 
@@ -111,7 +112,7 @@ export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewPro
 
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          {questionsSet.questions.length} question{questionsSet.questions.length !== 1 ? "s" : ""}
+          {questionsSet.questions.length} {itemLabel.toLowerCase()}{questionsSet.questions.length !== 1 ? "s" : ""}
         </h3>
         {questionsSet.questions.length < 30 && (
           <button
@@ -119,7 +120,7 @@ export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewPro
             onClick={addQuestion}
             className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
-            + Add question
+            + Add {itemLabel.toLowerCase()}
           </button>
         )}
       </div>
@@ -151,7 +152,7 @@ export function QuestionsPreview({ questionsSet, onChange }: QuestionsPreviewPro
             onClick={addQuestion}
             className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
-            + Add question
+            + Add {itemLabel.toLowerCase()}
           </button>
         </div>
       )}

@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   // Search funds by name
   const { data: fundsByName, error: nameError } = await supabase
     .from("funds")
-    .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at")
+    .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at, application_format")
     .textSearch("name", tsQuery)
     .eq("approved", true)
     .eq("shared", true)
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
     const orgIds = matchingOrgs.map((o) => o.id);
     const { data: orgFunds } = await supabase
       .from("funds")
-      .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at")
+      .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at, application_format")
       .in("organisation_id", orgIds)
       .eq("approved", true)
       .eq("shared", true)
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { name, organisation_id, url, notes, opens_at, closes_at, shared } = parsed.data;
+  const { name, organisation_id, url, notes, opens_at, closes_at, shared, application_format } = parsed.data;
 
   if (opens_at && closes_at && new Date(opens_at) > new Date(closes_at)) {
     return NextResponse.json(
@@ -156,9 +156,10 @@ export async function POST(request: Request) {
       opens_at: opens_at ?? null,
       closes_at: closes_at ?? null,
       shared: shared ?? false,
+      application_format: application_format ?? "question_form",
       created_by: user.id,
     })
-    .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at")
+    .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at, application_format")
     .single();
 
   if (error) {
