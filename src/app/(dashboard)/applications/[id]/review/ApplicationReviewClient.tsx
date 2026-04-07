@@ -203,8 +203,18 @@ export function ApplicationReviewClient({
     (disabled_questions ?? []).map((q) => q.question_id)
   );
 
+  // For unstructured_doc, questions is [] (no questions set) — build synthetic
+  // question entries from answer_feedback keys so AnswersTab can render feedback
+  const displayQuestions =
+    questions.length > 0
+      ? questions
+      : Object.keys(answer_feedback ?? {}).map((key) => ({
+          id: key,
+          question: labels.item,
+        }));
+
   // Compute badge counts
-  const answersNeedAttention = questions.filter((q) => {
+  const answersNeedAttention = displayQuestions.filter((q) => {
     if (disabledQuestionIds.has(q.id)) return false;
     const fb = answer_feedback?.[q.id];
     return fb && !GOOD_SCORES.has(fb.answer_score);
@@ -283,7 +293,7 @@ export function ApplicationReviewClient({
 
           {activeTab === "answers" && (
             <AnswersTab
-              questions={questions}
+              questions={displayQuestions}
               answers={answers}
               answerFeedback={answer_feedback}
               outdatedMap={outdatedMap}
