@@ -86,6 +86,64 @@ interface ApplicationFormClientProps {
   criteriaSet?: CriteriaSetData | null;
 }
 
+// ---------------------------------------------------------------------------
+// Converts a mammoth HTML string to plain text, preserving tables as
+// GitHub-flavoured markdown tables and collapsing other HTML to text.
+// Runs client-side using the browser's built-in DOMParser.
+// ---------------------------------------------------------------------------
+function tableToMarkdown(table: Element): string {
+  const rows = Array.from(table.querySelectorAll("tr"));
+  if (rows.length === 0) return "";
+
+  const tableData = rows.map((row) =>
+    Array.from(row.querySelectorAll("td, th")).map((cell) =>
+      (cell.textContent ?? "").trim().replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ")
+    )
+  );
+
+  const maxCols = Math.max(...tableData.map((r) => r.length));
+  const padded = tableData.map((row) => {
+    const r = [...row];
+    while (r.length < maxCols) r.push("");
+    return r;
+  });
+
+  const separator = Array(maxCols).fill("---");
+  const lines = padded.flatMap((row, i) => {
+    const line = "| " + row.join(" | ") + " |";
+    return i === 0 ? [line, "| " + separator.join(" | ") + " |"] : [line];
+  });
+
+  return lines.join("\n");
+}
+
+function nodeToMarkdownText(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
+  if (node.nodeType !== Node.ELEMENT_NODE) return "";
+
+  const el = node as Element;
+  const tag = el.tagName.toLowerCase();
+
+  if (tag === "table") return tableToMarkdown(el) + "\n\n";
+  if (tag === "br") return "\n";
+
+  const inner = Array.from(el.childNodes).map(nodeToMarkdownText).join("");
+
+  if (["p", "div", "h1", "h2", "h3", "h4", "h5", "h6"].includes(tag)) {
+    return inner.trim() ? inner.trimEnd() + "\n\n" : "";
+  }
+  if (tag === "li") return inner.trimEnd() + "\n";
+
+  return inner;
+}
+
+function htmlToMarkdownText(html: string): string {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return nodeToMarkdownText(doc.body)
+    .replace(/\n{3,}/g, "\n\n") // collapse excessive blank lines
+    .trim();
+}
+
 export function ApplicationFormClient({
   application,
   answers: initialAnswers,
@@ -265,8 +323,8 @@ export function ApplicationFormClient({
       // Dynamic CJS imports in Next.js can land on .default
       const mammoth = (mod as unknown as { default?: typeof mod }).default ?? mod;
       const arrayBuffer = await file.arrayBuffer();
-      const { value } = await mammoth.extractRawText({ arrayBuffer });
-      const text = value.trim();
+      const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
+      const text = htmlToMarkdownText(html);
       if (!text) {
         setError("The .docx file appears to be empty or could not be read.");
         return;
