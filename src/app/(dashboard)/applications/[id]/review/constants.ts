@@ -41,6 +41,14 @@ export function getPipelineSteps(applicationFormat?: string) {
       { key: "scoring", label: "Scoring" },
     ];
   }
+  if (applicationFormat === "structured_doc") {
+    return [
+      { key: "pending", label: "Queued" },
+      { key: "analysing", label: "Analysing sections" },
+      { key: "cross_referencing", label: "Cross-referencing" },
+      { key: "scoring", label: "Scoring" },
+    ];
+  }
   return PIPELINE_STEPS;
 }
 
