@@ -1,10 +1,11 @@
 import { z } from "zod";
+import * as chrono from "chrono-node";
 import { callClaude } from "./anthropic";
 
 const MODEL = "claude-sonnet-4-6";
 
 // ---------------------------------------------------------------------------
-// Section parsing — no AI involved
+// Types
 // ---------------------------------------------------------------------------
 
 interface DocumentSection {
@@ -12,10 +13,23 @@ interface DocumentSection {
   content: string;
 }
 
-/**
- * Splits structured text (with # heading markers from htmlToMarkdownText)
- * into sections. Falls back to splitting by paragraph if no headings found.
- */
+export interface ExtractQuestion {
+  id: string;
+  question: string;
+  field_type?: string;
+  options?: string[];
+}
+
+export interface ExtractedAnswer {
+  question_id: string;
+  answer_text: string;
+  selected_options?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Section parsing — no AI involved
+// ---------------------------------------------------------------------------
+
 function parseDocumentSections(text: string): DocumentSection[] {
   const lines = text.split("\n");
   const sections: DocumentSection[] = [];
@@ -46,7 +60,6 @@ function parseDocumentSections(text: string): DocumentSection[] {
 
   const nonEmpty = sections.filter((s) => s.content.trim());
 
-  // No headings — fall back to paragraph splitting
   if (nonEmpty.length === 0 || (nonEmpty.length === 1 && !sections.some((s) => /^#{1,6}\s/.test(s.heading)))) {
     return text
       .split(/\n{2,}/)
@@ -58,10 +71,14 @@ function parseDocumentSections(text: string): DocumentSection[] {
 }
 
 // ---------------------------------------------------------------------------
-// String-match mapping — uses question/section titles to match without AI
+// Option matching — no AI, string-based
 // ---------------------------------------------------------------------------
 
-/** Normalise text for comparison: lowercase, strip punctuation, collapse spaces. */
+const STOP_WORDS = new Set([
+  "a", "an", "the", "and", "or", "of", "to", "in", "is", "for",
+  "on", "at", "by", "with", "this", "that", "are", "your", "our",
+]);
+
 function normalise(text: string): string {
   return text
     .toLowerCase()
@@ -70,15 +87,11 @@ function normalise(text: string): string {
     .trim();
 }
 
-/**
- * Returns a 0–1 similarity score between two strings based on word overlap
- * (Jaccard index). Common stop-words are excluded to avoid false positives.
- */
-const STOP_WORDS = new Set(["a", "an", "the", "and", "or", "of", "to", "in", "is", "for", "on", "at", "by", "with", "this", "that", "are", "your", "our"]);
+const OPTION_MATCH_THRESHOLD = 0.5;
 
 function wordSimilarity(a: string, b: string): number {
-  const words = (text: string) =>
-    new Set(normalise(text).split(" ").filter((w) => w.length > 1 && !STOP_WORDS.has(w)));
+  const words = (t: string) =>
+    new Set(normalise(t).split(" ").filter((w) => w.length > 1 && !STOP_WORDS.has(w)));
   const wa = words(a);
   const wb = words(b);
   if (wa.size === 0 && wb.size === 0) return 1;
@@ -88,16 +101,78 @@ function wordSimilarity(a: string, b: string): number {
   return intersection / union;
 }
 
-const MATCH_THRESHOLD = 0.5; // ≥50% word overlap → confident match
-
 /**
- * Try to match sections to questions by string similarity against the known
- * question/section titles. Returns confident matches and the leftovers that
- * need AI disambiguation.
+ * Attempts to match extracted section text against a question's known options.
+ * Returns selected_options (and clears answer_text for clean option fields).
+ *
+ * Strategy:
+ * - text_short / text_long / number / date / email / url / phone / time:
+ *   answer_text as-is, no selected_options
+ * - radio / dropdown:
+ *   find the single best-matching option by substring or word overlap
+ * - checkbox:
+ *   find all options mentioned in the text
+ * - radio_other / checkbox_other:
+ *   same as radio/checkbox for standard options; if the text doesn't match
+ *   any standard option, set selected_options: ["Other"] so the answer_text
+ *   (the section content) flows into the "other" free-text field
  */
+function resolveOptionField(
+  text: string,
+  options: string[],
+  fieldType: string
+): { answer_text: string; selected_options: string[] } {
+  const isMulti = fieldType === "checkbox" || fieldType === "checkbox_other";
+  const hasOther = fieldType === "radio_other" || fieldType === "checkbox_other";
+
+  // Separate "Other" pseudo-option from real options
+  const otherOption = options.find((o) => /^other$/i.test(o.trim()));
+  const realOptions = options.filter((o) => !/^other$/i.test(o.trim()));
+
+  const normText = normalise(text);
+  const matched: string[] = [];
+
+  for (const option of realOptions) {
+    const normOption = normalise(option);
+    const isMatch =
+      normText.includes(normOption) ||
+      normOption.includes(normText) ||
+      wordSimilarity(text, option) >= OPTION_MATCH_THRESHOLD;
+
+    if (isMatch) {
+      matched.push(option);
+      if (!isMulti) break; // single-select: first/best match only
+    }
+  }
+
+  if (matched.length > 0) {
+    // Found standard option matches — clear answer_text unless it's _other and
+    // "Other" might also apply (leave answer_text for the "other" free field)
+    return { answer_text: "", selected_options: matched };
+  }
+
+  if (hasOther && otherOption) {
+    // No standard option matched — treat the whole section as an "other" answer
+    return { answer_text: text, selected_options: [otherOption] };
+  }
+
+  // No options matched and no "other" fallback — return text so user can see it
+  return { answer_text: text, selected_options: [] };
+}
+
+// ---------------------------------------------------------------------------
+// String-match mapping — uses question/section titles to map without AI
+// ---------------------------------------------------------------------------
+
+function wordSimilarityForMapping(a: string, b: string): number {
+  return wordSimilarity(a, b);
+}
+
+const MATCH_THRESHOLD = 0.5;
+
 function matchByTitle(
   sections: DocumentSection[],
-  questions: Array<{ id: string; question: string }>
+  questions: ExtractQuestion[]
 ): {
   matched: Array<{ section_index: number; question_id: string }>;
   unmatchedSectionIndexes: number[];
@@ -107,38 +182,33 @@ function matchByTitle(
   const usedSectionIndexes = new Set<number>();
   const usedQuestionIds = new Set<string>();
 
-  // Score every section × question pair
   const scores: Array<{ sectionIndex: number; questionId: string; score: number }> = [];
   for (let si = 0; si < sections.length; si++) {
     for (const q of questions) {
-      const score = wordSimilarity(sections[si].heading, q.question);
+      const score = wordSimilarityForMapping(sections[si].heading, q.question);
       if (score >= MATCH_THRESHOLD) {
         scores.push({ sectionIndex: si, questionId: q.id, score });
       }
     }
   }
 
-  // Greedy assignment: take highest-scoring pair first, one-to-one
   scores.sort((a, b) => b.score - a.score);
-  for (const { sectionIndex, questionId, score: _ } of scores) {
+  for (const { sectionIndex, questionId } of scores) {
     if (usedSectionIndexes.has(sectionIndex) || usedQuestionIds.has(questionId)) continue;
     matched.push({ section_index: sectionIndex, question_id: questionId });
     usedSectionIndexes.add(sectionIndex);
     usedQuestionIds.add(questionId);
   }
 
-  const unmatchedSectionIndexes = sections
-    .map((_, i) => i)
-    .filter((i) => !usedSectionIndexes.has(i));
-  const unmatchedQuestionIds = questions
-    .map((q) => q.id)
-    .filter((id) => !usedQuestionIds.has(id));
-
-  return { matched, unmatchedSectionIndexes, unmatchedQuestionIds };
+  return {
+    matched,
+    unmatchedSectionIndexes: sections.map((_, i) => i).filter((i) => !usedSectionIndexes.has(i)),
+    unmatchedQuestionIds: questions.map((q) => q.id).filter((id) => !usedQuestionIds.has(id)),
+  };
 }
 
 // ---------------------------------------------------------------------------
-// AI fallback — only for sections/questions that couldn't be matched by title
+// AI fallback — only for unmatched sections/questions
 // ---------------------------------------------------------------------------
 
 const SectionMappingSchema = z.object({
@@ -158,14 +228,12 @@ Rules:
 - Return only the section_index (0-based integer) and question_id — no text content`;
 
 async function mapRemainingWithAI(
-  sections: DocumentSection[],
   allSections: DocumentSection[],
   sectionIndexes: number[],
-  questions: Array<{ id: string; question: string }>
+  questions: ExtractQuestion[]
 ): Promise<Array<{ section_index: number; question_id: string }>> {
   if (sectionIndexes.length === 0 || questions.length === 0) return [];
 
-  // Pass original section_index values so Claude's output maps back to allSections
   const sectionList = sectionIndexes
     .map((i) => `[${i}] "${allSections[i].heading}" — ${allSections[i].content.slice(0, 120).trim()}${allSections[i].content.length > 120 ? "…" : ""}`)
     .join("\n");
@@ -185,36 +253,69 @@ async function mapRemainingWithAI(
 }
 
 // ---------------------------------------------------------------------------
+// Field-type normalisation
+// ---------------------------------------------------------------------------
+
+/**
+ * Converts free-text extracted from a document into the canonical format
+ * expected by each field type:
+ *   date        → "YYYY-MM-DD"  (via chrono-node)
+ *   time        → "HH:mm"       (via chrono-node)
+ *   number      → numeric string (strip non-numeric except decimal point/minus)
+ *   everything else → text as-is
+ */
+function normaliseValue(text: string, fieldType: string): string {
+  const trimmed = text.trim();
+
+  if (fieldType === "date") {
+    const parsed = chrono.parseDate(trimmed);
+    if (!parsed) return trimmed; // leave raw text; DatePicker will show empty
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, "0");
+    const d = String(parsed.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  if (fieldType === "time") {
+    const parsed = chrono.parseDate(trimmed);
+    if (!parsed) return trimmed;
+    const h = String(parsed.getHours()).padStart(2, "0");
+    const min = String(parsed.getMinutes()).padStart(2, "0");
+    return `${h}:${min}`;
+  }
+
+  if (fieldType === "number") {
+    // Keep digits, decimal point and leading minus; strip everything else
+    const numeric = trimmed.replace(/[^\d.-]/g, "");
+    return numeric || trimmed;
+  }
+
+  return trimmed;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 export async function extractAnswersFromDocument(
   documentText: string,
-  questions: Array<{ id: string; question: string }>
-): Promise<Array<{ question_id: string; answer_text: string }>> {
+  questions: ExtractQuestion[]
+): Promise<ExtractedAnswer[]> {
   const sections = parseDocumentSections(documentText);
 
   if (sections.length === 0) {
     return questions.map((q) => ({ question_id: q.id, answer_text: "" }));
   }
 
-  // Step 1: match as many sections as possible using the known question/section
-  // titles — no AI, no hallucination risk, and faster for well-structured docs
   const { matched, unmatchedSectionIndexes, unmatchedQuestionIds } = matchByTitle(
     sections,
     questions
   );
 
-  // Step 2: AI fallback only for anything that didn't match by title
   const unmatchedQuestions = questions.filter((q) => unmatchedQuestionIds.includes(q.id));
   const aiMappings =
     unmatchedSectionIndexes.length > 0 && unmatchedQuestions.length > 0
-      ? await mapRemainingWithAI(
-          sections,
-          sections,
-          unmatchedSectionIndexes,
-          unmatchedQuestions
-        )
+      ? await mapRemainingWithAI(sections, unmatchedSectionIndexes, unmatchedQuestions)
       : [];
 
   const allMappings = [...matched, ...aiMappings];
@@ -222,9 +323,26 @@ export async function extractAnswersFromDocument(
   return questions.map((q) => {
     const mapping = allMappings.find((m) => m.question_id === q.id);
     const section = mapping !== undefined ? sections[mapping.section_index] : null;
-    return {
-      question_id: q.id,
-      answer_text: section?.content ?? "",
-    };
+
+    if (!section) {
+      return { question_id: q.id, answer_text: "" };
+    }
+
+    const fieldType = q.field_type ?? "text_long";
+    const isOptionField = [
+      "radio", "checkbox", "dropdown", "radio_other", "checkbox_other",
+    ].includes(fieldType);
+
+    if (isOptionField && q.options && q.options.length > 0) {
+      const resolved = resolveOptionField(section.content, q.options, fieldType);
+      return {
+        question_id: q.id,
+        answer_text: resolved.answer_text,
+        selected_options: resolved.selected_options,
+      };
+    }
+
+    // Text / number / date / email / url / phone / time — answer_text only
+    return { question_id: q.id, answer_text: normaliseValue(section.content, fieldType) };
   });
 }

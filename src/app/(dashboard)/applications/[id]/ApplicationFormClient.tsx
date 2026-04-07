@@ -302,12 +302,21 @@ export function ApplicationFormClient({
         return;
       }
       const data = await res.json();
-      const extracted: Array<{ question_id: string; answer_text: string }> = data.answers ?? [];
+      const extracted: Array<{ question_id: string; answer_text: string; selected_options?: string[] }> = data.answers ?? [];
       setAnswerMap((prev) => {
         const next = { ...prev };
         for (const a of extracted) {
           if (a.answer_text) {
             next[a.question_id] = a.answer_text;
+          }
+        }
+        return next;
+      });
+      setOptionsMap((prev) => {
+        const next = { ...prev };
+        for (const a of extracted) {
+          if (a.selected_options && a.selected_options.length > 0) {
+            next[a.question_id] = a.selected_options;
           }
         }
         return next;

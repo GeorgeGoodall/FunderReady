@@ -93,7 +93,12 @@ export async function POST(
     return NextResponse.json({ error: "Questions not found" }, { status: 404 });
   }
 
-  const QuestionItemSchema = z.object({ id: z.string(), question: z.string() });
+  const QuestionItemSchema = z.object({
+    id: z.string(),
+    question: z.string(),
+    field_type: z.string().optional(),
+    options: z.array(z.string()).optional(),
+  });
   const questionsParseResult = z.array(QuestionItemSchema).safeParse(questionsSet.questions_json);
   if (!questionsParseResult.success) {
     return NextResponse.json({ error: "Questions data is malformed" }, { status: 500 });
