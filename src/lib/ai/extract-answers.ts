@@ -17,10 +17,12 @@ const SYSTEM_PROMPT = `You extract answers to specific questions from a document
 Given a document and a list of questions (each with an id), find the text in the document that best answers each question.
 
 Rules:
-- Return the relevant text verbatim or closely paraphrased from the document
+- The document may contain section headings (lines starting with #). Use these headings to identify which part of the document corresponds to each question.
+- Return the relevant text verbatim from the document — do not paraphrase or summarise
 - If a question is not addressed in the document, return an empty string for that question
 - Return every question id in the response, even if the answer is empty
-- Do not add content that is not in the document`;
+- Do not add content that is not in the document
+- Preserve paragraph breaks within an answer using newlines`;
 
 export async function extractAnswersFromDocument(
   documentText: string,

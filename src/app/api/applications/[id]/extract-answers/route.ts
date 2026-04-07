@@ -4,6 +4,45 @@ import { extractAnswersFromDocument } from "@/lib/ai/extract-answers";
 import mammoth from "mammoth";
 import { z } from "zod";
 
+/**
+ * Converts a mammoth HTML string to structured plain text on the server side
+ * (no DOMParser in Node.js). Preserves headings as markdown # markers so
+ * Claude can use document structure when mapping sections to questions.
+ */
+function htmlToStructuredText(html: string): string {
+  return html
+    // Headings → markdown heading markers
+    .replace(/<h1[^>]*>(.*?)<\/h1>/gis, "\n# $1\n")
+    .replace(/<h2[^>]*>(.*?)<\/h2>/gis, "\n## $1\n")
+    .replace(/<h3[^>]*>(.*?)<\/h3>/gis, "\n### $1\n")
+    .replace(/<h4[^>]*>(.*?)<\/h4>/gis, "\n#### $1\n")
+    .replace(/<h5[^>]*>(.*?)<\/h5>/gis, "\n##### $1\n")
+    .replace(/<h6[^>]*>(.*?)<\/h6>/gis, "\n###### $1\n")
+    // Table rows → pipe-separated lines (basic, good enough for extraction)
+    .replace(/<tr[^>]*>(.*?)<\/tr>/gis, (_, cells) => {
+      const cols = [...cells.matchAll(/<t[dh][^>]*>(.*?)<\/t[dh]>/gis)]
+        .map((m) => m[1].replace(/<[^>]+>/g, "").trim());
+      return cols.join(" | ") + "\n";
+    })
+    .replace(/<table[^>]*>/gi, "\n")
+    .replace(/<\/table>/gi, "\n")
+    // Block elements → newlines
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    // Strip all remaining tags
+    .replace(/<[^>]+>/g, "")
+    // Decode common HTML entities
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#160;/g, " ")
+    // Collapse runs of blank lines
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 const RequestSchema = z.object({
   content: z.string().min(1).max(14_000_000), // ~10 MB docx
   contentType: z.enum(["docx_base64", "plain_text"]),
@@ -82,8 +121,12 @@ export async function POST(
     let documentText: string;
     if (parsed.data.contentType === "docx_base64") {
       const buffer = Buffer.from(parsed.data.content, "base64");
-      const { value } = await mammoth.extractRawText({ buffer });
-      documentText = value.trim();
+      // Use convertToHtml rather than extractRawText so that headings and
+      // section structure are preserved. htmlToStructuredText converts
+      // <h1>–<h6> to markdown headings so Claude can use them to map
+      // sections to questions instead of guessing by content alone.
+      const { value: html } = await mammoth.convertToHtml({ buffer });
+      documentText = htmlToStructuredText(html).trim();
     } else {
       documentText = parsed.data.content;
     }
