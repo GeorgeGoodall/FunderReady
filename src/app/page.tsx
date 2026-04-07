@@ -26,15 +26,15 @@ const SOCIAL_PROOF = {
 const FAQ_ITEMS = [
   {
     q: "Is my application data private and secure?",
-    a: "Yes. Your answers are stored securely and only ever used to generate your review. We never share your application data with funders or other users. To power AI reviews, your answers are sent to Anthropic's Claude API — Anthropic is bound by strict data processing terms and does not use your data to train models. See our Privacy Policy for full details.",
+    a: "Yes. Your answers are stored securely and only ever used to generate your review. We never share your application data with funders or other users. To power AI reviews, your answers are sent to Anthropic's Claude API. Anthropic is bound by strict data processing terms and does not use your data to train models. See our Privacy Policy for full details.",
   },
   {
     q: "How accurate is the AI feedback?",
-    a: "FunderReady reviews your answers against the specific criteria published by each funder. It identifies gaps, weak evidence, and missing elements. Like any AI tool, it works best alongside your own judgement — think of it as a rigorous second pair of eyes, not a guarantee of success.",
+    a: "FunderReady reviews your answers against the specific criteria published by each funder. It identifies gaps, weak evidence, and missing elements. Like any AI tool, it works best alongside your own judgement: think of it as a rigorous second pair of eyes, not a guarantee of success.",
   },
   {
     q: "What funds are already in the library?",
-    a: "The library is growing. We're adding major UK grant-makers during beta — request beta access to see what's available and to suggest funds you'd like added.",
+    a: "The library is growing. We're adding major UK grant-makers during beta. Request beta access to see what's available and to suggest funds you'd like added.",
   },
   {
     q: "Can I add a fund that isn't listed?",
@@ -42,7 +42,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "What does beta access include?",
-    a: "Beta users get full access to all features — unlimited applications, AI reviews, and the community fund library — free of charge. In return, we ask for honest feedback and a genuine interest in helping FunderReady improve. Beta testers are the people who shape what this becomes.",
+    a: "Beta users get full access to all features (unlimited applications, AI reviews, and the community fund library) free of charge. In return, we ask for honest feedback and a genuine interest in helping FunderReady improve. Beta testers are the people who shape what this becomes.",
   },
 ];
 
@@ -143,7 +143,7 @@ export default async function Home() {
       <section className="bg-slate-900 px-6 py-20 text-center md:px-10">
         <p className="mx-auto max-w-2xl text-xl font-semibold leading-relaxed text-slate-50 md:text-2xl">
           &ldquo;What if you could get expert-level feedback on every answer,
-          before you submit &mdash;{" "}
+          before you submit,{" "}
           <span className="text-blue-400">
             scored against what that funder actually cares about?
           </span>
@@ -165,17 +165,17 @@ export default async function Home() {
               {
                 n: "1",
                 title: "Find your fund",
-                body: "Search the community library of funds and criteria sets. If yours isn't listed yet, add it — and help future applicants too.",
+                body: "Search the community library of funds and criteria sets. If yours isn't listed yet, add it, and help future applicants too.",
               },
               {
                 n: "2",
                 title: "Write your answers",
-                body: "Fill in your answers guided by that fund's real criteria. Word limits are built in — no copy-pasting between documents.",
+                body: "Fill in your answers guided by that fund's real criteria. Word limits are built in. No copy-pasting between documents.",
               },
               {
                 n: "3",
                 title: "See exactly where you stand",
-                body: "Get scores per criterion, inline comments on your text, and clear guidance on where to improve — before you submit.",
+                body: "Get scores per criterion, inline comments on your text, and clear guidance on where to improve before you submit.",
               },
             ].map(({ n, title, body }) => (
               <div key={n} className="flex gap-5 py-6">
@@ -208,12 +208,12 @@ export default async function Home() {
               {
                 icon: "🎯",
                 title: "Scored against this funder\u2019s priorities",
-                body: "Every review is calibrated to the criteria of the specific fund you\u2019re applying to \u2014 not generic \u201Cgood writing\u201D advice.",
+                body: "Every review is calibrated to the criteria of the specific fund you\u2019re applying to, not generic \u201Cgood writing\u201D advice.",
               },
               {
                 icon: "🔍",
                 title: "Three-stage review catches more",
-                body: "Three dedicated stages \u2014 per-answer analysis, cross-referencing, and scoring \u2014 catch gaps a single-pass review misses.",
+                body: "Three dedicated stages (per-answer analysis, cross-referencing, and scoring) catch gaps a single-pass review misses.",
               },
               {
                 icon: "🤝",
