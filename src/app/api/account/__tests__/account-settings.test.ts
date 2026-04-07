@@ -115,6 +115,18 @@ describe("PATCH /api/account/profile", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 for malformed JSON body", async () => {
+    authenticatedUser();
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "not-json{",
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+  });
+
   it("returns 200 on success", async () => {
     authenticatedUser();
     const chain = chainMock({ error: null });
