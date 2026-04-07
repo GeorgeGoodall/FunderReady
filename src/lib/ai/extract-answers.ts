@@ -37,7 +37,7 @@ export async function extractAnswersFromDocument(
     prompt: `Questions:\n${questionList}\n\nDocument:\n${documentText}`,
     schema: ExtractAnswersResponseSchema,
     model: MODEL,
-    maxTokens: 4096,
+    maxTokens: 8192,
     temperature: 0,
   });
 

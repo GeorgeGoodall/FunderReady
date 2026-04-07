@@ -138,7 +138,8 @@ export async function POST(
     const extractedAnswers = await extractAnswersFromDocument(documentText, questions);
     return NextResponse.json({ answers: extractedAnswers });
   } catch (err) {
-    console.error("[extract-answers] error:", err);
-    return NextResponse.json({ error: "Failed to extract answers from document" }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[extract-answers] error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
