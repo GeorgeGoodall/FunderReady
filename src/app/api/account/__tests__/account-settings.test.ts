@@ -245,3 +245,94 @@ describe("PATCH /api/account/password", () => {
     expect(res.status).toBe(400);
   });
 });
+
+// =====================================================================
+// PATCH /api/account/email
+// =====================================================================
+
+describe("PATCH /api/account/email", () => {
+  async function importRoute() {
+    const mod = await import("../email/route");
+    return mod.PATCH;
+  }
+
+  it("returns 401 when not authenticated", async () => {
+    unauthenticatedUser();
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/email", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "new@example.com" }),
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 400 for invalid email", async () => {
+    authenticatedUser();
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/email", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "not-an-email" }),
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for missing email", async () => {
+    authenticatedUser();
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/email", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for malformed JSON body", async () => {
+    authenticatedUser();
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/email", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "not-json{",
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 200 and sends verification email on success", async () => {
+    authenticatedUser();
+    mockAuthUpdateUser.mockResolvedValue({ data: {}, error: null });
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/email", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "new@example.com" }),
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.message).toMatch(/verification/i);
+    expect(mockAuthUpdateUser).toHaveBeenCalledWith({ email: "new@example.com" });
+  });
+
+  it("returns 400 when Supabase rejects (e.g. email already in use)", async () => {
+    authenticatedUser();
+    mockAuthUpdateUser.mockResolvedValue({
+      data: null,
+      error: { message: "Email address already registered." },
+    });
+    const PATCH = await importRoute();
+    const req = new Request("http://localhost/api/account/email", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "taken@example.com" }),
+    });
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+  });
+});
