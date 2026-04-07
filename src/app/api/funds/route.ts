@@ -31,16 +31,28 @@ export async function GET(request: Request) {
     return NextResponse.json({ funds: [] });
   }
 
-  // Search funds by name
-  const { data: fundsByName, error: nameError } = await supabase
-    .from("funds")
-    .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at, application_format")
-    .textSearch("name", tsQuery)
-    .eq("approved", true)
-    .eq("shared", true)
-    .eq("rejected", false)
-    .order("created_at", { ascending: false })
-    .limit(10);
+  const fundSelect = "id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at, application_format, created_by";
+
+  // Search funds by name — two passes: community funds + user's own
+  const [{ data: communityByName, error: nameError }, { data: ownByName }] = await Promise.all([
+    supabase
+      .from("funds")
+      .select(fundSelect)
+      .textSearch("name", tsQuery)
+      .eq("approved", true)
+      .eq("shared", true)
+      .eq("rejected", false)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("funds")
+      .select(fundSelect)
+      .textSearch("name", tsQuery)
+      .eq("created_by", user.id)
+      .eq("rejected", false)
+      .order("created_at", { ascending: false })
+      .limit(10),
+  ]);
 
   if (nameError) {
     console.error("Fund search error:", nameError);
@@ -56,28 +68,44 @@ export async function GET(request: Request) {
     .eq("rejected", false)
     .limit(20);
 
-  let fundsByOrg: typeof fundsByName = [];
+  let communityByOrg: NonNullable<typeof communityByName> = [];
+  let ownByOrg: NonNullable<typeof communityByName> = [];
   if (matchingOrgs && matchingOrgs.length > 0) {
     const orgIds = matchingOrgs.map((o) => o.id);
-    const { data: orgFunds } = await supabase
-      .from("funds")
-      .select("id, name, organisation_id, organisations(id, name), url, notes, opens_at, closes_at, created_at, application_format")
-      .in("organisation_id", orgIds)
-      .eq("approved", true)
-      .eq("shared", true)
-      .eq("rejected", false)
-      .order("created_at", { ascending: false })
-      .limit(10);
-    fundsByOrg = orgFunds ?? [];
+    const [{ data: comOrgFunds }, { data: ownOrgFunds }] = await Promise.all([
+      supabase
+        .from("funds")
+        .select(fundSelect)
+        .in("organisation_id", orgIds)
+        .eq("approved", true)
+        .eq("shared", true)
+        .eq("rejected", false)
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("funds")
+        .select(fundSelect)
+        .in("organisation_id", orgIds)
+        .eq("created_by", user.id)
+        .eq("rejected", false)
+        .order("created_at", { ascending: false })
+        .limit(10),
+    ]);
+    communityByOrg = comOrgFunds ?? [];
+    ownByOrg = ownOrgFunds ?? [];
   }
 
-  // Merge + deduplicate by fund id
+  // Merge + deduplicate by fund id, tagging user's own funds
+  // Own funds are added first so is_own is preserved on duplicates
   const seen = new Set<string>();
-  const funds: typeof fundsByName = [];
-  for (const f of [...(fundsByName ?? []), ...fundsByOrg]) {
+  const funds: Array<{ id: string; name: string; organisation_id: string | null; organisations: unknown; url: string | null; notes: string | null; opens_at: string | null; closes_at: string | null; created_at: string; application_format: string; is_own: boolean }> = [];
+  const allOwn = [...(ownByName ?? []), ...ownByOrg];
+  const allCommunity = [...(communityByName ?? []), ...communityByOrg];
+  for (const f of [...allOwn, ...allCommunity]) {
     if (!seen.has(f.id)) {
       seen.add(f.id);
-      funds.push(f);
+      const { created_by, ...rest } = f;
+      funds.push({ ...rest, is_own: created_by === user.id });
     }
   }
   funds.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());

@@ -14,6 +14,7 @@ interface Fund {
   closes_at: string | null;
   created_at: string;
   application_format: "question_form" | "structured_doc" | "unstructured_doc";
+  is_own?: boolean;
 }
 
 interface FundDetectionProps {
@@ -100,6 +101,7 @@ export function FundDetection({
           ...f,
           organisation: f.organisations ?? null,
           application_format: (f.application_format ?? "question_form") as "question_form" | "structured_doc" | "unstructured_doc",
+          is_own: f.is_own ?? false,
         }));
         setSearchResults(funds);
       }
