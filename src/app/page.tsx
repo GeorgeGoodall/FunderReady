@@ -211,9 +211,9 @@ export default async function Home() {
                 body: "Every review is calibrated to the criteria of the specific fund you\u2019re applying to \u2014 not generic \u201Cgood writing\u201D advice.",
               },
               {
-                icon: "📈",
-                title: "Re-review tracks your improvement",
-                body: "Submit a second draft and see exactly how your scores changed. Know whether your rewrites are actually working.",
+                icon: "🔍",
+                title: "Three-stage review catches more",
+                body: "Most AI tools review each answer in isolation. FunderReady runs three dedicated stages — analysing each answer in depth, cross-referencing answers against each other to catch gaps and inconsistencies, then scoring. More stages means less slips through.",
               },
               {
                 icon: "🤝",
