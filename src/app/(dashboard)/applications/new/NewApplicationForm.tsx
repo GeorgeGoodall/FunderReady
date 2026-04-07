@@ -421,7 +421,7 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
             What you&apos;ll need
           </h2>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Many funds are already set up in FunderReady. You may only need the fund name — criteria and questions are often pre-loaded.
+            Many funds are already set up in FunderReady. You may only need the fund name — criteria and application content are often pre-loaded.
           </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             {[
@@ -440,11 +440,11 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
                   "The guidance document — look for a scoring rubric, assessment criteria, or a list of what the fund prioritises.",
               },
               {
-                title: "Questions",
+                title: "Questions / Sections",
                 badge: "if not pre-loaded",
-                what: "The specific questions on the application form.",
+                what: "The questions, section prompts, or structure of the written response (depending on the fund's format).",
                 where:
-                  "The application form itself — usually a Word doc or PDF download from the fund's website.",
+                  "The application form or guidance document — usually a Word doc or PDF download from the fund's website.",
               },
             ].map(({ title: cardTitle, badge, what, where }) => (
               <div
@@ -649,13 +649,13 @@ export function NewApplicationForm({ tier, usage, isAdmin, fundId }: NewApplicat
       {step === "questions" && (
         <div className="space-y-6">
           <p className="rounded-lg border border-zinc-100 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-            Paste the application questions from the fund&apos;s form — the AI will extract them. You can also enter them manually.
+            Paste the fund&apos;s application {itemLabel.toLowerCase()}s — the AI will extract them. You can also enter them manually.
           </p>
 
           {questionsPreLoaded && questionsSet && !questionsEdited && (
             <div className="rounded-lg border border-green-100 bg-green-50 p-3 dark:border-green-900/30 dark:bg-green-900/10">
               <p className="text-sm text-green-800 dark:text-green-300">
-                Questions pre-loaded from <strong>{selectedFund?.name}</strong>. You can edit below or continue.
+                {itemLabel}s pre-loaded from <strong>{selectedFund?.name}</strong>. You can edit below or continue.
               </p>
             </div>
           )}
