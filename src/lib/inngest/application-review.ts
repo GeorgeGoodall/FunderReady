@@ -606,6 +606,12 @@ export const applicationReviewRequested = inngest.createFunction(
         answerContexts = [];
       } else {
         // Long unstructured doc: run structure assignment to split into sections
+        await step.run("structuring-progress", async () => {
+          await updateAppReviewProgress(reviewId, "structuring", {
+            structuring_started: Date.now(),
+          });
+        });
+
         const { systemPrompt: structSystemPrompt, userPrompt: structUserPrompt } =
           buildStructureAssignmentPrompt(enabledAnswers[0].answer_text, criteria);
         const { result: structure, usage: structUsageData } = await inferWithClaude(

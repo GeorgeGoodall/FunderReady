@@ -31,6 +31,19 @@ export const PIPELINE_STEPS = [
   { key: "scoring", label: "Scoring" },
 ];
 
+export function getPipelineSteps(applicationFormat?: string) {
+  if (applicationFormat === "unstructured_doc") {
+    return [
+      { key: "pending", label: "Queued" },
+      { key: "structuring", label: "Structuring document" },
+      { key: "analysing", label: "Analysing sections" },
+      { key: "cross_referencing", label: "Cross-referencing" },
+      { key: "scoring", label: "Scoring" },
+    ];
+  }
+  return PIPELINE_STEPS;
+}
+
 export const SCORE_ORDER: Record<string, number> = {
   Missing: 0,
   Poor: 1,

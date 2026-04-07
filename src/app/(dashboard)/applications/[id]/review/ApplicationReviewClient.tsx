@@ -163,6 +163,7 @@ export function ApplicationReviewClient({
         <Header application={application} fund={fund} submittedAt={review?.created_at} creditsUsed={review.credits_charged || undefined} />
         <ReviewProgress
           review={review}
+          applicationFormat={applicationFormat}
           cancellingReview={cancellingReview}
           showCancelConfirm={showCancelConfirm}
           onCancel={handleCancelReview}
