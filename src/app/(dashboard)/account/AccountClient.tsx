@@ -68,21 +68,26 @@ function DisplayNameSection({ initialName }: { initialName: string }) {
     setSuccess("");
     setError("");
 
-    const res = await fetch("/api/account/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ display_name: name }),
-    });
+    try {
+      const res = await fetch("/api/account/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: name }),
+      });
 
-    const data = await res.json();
-    setLoading(false);
+      const data = await res.json();
 
-    if (!res.ok) {
-      setError(data.error ?? "Failed to update name");
-      return;
+      if (!res.ok) {
+        setError(data.error ?? "Failed to update name");
+        return;
+      }
+
+      setSuccess("Display name updated.");
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setSuccess("Display name updated.");
   }
 
   return (
@@ -127,22 +132,27 @@ function EmailSection({ currentEmail }: { currentEmail: string }) {
     setSuccess("");
     setError("");
 
-    const res = await fetch("/api/account/email", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
+    try {
+      const res = await fetch("/api/account/email", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
 
-    const data = await res.json();
-    setLoading(false);
+      const data = await res.json();
 
-    if (!res.ok) {
-      setError(data.error ?? "Failed to update email");
-      return;
+      if (!res.ok) {
+        setError(data.error ?? "Failed to update email");
+        return;
+      }
+
+      setSuccess(data.message);
+      setEmail("");
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setSuccess(data.message);
-    setEmail("");
   }
 
   return (
@@ -194,23 +204,28 @@ function PasswordSection() {
 
     setLoading(true);
 
-    const res = await fetch("/api/account/password", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
+    try {
+      const res = await fetch("/api/account/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
 
-    const data = await res.json();
-    setLoading(false);
+      const data = await res.json();
 
-    if (!res.ok) {
-      setError(data.error ?? "Failed to update password");
-      return;
+      if (!res.ok) {
+        setError(data.error ?? "Failed to update password");
+        return;
+      }
+
+      setSuccess("Password updated.");
+      setPassword("");
+      setConfirm("");
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setSuccess("Password updated.");
-    setPassword("");
-    setConfirm("");
   }
 
   return (
@@ -372,7 +387,7 @@ function DeleteAccountSection() {
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder="DELETE"
-            className="block w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 dark:border-zinc-900 dark:border-red-700"
+            className="block w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 dark:border-red-700"
           />
           {error && <ErrorMessage message={error} />}
           <div className="flex gap-3">
