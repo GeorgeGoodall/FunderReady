@@ -56,4 +56,15 @@ describe("requirePro", () => {
     expect(isGuardError(result)).toBe(false);
     if (!isGuardError(result)) expect(result.userId).toBe("user-1");
   });
+
+  it("returns 403 when profile is missing", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    mockFrom.mockReturnValue(
+      chainMock({ data: null, error: null })
+    );
+    const { requirePro, isGuardError } = await importGuard();
+    const result = await requirePro();
+    expect(isGuardError(result)).toBe(true);
+    if (isGuardError(result)) expect(result.status).toBe(403);
+  });
 });

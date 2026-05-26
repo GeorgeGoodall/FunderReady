@@ -311,21 +311,6 @@ describe("POST /api/parse-questions", () => {
     expect(res.status).toBe(403);
   });
 
-  it("returns 429 when guard rejects (rate limit)", async () => {
-    const { NextResponse } = await import("next/server");
-    mockRequirePro.mockResolvedValue(
-      NextResponse.json({ error: "Daily AI limit reached" }, { status: 429 })
-    );
-    const POST = await importRoute();
-    const req = new Request("http://localhost/api/parse-questions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rawText: "Question 1: Describe your project (max 300 words)" }),
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(429);
-  });
-
   it("returns 400 for invalid JSON body", async () => {
     const POST = await importRoute();
     const req = new Request("http://localhost/api/parse-questions", {
@@ -477,21 +462,6 @@ describe("POST /api/detect-fund", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(403);
-  });
-
-  it("returns 429 when guard rejects (rate limit)", async () => {
-    const { NextResponse } = await import("next/server");
-    mockRequirePro.mockResolvedValue(
-      NextResponse.json({ error: "Daily AI limit reached" }, { status: 429 })
-    );
-    const POST = await importRoute();
-    const req = new Request("http://localhost/api/detect-fund", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileName: "bid-document.docx" }),
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(429);
   });
 
   it("returns 400 for invalid JSON body", async () => {

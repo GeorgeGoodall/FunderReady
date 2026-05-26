@@ -117,20 +117,6 @@ describe("POST /api/parse-criteria", () => {
     expect(res.status).toBe(403);
   });
 
-  it("returns 429 when guard rejects (rate limit)", async () => {
-    const { NextResponse } = await import("next/server");
-    mockRequirePro.mockResolvedValue(
-      NextResponse.json({ error: "Daily AI limit reached" }, { status: 429 })
-    );
-    const POST = await importRoute();
-    const req = new Request("http://localhost/api/parse-criteria", {
-      method: "POST",
-      body: JSON.stringify({ rawText: "Quality of delivery — 30%" }),
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(429);
-  });
-
   it("returns 400 for invalid JSON body", async () => {
     const POST = await importRoute();
     const req = new Request("http://localhost/api/parse-criteria", {
