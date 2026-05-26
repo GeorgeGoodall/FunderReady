@@ -4,7 +4,7 @@ import { inngest } from "@/lib/inngest/client";
 import { getUsagePeriod } from "@/lib/usage/period";
 import { estimateReviewCost, estimateReviewCostWithStats } from "@/lib/usage/estimate-review-cost";
 import { getEstimationStats } from "@/lib/usage/estimation-stats";
-import { PLANS } from "@/lib/stripe/plans";
+import { TIER_CREDITS } from "@/lib/usage/credits";
 
 export async function POST(
   request: Request,
@@ -42,35 +42,23 @@ export async function POST(
 
   const serviceClient = createServiceClient();
 
-  // Get profile for tier, status, and billing period
+  // Get profile for tier and billing period
   const { data: profile } = await serviceClient
     .from("profiles")
-    .select("subscription_tier, subscription_status, current_period_end")
+    .select("subscription_tier, current_period_end")
     .eq("id", user.id)
     .single();
 
-  const tier = (profile?.subscription_tier ?? "free") as keyof typeof PLANS;
-
-  const validTiers = Object.keys(PLANS) as Array<keyof typeof PLANS>;
-  if (!validTiers.includes(tier)) {
-    return NextResponse.json({ error: "Invalid subscription tier" }, { status: 403 });
-  }
+  const tier = profile?.subscription_tier ?? "free";
 
   if (tier === "free") {
     return NextResponse.json(
-      { error: "Active subscription required" },
+      { error: "Access restricted" },
       { status: 403 }
     );
   }
 
-  if (profile?.subscription_status !== "active") {
-    return NextResponse.json(
-      { error: "Active subscription required" },
-      { status: 403 }
-    );
-  }
-
-  const defaultLimit = PLANS[tier]?.creditsPerMonth ?? 0;
+  const defaultLimit = TIER_CREDITS[tier] ?? 0;
   const { periodKey: period } = getUsagePeriod(tier, profile?.current_period_end);
 
   // Check there are non-empty, non-disabled answers
