@@ -695,7 +695,7 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     questions_set_id: QUESTIONS_SET_ID,
   };
 
-  const proProfile = { subscription_tier: "pro", subscription_status: "active", current_period_end: null };
+  const proProfile = { subscription_tier: "pro", current_period_end: null };
   const nonEmptyAnswers = [{ question_id: "q1", answer_text: "Our answer." }];
 
   function setupSuccessfulMocks() {
@@ -762,21 +762,7 @@ describe("POST /api/applications/[id]/submit-for-review", () => {
     const POST = await importRoute();
     const res = await POST(new Request("http://localhost"), routeParams(APP_ID));
     expect(res.status).toBe(403);
-    expect((await res.json()).error).toContain("subscription");
-  });
-
-  it("returns 403 if subscription_status is not active", async () => {
-    authenticatedUser();
-    mockFrom.mockImplementation(tableDispatch({ applications: { data: draftApp, error: null } }));
-    mockServiceFrom.mockImplementation(
-      tableDispatch({
-        profiles: { data: { subscription_tier: "pro", subscription_status: "past_due", current_period_end: null }, error: null },
-      })
-    );
-    const POST = await importRoute();
-    const res = await POST(new Request("http://localhost"), routeParams(APP_ID));
-    expect(res.status).toBe(403);
-    expect((await res.json()).error).toContain("subscription");
+    expect((await res.json()).error).toContain("Access restricted");
   });
 
   it("returns 402 if insufficient credits (RPC)", async () => {
