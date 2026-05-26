@@ -105,11 +105,11 @@ export default async function AdminBetaPage() {
           <p className="mt-1 text-2xl font-bold">{totalBeta}</p>
         </div>
         <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Pro access granted</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Access granted</p>
           <p className="mt-1 text-2xl font-bold">{totalPro}</p>
           {needsPro.length > 0 && (
             <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
-              {needsPro.length} still on free
+              {needsPro.length} pending access
             </p>
           )}
         </div>
@@ -130,7 +130,7 @@ export default async function AdminBetaPage() {
               <tr>
                 <th className="px-4 py-2 font-medium">User</th>
                 <th className="px-4 py-2 font-medium">Signed up</th>
-                <th className="px-4 py-2 font-medium">Plan</th>
+                <th className="px-4 py-2 font-medium">Access</th>
                 <th className="px-4 py-2 font-medium">Apps</th>
                 <th className="px-4 py-2 font-medium">Reviews</th>
                 <th className="px-4 py-2 font-medium">Actions</th>
@@ -158,7 +158,7 @@ export default async function AdminBetaPage() {
                           : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
                       }`}
                     >
-                      {p.subscription_tier}
+                      {p.subscription_tier === "pro" ? "Granted" : "Pending"}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
