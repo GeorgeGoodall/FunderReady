@@ -37,11 +37,11 @@ vi.mock("@/lib/ai/parse-criteria", () => ({
   parseCriteriaWithAI: (...args: unknown[]) => mockParseCriteriaWithAI(...args),
 }));
 
-// Mock requireProWithRateLimit guard
-const mockRequireProWithRateLimit = vi.fn();
-vi.mock("@/lib/usage/require-pro-with-rate-limit", () => ({
-  requireProWithRateLimit: (...args: unknown[]) =>
-    mockRequireProWithRateLimit(...args),
+// Mock requirePro guard
+const mockRequirePro = vi.fn();
+vi.mock("@/lib/usage/require-pro", () => ({
+  requirePro: (...args: unknown[]) =>
+    mockRequirePro(...args),
   isGuardError: (result: unknown) => result instanceof NextResponse,
 }));
 
@@ -86,12 +86,12 @@ describe("POST /api/parse-criteria", () => {
 
   beforeEach(() => {
     // Default: guard passes (authenticated pro user)
-    mockRequireProWithRateLimit.mockResolvedValue({ userId: "user-123" });
+    mockRequirePro.mockResolvedValue({ userId: "user-123" });
   });
 
   it("returns 401 when guard rejects (unauthenticated)", async () => {
     const { NextResponse } = await import("next/server");
-    mockRequireProWithRateLimit.mockResolvedValue(
+    mockRequirePro.mockResolvedValue(
       NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     );
     const POST = await importRoute();
@@ -105,7 +105,7 @@ describe("POST /api/parse-criteria", () => {
 
   it("returns 403 when guard rejects (free tier)", async () => {
     const { NextResponse } = await import("next/server");
-    mockRequireProWithRateLimit.mockResolvedValue(
+    mockRequirePro.mockResolvedValue(
       NextResponse.json({ error: "Pro subscription required" }, { status: 403 })
     );
     const POST = await importRoute();
@@ -119,7 +119,7 @@ describe("POST /api/parse-criteria", () => {
 
   it("returns 429 when guard rejects (rate limit)", async () => {
     const { NextResponse } = await import("next/server");
-    mockRequireProWithRateLimit.mockResolvedValue(
+    mockRequirePro.mockResolvedValue(
       NextResponse.json({ error: "Daily AI limit reached" }, { status: 429 })
     );
     const POST = await importRoute();

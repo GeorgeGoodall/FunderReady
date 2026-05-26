@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { ParseCriteriaRequestSchema } from "@/lib/schemas/criteria";
 import { parseQuestionsWithAI } from "@/lib/ai/parse-questions";
-import { requireProWithRateLimit, isGuardError } from "@/lib/usage/require-pro-with-rate-limit";
+import { requirePro, isGuardError } from "@/lib/usage/require-pro";
 
 export async function POST(request: Request) {
-  const guard = await requireProWithRateLimit();
+  const guard = await requirePro();
   if (isGuardError(guard)) return guard;
 
   let body: unknown;

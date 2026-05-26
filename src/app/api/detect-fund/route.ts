@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { detectFundName } from "@/lib/ai/detect-fund";
 import { z } from "zod";
-import { requireProWithRateLimit, isGuardError } from "@/lib/usage/require-pro-with-rate-limit";
+import { requirePro, isGuardError } from "@/lib/usage/require-pro";
 
 const DetectFundRequestSchema = z.object({
   fileName: z.string().min(1),
@@ -10,7 +10,7 @@ const DetectFundRequestSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const guard = await requireProWithRateLimit();
+  const guard = await requirePro();
   if (isGuardError(guard)) return guard;
 
   let body: unknown;
