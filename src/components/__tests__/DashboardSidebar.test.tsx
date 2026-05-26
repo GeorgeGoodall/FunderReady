@@ -15,7 +15,7 @@ describe("DashboardSidebar", () => {
     render(<DashboardSidebar isAdmin={false} isOpen={false} onClose={() => {}} />);
     expect(screen.getByText("Applications")).toBeInTheDocument();
     expect(screen.getByText("Funds")).toBeInTheDocument();
-    expect(screen.getByText("Billing")).toBeInTheDocument();
+    expect(screen.getByText("Usage")).toBeInTheDocument();
   });
 
   it("shows Admin link when isAdmin is true", () => {
