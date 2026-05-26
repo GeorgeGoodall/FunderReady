@@ -73,7 +73,6 @@ export async function GET(
       credits: {
         remaining: usage.remaining,
         period: Math.max(0, usage.limit - usage.used),
-        purchased: usage.purchased,
       },
       canAfford: usage.remaining >= statsEstimate.low,
     });
@@ -85,7 +84,6 @@ export async function GET(
     credits: {
       remaining: usage.remaining,
       period: Math.max(0, usage.limit - usage.used),
-      purchased: usage.purchased,
     },
     canAfford: usage.remaining > 0,
   });

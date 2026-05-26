@@ -81,7 +81,6 @@ describe("GET /api/usage", () => {
       data: {
         subscription_tier: "pro",
         current_period_end: null,
-        purchased_credits: 5,
       },
       error: null,
     });
@@ -112,7 +111,6 @@ describe("GET /api/usage", () => {
       used: expect.any(Number),
       limit: expect.any(Number),
       bonus: expect.any(Number),
-      purchased: expect.any(Number),
       remaining: expect.any(Number),
       period: expect.any(String),
     });
@@ -120,10 +118,9 @@ describe("GET /api/usage", () => {
     expect(body.used).toBe(3);
     expect(body.limit).toBe(100);
     expect(body.bonus).toBe(2);
-    expect(body.purchased).toBe(5);
-    // remaining = max(0, credits_limit + bonus_reviews - credits_used) + purchased
-    //           = max(0, 100 + 2 - 3) + 5 = 99 + 5 = 104
-    expect(body.remaining).toBe(104);
+    // remaining = max(0, credits_limit + bonus_reviews - credits_used)
+    //           = max(0, 100 + 2 - 3) = 99
+    expect(body.remaining).toBe(99);
     expect(body.allowed).toBe(true);
   });
 });

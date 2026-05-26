@@ -128,9 +128,7 @@ export default async function BillingPage() {
               Resets {resetDate}
             </span>
           </div>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            {Math.max(0, usage.limit - usage.used)} monthly + {usage.purchased} purchased credits
-          </p>
+
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
             <div
               className="h-full rounded-full bg-blue-600 transition-all"
