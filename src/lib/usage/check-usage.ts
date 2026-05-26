@@ -1,18 +1,12 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { getUsagePeriod } from "./period";
-
-const TIER_LIMITS: Record<string, number> = {
-  free: 0,
-  basic: 30,
-  pro: 100,
-};
+import { TIER_CREDITS } from "./credits";
 
 export interface UsageResult {
   allowed: boolean;
   used: number;
   limit: number;
   bonus: number;
-  purchased: number;
   remaining: number;
   period: string;
   resetDate: Date;
@@ -24,13 +18,12 @@ export async function checkUsage(
 ): Promise<UsageResult> {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("subscription_tier, current_period_end, purchased_credits")
+    .select("subscription_tier, current_period_end")
     .eq("id", userId)
     .single();
 
   const tier = profile?.subscription_tier ?? "free";
-  const limit = TIER_LIMITS[tier] ?? TIER_LIMITS.free;
-  const purchased = profile?.purchased_credits ?? 0;
+  const limit = TIER_CREDITS[tier] ?? TIER_CREDITS.free;
   const { periodKey: period, resetDate } = getUsagePeriod(tier, profile?.current_period_end);
 
   const { data: usage } = await supabase
@@ -42,12 +35,11 @@ export async function checkUsage(
 
   if (!usage) {
     return {
-      allowed: limit + purchased > 0,
+      allowed: limit > 0,
       used: 0,
       limit,
       bonus: 0,
-      purchased,
-      remaining: limit + purchased,
+      remaining: limit,
       period,
       resetDate,
     };
@@ -55,14 +47,13 @@ export async function checkUsage(
 
   const effectiveLimit = (usage.credits_limit ?? limit) + (usage.bonus_reviews ?? 0);
   const periodRemaining = Math.max(0, effectiveLimit - (usage.credits_used ?? 0));
-  const remaining = periodRemaining + purchased;
+  const remaining = periodRemaining;
 
   return {
     allowed: remaining > 0,
     used: usage.credits_used ?? 0,
     limit: usage.credits_limit ?? limit,
     bonus: usage.bonus_reviews ?? 0,
-    purchased,
     remaining,
     period,
     resetDate,

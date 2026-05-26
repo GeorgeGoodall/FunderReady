@@ -8,7 +8,7 @@
  * 2. estimateReviewCost() — hardcoded fallback with wider 0.8x-1.3x range.
  */
 
-import { COST_PER_CREDIT_USD } from "@/lib/stripe/plans";
+import { COST_PER_CREDIT_USD } from "./credits";
 import type { EstimationStats } from "./estimation-stats";
 
 // Fallback constants (used when no historical data)

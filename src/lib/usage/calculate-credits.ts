@@ -1,4 +1,4 @@
-import { COST_PER_CREDIT_USD } from "@/lib/stripe/plans";
+import { COST_PER_CREDIT_USD } from "./credits";
 
 /**
  * Converts a USD cost into credits. Always rounds up so the user is never
