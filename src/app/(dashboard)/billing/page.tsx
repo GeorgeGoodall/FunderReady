@@ -37,7 +37,7 @@ export default async function UsagePage() {
       )
     `)
     .eq("applications.user_id", user.id)
-    .eq("status", "completed")
+    .eq("status", "completed") // credits only charged on completed reviews
     .order("created_at", { ascending: false });
 
   type ReviewRow = {
@@ -56,7 +56,7 @@ export default async function UsagePage() {
     };
   };
 
-  const reviews = (reviewRows ?? []) as unknown as ReviewRow[];
+  const reviews = (reviewRows ?? []) as ReviewRow[];
 
   return (
     <div className="space-y-6">
@@ -92,6 +92,11 @@ export default async function UsagePage() {
                 {usage.bonus > 0 && ` · ${usage.bonus} bonus credits`}
               </p>
             </>
+          )}
+          {usage.limit === 0 && usage.bonus === 0 && (
+            <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+              No credits have been allocated to your account yet.
+            </p>
           )}
         </div>
         <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
