@@ -1,10 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { checkUsage } from "@/lib/usage/check-usage";
-import { PLANS } from "@/lib/stripe/plans";
-import { BillingClient } from "./BillingClient";
 
-export default async function BillingPage() {
+export default async function UsagePage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -12,16 +10,7 @@ export default async function BillingPage() {
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("subscription_tier, subscription_status")
-    .eq("id", user.id)
-    .single();
-
-  const tier = (profile?.subscription_tier ?? "free") as "free" | "basic" | "pro";
-  const status = profile?.subscription_status as string | null;
   const usage = await checkUsage(supabase, user.id);
-  const plan = PLANS[tier];
 
   const resetDate = usage.resetDate.toLocaleDateString("en-GB", {
     day: "numeric",
@@ -29,7 +18,7 @@ export default async function BillingPage() {
     year: "numeric",
   });
 
-  // Fetch review history for credit usage table
+  // Fetch review history
   const { data: reviewRows } = await supabase
     .from("application_reviews")
     .select(`
@@ -72,95 +61,64 @@ export default async function BillingPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Billing</h1>
+        <h1 className="text-2xl font-bold">Usage</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Manage your subscription and usage
+          Your credit balance and review history.
         </p>
       </div>
 
-      {/* Current Plan */}
+      {/* Credit balance */}
       <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Current plan</h2>
-            <div className="mt-1 flex items-center gap-2">
-              <span className="text-2xl font-bold">{plan.name}</span>
-              <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium capitalize dark:bg-zinc-800">
-                {tier}
-              </span>
-              {status === "past_due" && (
-                <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                  Payment issue
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              {tier === "pro" ? "£49/month" : tier === "basic" ? "£19/month" : "No active plan"}
-            </p>
-          </div>
-        </div>
-
-        {/* Features */}
-        <ul className="mt-4 space-y-1">
-          {plan.features.map((feature) => (
-            <li
-              key={feature}
-              className="text-sm text-zinc-600 dark:text-zinc-400"
-            >
-              ✓ {feature}
-            </li>
-          ))}
-          {plan.creditsPerMonth > 0 && (
-            <li className="text-sm text-zinc-600 dark:text-zinc-400">
-              ✓ {plan.creditsPerMonth} credits/month
-            </li>
-          )}
-        </ul>
-      </div>
-
-      {/* Usage */}
-      <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="text-lg font-semibold">Credits</h2>
+        <h2 className="text-lg font-semibold">Credits remaining</h2>
         <div className="mt-3">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-2xl font-bold">{usage.remaining}</span>
+            <span className="text-3xl font-bold">{usage.remaining}</span>
             <span className="text-zinc-500 dark:text-zinc-400">
               Resets {resetDate}
             </span>
           </div>
-
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-            <div
-              className="h-full rounded-full bg-blue-600 transition-all"
-              style={{
-                width: `${usage.limit > 0 ? Math.min(100, (usage.used / usage.limit) * 100) : 0}%`,
-              }}
-            />
-          </div>
-          <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-            {usage.used} of {usage.limit} monthly credits used
-          </p>
+          {usage.limit > 0 && (
+            <>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                <div
+                  className="h-full rounded-full bg-blue-600 transition-all"
+                  style={{
+                    width: `${Math.min(100, (usage.used / usage.limit) * 100)}%`,
+                  }}
+                />
+              </div>
+              <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+                {usage.used} of {usage.limit} monthly credits used
+                {usage.bonus > 0 && ` · ${usage.bonus} bonus credits`}
+              </p>
+            </>
+          )}
         </div>
+        <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
+          Need more credits? Contact the site owner.
+        </p>
       </div>
 
       {/* Review history */}
       <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
-          <h2 className="text-lg font-semibold">Credit usage</h2>
+        <div className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+          <h2 className="text-lg font-semibold">Review history</h2>
         </div>
         {reviews.length === 0 ? (
-          <p className="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400">No reviews submitted yet.</p>
+          <p className="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400">
+            No reviews submitted yet.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs text-zinc-500 dark:text-zinc-400">
+                <tr className="border-b border-zinc-200 text-left text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
                   <th className="px-6 py-3 font-medium">Date</th>
                   <th className="px-6 py-3 font-medium">Fund</th>
                   <th className="px-6 py-3 font-medium">Organisation</th>
                   <th className="px-6 py-3 font-medium">Application</th>
                   <th className="px-6 py-3 font-medium">Review #</th>
-                  <th className="px-6 py-3 font-medium text-right">Credits</th>
+                  <th className="px-6 py-3 font-medium text-right">Credits used</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -170,7 +128,7 @@ export default async function BillingPage() {
                   const org = fund?.organisations;
                   return (
                     <tr key={r.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                      <td className="px-6 py-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
+                      <td className="whitespace-nowrap px-6 py-3 text-zinc-600 dark:text-zinc-400">
                         {new Date(r.created_at).toLocaleDateString("en-GB", {
                           day: "numeric",
                           month: "short",
@@ -205,9 +163,6 @@ export default async function BillingPage() {
           </div>
         )}
       </div>
-
-      {/* Actions */}
-      <BillingClient tier={tier} />
     </div>
   );
 }

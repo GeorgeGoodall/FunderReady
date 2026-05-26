@@ -32,7 +32,7 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    label: "Billing",
+    label: "Usage",
     href: "/billing",
     matchPrefixes: ["/billing"],
     icon: (
