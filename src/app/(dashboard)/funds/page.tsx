@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { FundsBrowser } from "./FundsBrowser";
 
 export default async function FundsPage() {
@@ -24,13 +23,10 @@ export default async function FundsPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
           </svg>
         </div>
-        <h2 className="text-lg font-semibold">Pro Feature</h2>
+        <h2 className="text-lg font-semibold">Access Required</h2>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Browse and create funds with a Pro subscription.
+          Contact the site owner to request access to the Funds feature.
         </p>
-        <Link href="/billing" className="mt-4 inline-block rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700">
-          Upgrade to Pro
-        </Link>
       </div>
     );
   }
