@@ -12,15 +12,15 @@ import { z } from "zod";
 function htmlToStructuredText(html: string): string {
   return html
     // Headings → markdown heading markers
-    .replace(/<h1[^>]*>(.*?)<\/h1>/gis, "\n# $1\n")
-    .replace(/<h2[^>]*>(.*?)<\/h2>/gis, "\n## $1\n")
-    .replace(/<h3[^>]*>(.*?)<\/h3>/gis, "\n### $1\n")
-    .replace(/<h4[^>]*>(.*?)<\/h4>/gis, "\n#### $1\n")
-    .replace(/<h5[^>]*>(.*?)<\/h5>/gis, "\n##### $1\n")
-    .replace(/<h6[^>]*>(.*?)<\/h6>/gis, "\n###### $1\n")
+    .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "\n# $1\n")
+    .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n")
+    .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, "\n### $1\n")
+    .replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, "\n#### $1\n")
+    .replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, "\n##### $1\n")
+    .replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, "\n###### $1\n")
     // Table rows → pipe-separated lines (basic, good enough for extraction)
-    .replace(/<tr[^>]*>(.*?)<\/tr>/gis, (_, cells) => {
-      const cols = [...cells.matchAll(/<t[dh][^>]*>(.*?)<\/t[dh]>/gis)]
+    .replace(/<tr[^>]*>([\s\S]*?)<\/tr>/gi, (_, cells) => {
+      const cols = [...cells.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)]
         .map((m) => m[1].replace(/<[^>]+>/g, "").trim());
       return cols.join(" | ") + "\n";
     })

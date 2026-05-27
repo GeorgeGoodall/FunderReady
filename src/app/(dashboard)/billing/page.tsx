@@ -51,9 +51,9 @@ export default async function UsagePage() {
       funds: {
         id: string;
         name: string;
-        organisations: { id: string; name: string } | null;
-      } | null;
-    };
+        organisations: { id: string; name: string }[];
+      }[];
+    }[];
   };
 
   const reviews = (reviewRows ?? []) as ReviewRow[];
@@ -128,9 +128,9 @@ export default async function UsagePage() {
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                 {reviews.map((r) => {
-                  const app = r.applications;
-                  const fund = app?.funds;
-                  const org = fund?.organisations;
+                  const app = r.applications[0];
+                  const fund = app?.funds?.[0];
+                  const org = fund?.organisations?.[0];
                   return (
                     <tr key={r.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                       <td className="whitespace-nowrap px-6 py-3 text-zinc-600 dark:text-zinc-400">

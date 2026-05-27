@@ -23,7 +23,7 @@
     "@supabase/supabase-js": "^2.97.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
-    "chrono-node": "^2.9.0",
+    "chrono-node": "^2.9.1",
     "docx": "^9.5.3",
     "inngest": "^3.52.3",
     "mammoth": "^1.11.0",
